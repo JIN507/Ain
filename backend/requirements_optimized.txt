@@ -1,0 +1,50 @@
+# Optimized News Aggregation System Requirements
+
+# Core Web Framework
+Flask==3.0.0
+flask-cors==4.0.0
+
+# RSS Parsing
+feedparser==6.0.10
+
+# HTTP Clients
+requests==2.31.0
+urllib3==2.1.0
+certifi==2023.11.17
+
+# Async HTTP (for concurrent fetching)
+aiohttp==3.9.1
+httpx==0.25.2  # Alternative async HTTP client
+
+# HTML/XML Parsing
+beautifulsoup4==4.12.2
+lxml==4.9.3
+
+# Database
+sqlalchemy==2.0.23
+
+# Language Detection & Translation
+langdetect==1.0.9
+googletrans==4.0.0-rc1
+# For production, consider:
+# google-cloud-translate==3.12.1  # Official Google Translate API
+# deepl==1.16.1  # DeepL API (faster, more accurate)
+
+# Utilities
+python-dotenv==1.0.0
+openpyxl==3.1.2
+python-dateutil==2.8.2  # For date parsing
+
+# Optional: For advanced caching
+# redis==5.0.1  # Redis client for production caching
+# hiredis==2.2.3  # C parser for Redis (faster)
+
+# Optional: For background task queues
+# celery==5.3.4  # Distributed task queue
+# rq==1.15.1  # Simple Redis Queue
+
+# Optional: For monitoring
+# prometheus-client==0.19.0  # Prometheus metrics
+# psutil==5.9.6  # System monitoring
+
+# All dependencies pinned for reproducibility

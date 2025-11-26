@@ -1,0 +1,28 @@
+Flask==3.0.0
+flask-cors==4.0.0
+feedparser==6.0.10
+requests==2.31.0
+urllib3==2.1.0
+certifi==2023.11.17
+aiohttp==3.9.1
+beautifulsoup4==4.12.2
+lxml==4.9.3
+python-dotenv==1.0.0
+sqlalchemy==2.0.23
+langdetect==1.0.9
+openpyxl==3.1.2
+googletrans==4.0.0-rc1
+python-dateutil==2.8.2
+
+# Auth & security
+bcrypt==4.0.1
+PyJWT[crypto]==2.8.0
+itsdangerous==2.1.2
+email-validator==2.1.0.post1
+
+# Sessions & CSRF
+Flask-Login==0.6.3
+Flask-WTF==1.2.1
+
+# All dependencies pinned for reproducibility
+# Note: OpenAI removed - using Google Translate instead

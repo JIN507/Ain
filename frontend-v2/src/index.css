@@ -1,0 +1,81 @@
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root {
+  height: 100%;
+}
+
+html[dir="rtl"] * {
+  direction: rtl;
+}
+
+body {
+  font-family: "Cairo", ui-sans-serif, system-ui;
+  background: transparent;
+}
+
+@layer components {
+  .badge {
+    @apply inline-flex items-center rounded-lg px-2 py-0.5 text-xs font-semibold;
+  }
+  
+  .badge-positive {
+    @apply bg-green-100 text-green-800 border border-green-200;
+  }
+  
+  .badge-negative {
+    @apply bg-red-100 text-red-800 border border-red-200;
+  }
+  
+  .badge-neutral {
+    @apply bg-gray-100 text-gray-800 border border-gray-200;
+  }
+  
+  .card {
+    @apply bg-white/80 backdrop-blur-sm border border-emerald-200 rounded-xl shadow-lg;
+  }
+  
+  .btn {
+    @apply inline-flex items-center gap-2 rounded-lg px-4 py-2 text-white bg-emerald-600 hover:bg-emerald-700 transition-all duration-200 shadow-lg;
+  }
+  
+  .btn-outline {
+    @apply inline-flex items-center gap-2 rounded-lg px-4 py-2 text-emerald-700 bg-white border-2 border-emerald-600 hover:bg-emerald-50 transition-all duration-200;
+  }
+  
+  .input {
+    @apply w-full rounded-lg border border-emerald-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition;
+  }
+  
+  .sidebar-link {
+    @apply block px-3 py-2 rounded-lg text-slate-700 hover:bg-emerald-100 hover:text-emerald-700 transition;
+  }
+  
+  .sidebar-link.active {
+    @apply bg-emerald-100 text-emerald-700 font-semibold;
+  }
+}
+
+/* Skeleton shimmer animation */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    #f3f4f6 0px,
+    #e5e7eb 40px,
+    #f3f4f6 80px
+  );
+  background-size: 1000px;
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}

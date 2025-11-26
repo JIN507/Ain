@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { apiFetch } from '../apiClient'
 
 export default function Login({ onLogin }) {
   const [mode, setMode] = useState('login') // 'login' or 'signup'
@@ -21,7 +22,7 @@ export default function Login({ onLogin }) {
 
     setLoading(true)
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await apiFetch('/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -58,7 +59,7 @@ export default function Login({ onLogin }) {
 
     setLoading(true)
     try {
-      const res = await fetch('/api/auth/signup', {
+      const res = await apiFetch('/api/auth/signup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

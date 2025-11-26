@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { Search, ChevronDown, ChevronUp, X, AlertCircle } from 'lucide-react'
 import ArticleCard from '../components/ArticleCard'
 import Loader from '../components/Loader'
+import { apiFetch } from '../apiClient'
 
 export default function DirectSearch() {
   // Search parameters
@@ -104,7 +105,7 @@ export default function DirectSearch() {
       }
       
       // Fetch with timeout
-      const response = await fetch(`/api/direct-search?${params}`, {
+      const response = await apiFetch(`/api/direct-search?${params}`, {
         signal: abortControllerRef.current.signal
       })
       

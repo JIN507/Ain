@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Plus, Loader2, Trash2, RefreshCw } from 'lucide-react'
+import { apiFetch } from '../apiClient'
 
 export default function Keywords() {
   const [keywords, setKeywords] = useState([])
@@ -13,7 +14,7 @@ export default function Keywords() {
 
   const loadKeywords = async () => {
     try {
-      const res = await fetch('/api/keywords')
+      const res = await apiFetch('/api/keywords')
       const data = await res.json()
       setKeywords(data)
     } catch (error) {
@@ -26,7 +27,7 @@ export default function Keywords() {
 
     setLoading(true)
     try {
-      const res = await fetch('/api/keywords', {
+      const res = await apiFetch('/api/keywords', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text_ar: newKeyword })
@@ -49,7 +50,7 @@ export default function Keywords() {
     if (!confirm('هل تريد حذف هذه الكلمة المفتاحية؟')) return
 
     try {
-      await fetch(`/api/keywords/${id}`, { method: 'DELETE' })
+      await apiFetch(`/api/keywords/${id}`, { method: 'DELETE' })
       loadKeywords()
     } catch (error) {
       console.error('Error deleting keyword:', error)

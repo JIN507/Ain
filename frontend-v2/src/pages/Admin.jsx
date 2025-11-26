@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { apiFetch } from '../apiClient'
 
 export default function Admin() {
   const [users, setUsers] = useState([])
@@ -11,7 +12,7 @@ export default function Admin() {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch('/api/admin/users')
+      const res = await apiFetch('/api/admin/users')
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error || 'فشل تحميل المستخدمين')
@@ -31,7 +32,7 @@ export default function Admin() {
 
   const handleChangeUser = async (id, changes) => {
     try {
-      const res = await fetch(`/api/admin/users/${id}`, {
+      const res = await apiFetch(`/api/admin/users/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(changes),
@@ -49,7 +50,7 @@ export default function Admin() {
   const handleDeleteUser = async (id) => {
     if (!window.confirm('هل أنت متأكد من حذف هذا المستخدم؟')) return
     try {
-      const res = await fetch(`/api/admin/users/${id}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/admin/users/${id}`, { method: 'DELETE' })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error || 'فشل حذف المستخدم')
@@ -65,7 +66,7 @@ export default function Admin() {
     setCreating(true)
     setError('')
     try {
-      const res = await fetch('/api/admin/users', {
+      const res = await apiFetch('/api/admin/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

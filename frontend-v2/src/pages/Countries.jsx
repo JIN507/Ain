@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Globe, Plus, Edit2, Trash2, CheckCircle, XCircle, Loader2, AlertTriangle, Search, ChevronDown, ChevronUp } from 'lucide-react'
+import { apiFetch } from '../apiClient'
 
 export default function Countries() {
   const [countries, setCountries] = useState([])
@@ -20,7 +21,7 @@ export default function Countries() {
 
   const loadCountries = async () => {
     try {
-      const res = await fetch('/api/countries')
+      const res = await apiFetch('/api/countries')
       const data = await res.json()
       setCountries(data)
     } catch (error) {
@@ -30,7 +31,7 @@ export default function Countries() {
 
   const loadSources = async () => {
     try {
-      const res = await fetch('/api/sources')
+      const res = await apiFetch('/api/sources')
       const data = await res.json()
       setSources(data)
     } catch (error) {
@@ -40,7 +41,7 @@ export default function Countries() {
 
   const toggleCountry = async (id) => {
     try {
-      await fetch(`/api/countries/${id}/toggle`, { method: 'POST' })
+      await apiFetch(`/api/countries/${id}/toggle`, { method: 'POST' })
       loadCountries()
     } catch (error) {
       console.error('Error toggling country:', error)
@@ -49,7 +50,7 @@ export default function Countries() {
 
   const toggleSource = async (id) => {
     try {
-      await fetch(`/api/sources/${id}/toggle`, { method: 'POST' })
+      await apiFetch(`/api/sources/${id}/toggle`, { method: 'POST' })
       loadSources()
     } catch (error) {
       console.error('Error toggling source:', error)
@@ -60,7 +61,7 @@ export default function Countries() {
     setTestingSource(sourceId)
     try {
       // Use the existing diagnose endpoint by fetching all and finding our source
-      const res = await fetch('/api/feeds/diagnose')
+      const res = await apiFetch('/api/feeds/diagnose')
       const data = await res.json()
       
       if (data.success && data.feeds) {
@@ -88,7 +89,7 @@ export default function Countries() {
 
   const addSource = async (sourceData) => {
     try {
-      const res = await fetch('/api/sources', {
+      const res = await apiFetch('/api/sources', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(sourceData)
@@ -112,7 +113,7 @@ export default function Countries() {
     if (!confirm('هل تريد حذف هذا المصدر؟')) return
     
     try {
-      const res = await fetch(`/api/sources/${sourceId}`, {
+      const res = await apiFetch(`/api/sources/${sourceId}`, {
         method: 'DELETE'
       })
       

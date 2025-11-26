@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Newspaper, ChevronDown, Download, Loader2 } from 'lucide-react'
 import ArticleCard from '../components/ArticleCard'
 import Loader from '../components/Loader'
+import { apiFetch } from '../apiClient'
 
 export default function TopHeadlines() {
   const [countries, setCountries] = useState([])
@@ -20,7 +21,7 @@ export default function TopHeadlines() {
   const fetchCountries = async () => {
     try {
       console.log('🔍 Fetching countries from /api/sources/countries...')
-      const response = await fetch('/api/sources/countries')
+      const response = await apiFetch('/api/sources/countries')
       
       if (!response.ok) {
         console.error('❌ Response not OK:', response.status)
@@ -55,7 +56,7 @@ export default function TopHeadlines() {
     setError('')
     
     try {
-      const response = await fetch(
+      const response = await apiFetch(
         `/api/headlines/top?country=${encodeURIComponent(selectedCountry)}&per_source=5&translate=true`
       )
       

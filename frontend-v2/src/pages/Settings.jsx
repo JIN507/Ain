@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Play, Loader2, Check, AlertCircle, Download, Trash2 } from 'lucide-react'
+import { apiFetch } from '../apiClient'
 
 export default function Settings() {
   const [running, setRunning] = useState(false)
@@ -12,7 +13,7 @@ export default function Settings() {
     setResult(null)
 
     try {
-      const res = await fetch('/api/monitor/run', { method: 'POST' })
+      const res = await apiFetch('/api/monitor/run', { method: 'POST' })
       
       if (!res.ok) {
         const error = await res.json()
@@ -38,7 +39,7 @@ export default function Settings() {
     setExportResult(null)
 
     try {
-      const res = await fetch('/api/articles/export-and-reset', { method: 'POST' })
+      const res = await apiFetch('/api/articles/export-and-reset', { method: 'POST' })
       
       if (!res.ok) {
         const error = await res.json()

@@ -11,6 +11,7 @@ import Settings from './pages/Settings'
 import Login from './pages/Login'
 import Admin from './pages/Admin'
 import MyFiles from './pages/MyFiles'
+import { apiFetch } from './apiClient'
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState('dashboard')
@@ -32,7 +33,7 @@ export default function App() {
   useEffect(() => {
     const loadCurrentUser = async () => {
       try {
-        const res = await fetch('/api/auth/me')
+        const res = await apiFetch('/api/auth/me')
         if (res.ok) {
           const data = await res.json()
           setCurrentUser(data)
@@ -51,7 +52,7 @@ export default function App() {
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' })
+      await apiFetch('/api/auth/logout', { method: 'POST' })
     } catch (e) {}
     setCurrentUser(null)
   }

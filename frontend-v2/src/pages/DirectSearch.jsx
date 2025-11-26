@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Search, ChevronDown, ChevronUp, Loader as LoaderIcon } from 'lucide-react'
 import ArticleCard from '../components/ArticleCard'
 import Loader from '../components/Loader'
+import { apiFetch } from '../apiClient'
 
 export default function DirectSearch() {
   // Search state
@@ -78,7 +79,7 @@ export default function DirectSearch() {
         }
       }
       
-      const response = await fetch(`/api/direct-search?${params}`)
+      const response = await apiFetch(`/api/direct-search?${params}`)
       const data = await response.json()
       
       if (!response.ok) {

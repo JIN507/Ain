@@ -4,6 +4,7 @@ import StatsOverview from '../components/StatsOverview'
 import FilterBar from '../components/FilterBar'
 import ArticleCard from '../components/ArticleCard'
 import Loader from '../components/Loader'
+import { apiFetch } from '../apiClient'
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(false)
@@ -29,7 +30,7 @@ export default function Dashboard() {
     setLoading(true)
     try {
       const params = new URLSearchParams(filters)
-      const res = await fetch(`/api/articles?${params}`)
+      const res = await apiFetch(`/api/articles?${params}`)
       const data = await res.json()
       setArticles(data)
     } catch (error) {
@@ -41,7 +42,7 @@ export default function Dashboard() {
 
   const loadStats = async () => {
     try {
-      const res = await fetch('/api/articles/stats')
+      const res = await apiFetch('/api/articles/stats')
       const data = await res.json()
       setStats(data)
     } catch (error) {
@@ -53,7 +54,7 @@ export default function Dashboard() {
     // SINGLE SOURCE OF TRUTH: /api/articles/countries endpoint only
     // No fallback to avoid conflicts
     try {
-      const res = await fetch('/api/articles/countries')
+      const res = await apiFetch('/api/articles/countries')
       if (res.ok) {
         const data = await res.json()
         setCountries(data)
@@ -82,7 +83,7 @@ export default function Dashboard() {
 
   const loadKeywords = async () => {
     try {
-      const res = await fetch('/api/keywords')
+      const res = await apiFetch('/api/keywords')
       const data = await res.json()
       setKeywords(data)
     } catch (error) {
@@ -612,7 +613,7 @@ export default function Dashboard() {
       
       // Record export event for current user (export history)
       try {
-        await fetch('/api/exports', {
+        await apiFetch('/api/exports', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'

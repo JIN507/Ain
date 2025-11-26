@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { apiFetch } from '../apiClient'
 
 export default function MyFiles() {
   const [exportsList, setExportsList] = useState([])
@@ -9,7 +10,7 @@ export default function MyFiles() {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch('/api/exports')
+      const res = await apiFetch('/api/exports')
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error || 'فشل تحميل السجلات')

@@ -48,7 +48,15 @@ if os.environ.get('SESSION_COOKIE_SECURE', 'false').lower() == 'true':
 login_manager = LoginManager(app)
 csrf = CSRFProtect(app)
 
-CORS(app)
+frontend_origin = os.environ.get('FRONTEND_ORIGIN')
+if frontend_origin:
+    # Running with a separate frontend origin (e.g. Render Static Site)
+    app.config['SESSION_COOKIE_SAMESITE'] = 'None'
+    app.config['SESSION_COOKIE_SECURE'] = True
+    CORS(app, supports_credentials=True, origins=[frontend_origin])
+else:
+    # Local development or fallback (same-origin or dev server proxy)
+    CORS(app, supports_credentials=True)
 
 # Initialize database on startup
 init_db()

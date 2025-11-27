@@ -5,7 +5,10 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 
 export function apiFetch(path, options = {}) {
   const url = `${API_BASE}${path}`;
-  return fetch(url, options);
+  const defaultOptions = {
+    credentials: 'include',
+  };
+  return fetch(url, { ...defaultOptions, ...options });
 }
 
 export function getApiBase() {

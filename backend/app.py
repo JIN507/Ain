@@ -2147,5 +2147,8 @@ if __name__ == '__main__':
     print("ℹ️  Sentiment Analysis: Disabled (future update)")
     
     print("\n")
+    # Bind to Render's PORT if available; fall back to 5555 for local dev.
+    import os
+    port = int(os.environ.get("PORT", 5555))
     # Disable reloader to prevent interruptions during monitoring
-    app.run(debug=True, use_reloader=False, host='0.0.0.0', port=5555)
+    app.run(debug=False, use_reloader=False, host='0.0.0.0', port=port)

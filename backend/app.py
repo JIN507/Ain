@@ -28,7 +28,7 @@ from functools import wraps
 import json
 import os
 
-app = Flask(__name__, static_folder='../frontend', static_url_path='')
+app = Flask(__name__, static_folder='static', static_url_path='')
 
 # Ensure JSON responses use UTF-8 and do not escape Arabic characters
 app.config['JSON_AS_ASCII'] = False
@@ -48,18 +48,17 @@ if os.environ.get('SESSION_COOKIE_SECURE', 'false').lower() == 'true':
 login_manager = LoginManager(app)
 csrf = CSRFProtect(app)
 
-frontend_origin = os.environ.get('FRONTEND_ORIGIN')
-if frontend_origin:
-    # Running with a separate frontend origin (e.g. Render Static Site)
-    app.config['SESSION_COOKIE_SAMESITE'] = 'None'
-    app.config['SESSION_COOKIE_SECURE'] = True
-    CORS(app, supports_credentials=True, origins=[frontend_origin])
-else:
-    # Local development or fallback (same-origin or dev server proxy)
-    CORS(app, supports_credentials=True)
+# Single-origin deployment: frontend is served by Flask from backend/static
+# This keeps behavior identical between local dev (with proxy) and Render.
+CORS(app, supports_credentials=True)
 
 # Initialize database on startup
 init_db()
+try:
+    from models import engine as _engine
+    print(f"[DB] Connected to database: {_engine.url}")
+except Exception:
+    pass
 
 # Database session management
 @app.teardown_appcontext
@@ -72,6 +71,10 @@ def admin_required(fn):
     @wraps(fn)
     @login_required
     def wrapper(*args, **kwargs):
+        try:
+            print(f"[AUTH] admin_required check: auth={current_user.is_authenticated}, id={getattr(current_user, 'id', None)}, email={getattr(current_user, 'email', None)}, role={getattr(current_user, 'role', None)}")
+        except Exception:
+            pass
         if getattr(current_user, "role", "USER") != "ADMIN":
             return jsonify({"error": "Forbidden"}), 403
         return fn(*args, **kwargs)
@@ -422,8 +425,8 @@ def load_user(user_id):
 
 @app.route('/')
 def index():
-    """Serve frontend"""
-    return send_from_directory('../frontend', 'index.html')
+    """Serve built frontend from the static folder (backend/static)."""
+    return send_from_directory('static', 'index.html')
 
 @app.route('/api/auth/check', methods=['POST'])
 def check_auth():
@@ -501,6 +504,10 @@ def login():
             return jsonify({"error": "Invalid credentials"}), 401
         login_user(user)
         try:
+            print(f"[AUTH] login success: id={user.id}, email={user.email}, role={user.role}")
+        except Exception:
+            pass
+        try:
             log_action(user_id=user.id, action="login")
         except Exception:
             pass
@@ -530,6 +537,10 @@ def logout():
 
 @app.route('/api/auth/me', methods=['GET'])
 def auth_me():
+    try:
+        print(f"[AUTH] /api/auth/me: auth={current_user.is_authenticated}, id={getattr(current_user, 'id', None)}, email={getattr(current_user, 'email', None)}, role={getattr(current_user, 'role', None)}")
+    except Exception:
+        pass
     if not current_user.is_authenticated:
         return jsonify({"error": "Unauthorized"}), 401
     return jsonify({
@@ -1242,6 +1253,8 @@ def clear_articles():
         db.close()
 
 @app.route('/api/articles/export-and-reset', methods=['POST'])
+@login_required
+@csrf.exempt
 def export_and_reset():
     """
     Export all articles to Excel, then delete all articles and keywords

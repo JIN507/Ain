@@ -22,7 +22,7 @@ def bootstrap_admin():
         if admin:
             admin.is_active = True
             if not admin.password_hash:
-                admin.password_hash = hash_password("0000")
+                admin.password_hash = hash_password("135813581234")
             if admin.role != "ADMIN":
                 admin.role = "ADMIN"
             db.commit()
@@ -30,9 +30,9 @@ def bootstrap_admin():
             return
 
         admin = User(
-            name="elite",
+            name="عبدالله الكلثمي",
             email="elite@local",
-            password_hash=hash_password("0000"),
+            password_hash=hash_password("135813581234"),
             role="ADMIN",
             is_active=True,
         )

@@ -1,11 +1,11 @@
-"""
-Seed database with verified RSS feeds
-"""
+"""Seed database with verified RSS feeds"""
+
+import json
+
 from models import init_db, get_db, Country, Source
 from sqlalchemy.orm import Session
 
-# Verified RSS feeds by country with reliability ratings
-# reliability: "high" = consistently works, "medium" = may have SSL/403, "low" = often empty/unstable
+# Small default seed (kept for reference; main bulk seed is loaded in seed_database)
 VERIFIED_FEEDS = {
     "السعودية": [
         # Saudi feeds can be restrictive; use regional alternatives
@@ -114,9 +114,10 @@ def seed_database():
         
         country_id = 1
         source_count = 0
-        
-        for country_name, feeds in VERIFIED_FEEDS.items(
-            {
+
+        # Use the large JSON seed exported from the local DB. We keep it as raw JSON
+        # so that true/false/null are valid and parsed via json.loads.
+        VERIFIED_FEEDS = json.loads(r'''{
     "السعودية": [
         {
             "name": "عكاظ",
@@ -1430,7 +1431,9 @@ def seed_database():
         }
     ]
 }
-        ):
+''')
+
+        for country_name, feeds in VERIFIED_FEEDS.items():
             # Add country
             country = Country(
                 id=country_id,

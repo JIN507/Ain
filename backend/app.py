@@ -2010,7 +2010,18 @@ def external_headlines():
     # ---------- Core logic (similar to get_top_headlines, no cache) ----------
     db = get_db()
     try:
-        sources = db.query(Source).filter(Source.country_name == country_name).all()
+        # First, resolve the country row by its Arabic name
+        from models import Country as _Country
+        country_row = db.query(_Country).filter(_Country.name_ar == country_name).first()
+
+        if not country_row:
+            return jsonify({
+                "error": f"لا توجد مصادر للدولة: {country_name}",
+                "code": "no_sources"
+            }), 404
+
+        # Then fetch all sources linked to this country_id
+        sources = db.query(Source).filter(Source.country_id == country_row.id).all()
 
         if not sources:
             return jsonify({

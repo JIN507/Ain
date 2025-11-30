@@ -1937,6 +1937,7 @@ def get_top_headlines():
 
 
 @app.route('/api/external/headlines', methods=['POST'])
+@csrf.exempt
 def external_headlines():
     """External API: Get top headlines (أهم العناوين) for a given country.
 

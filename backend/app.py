@@ -2078,6 +2078,47 @@ def external_headlines():
 
                     summary = clean_html_content(summary_raw) if summary_raw else ''
 
+                    # Try to extract an image URL from common RSS fields
+                    image_url = None
+                    try:
+                        # media:content
+                        media_content = getattr(entry, 'media_content', None) or entry.get('media_content')
+                        if media_content and isinstance(media_content, list):
+                            for m in media_content:
+                                if isinstance(m, dict) and m.get('url'):
+                                    image_url = m['url']
+                                    break
+
+                        # media:thumbnail
+                        if not image_url:
+                            media_thumb = getattr(entry, 'media_thumbnail', None) or entry.get('media_thumbnail')
+                            if media_thumb and isinstance(media_thumb, list):
+                                for m in media_thumb:
+                                    if isinstance(m, dict) and m.get('url'):
+                                        image_url = m['url']
+                                        break
+
+                        # enclosure
+                        if not image_url:
+                            enclosures = getattr(entry, 'enclosures', None) or entry.get('enclosures')
+                            if enclosures and isinstance(enclosures, list):
+                                for enc in enclosures:
+                                    if isinstance(enc, dict):
+                                        enc_url = enc.get('url') or enc.get('href')
+                                        enc_type = enc.get('type', '')
+                                    else:
+                                        enc_url = getattr(enc, 'href', None) or getattr(enc, 'url', None)
+                                        enc_type = getattr(enc, 'type', '')
+                                    if enc_url and ('image' in (enc_type or '') or enc_url.lower().endswith((".jpg", ".jpeg", ".png", ".webp"))):
+                                        image_url = enc_url
+                                        break
+
+                        # Fallback: some feeds put image URL in a generic image field
+                        if not image_url:
+                            image_url = entry.get('image') or entry.get('img')
+                    except Exception:
+                        image_url = None
+
                     pub_date = None
                     if hasattr(entry, 'published_parsed') and entry.published_parsed:
                         pub_date = dt.fromtimestamp(mktime(entry.published_parsed)).isoformat()
@@ -2114,6 +2155,7 @@ def external_headlines():
                         'summary_ar': summary_ar,
                         'summary_original': summary,
                         'url': url,
+                        'image_url': image_url,
                         'published_at': pub_date,
                         'sentiment': 'محايد',
                         'keyword_original': ''

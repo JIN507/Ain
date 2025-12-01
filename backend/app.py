@@ -27,6 +27,7 @@ from datetime import datetime
 from functools import wraps
 import json
 import os
+import re
 
 app = Flask(__name__, static_folder='static', static_url_path='')
 
@@ -2116,6 +2117,15 @@ def external_headlines():
                         # Fallback: some feeds put image URL in a generic image field
                         if not image_url:
                             image_url = entry.get('image') or entry.get('img')
+
+                        # Final fallback: try to parse first <img src="..."> from the raw HTML summary
+                        if not image_url and summary_raw:
+                            try:
+                                m = re.search(r'<img[^>]+src=["\\\']([^"\\\']+)["\\\']', summary_raw, re.IGNORECASE)
+                                if m:
+                                    image_url = m.group(1)
+                            except Exception:
+                                pass
                     except Exception:
                         image_url = None
 

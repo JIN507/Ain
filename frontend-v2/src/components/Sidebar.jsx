@@ -75,8 +75,8 @@ export default function Sidebar({ currentPage, setCurrentPage, sidebarOpen, setS
           <div className="p-4 border-t border-emerald-200">
             <div className="bg-emerald-50 rounded-lg p-3 mb-3">
               <p className="text-xs text-emerald-700 font-semibold">طور بواسطة قسم الحلول التقنية</p>
-              <p className="text-sm text-emerald-900">November 2025</p>
-              <p className="text-sm text-red-900">Version 1.0</p>
+              <p className="text-sm text-emerald-900">{new Date().toLocaleDateString('ar-SA', { timeZone: 'Asia/Riyadh', year: 'numeric', month: 'long', day: 'numeric' , hour: '2-digit', minute: '2-digit' })}</p>
+              <p className="text-sm text-red-900">Version 2.0</p>
             </div>
           </div>
         </div>

@@ -328,12 +328,73 @@ export default function TopHeadlines() {
 </html>
       `
 
+      // Open print preview window for user to review
       const printWindow = window.open('', '_blank')
-      printWindow.document.write(printContent)
-      printWindow.document.close()
-      setTimeout(() => {
-        printWindow.print()
-      }, 500)
+      if (printWindow) {
+        printWindow.document.write(printContent)
+        printWindow.document.close()
+        setTimeout(() => {
+          try { printWindow.print() } catch (e) { console.error('Print error:', e) }
+        }, 500)
+      }
+      
+      // Generate PDF using html2pdf and upload to server
+      let iframe = null
+      try {
+        iframe = document.createElement('iframe')
+        iframe.style.cssText = 'position:fixed;top:0;left:0;width:210mm;height:297mm;opacity:0;pointer-events:none;z-index:-1;'
+        document.body.appendChild(iframe)
+        
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document
+        if (!iframeDoc) throw new Error('Cannot access iframe document')
+        
+        iframeDoc.open()
+        iframeDoc.write(printContent)
+        iframeDoc.close()
+        
+        await new Promise(resolve => setTimeout(resolve, 2000))
+        
+        const html2pdf = (await import('html2pdf.js')).default
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+        const filename = `تقرير_أهم_العناوين_${selectedCountry}_${timestamp}.pdf`
+        
+        const pdfBlob = await html2pdf()
+          .set({
+            margin: [10, 10, 10, 10],
+            filename: filename,
+            image: { type: 'jpeg', quality: 0.95 },
+            html2canvas: { 
+              scale: 2, 
+              useCORS: true,
+              logging: false,
+              allowTaint: true,
+              windowWidth: 794,
+              windowHeight: 1123
+            },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+            pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+          })
+          .from(iframeDoc.body)
+          .outputPdf('blob')
+        
+        // Upload PDF to server with user context
+        const formData = new FormData()
+        formData.append('file', pdfBlob, filename)
+        formData.append('filters', JSON.stringify({ country: selectedCountry, type: 'top_headlines' }))
+        formData.append('article_count', totalArticles.toString())
+        formData.append('source_type', 'top_headlines')
+        
+        await apiFetch('/api/exports', {
+          method: 'POST',
+          body: formData,
+        })
+      } catch (e) {
+        console.error('Failed to save export:', e)
+      } finally {
+        if (iframe && iframe.parentNode) {
+          iframe.parentNode.removeChild(iframe)
+        }
+      }
     } catch (error) {
       console.error('Error exporting headlines PDF:', error)
       alert('فشل تصدير PDF')

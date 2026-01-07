@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Menu, X } from 'lucide-react'
 import Sidebar from './components/Sidebar'
@@ -9,15 +9,16 @@ import Countries from './pages/Countries'
 import Keywords from './pages/Keywords'
 import Settings from './pages/Settings'
 import Login from './pages/Login'
+import Register from './pages/Register'
 import Admin from './pages/Admin'
 import MyFiles from './pages/MyFiles'
-import { apiFetch } from './apiClient'
+import { AuthProvider, useAuth } from './context/AuthContext'
 
-export default function App() {
+function AppContent() {
   const [currentPage, setCurrentPage] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [currentUser, setCurrentUser] = useState(null)
-  const [authLoading, setAuthLoading] = useState(true)
+  const [showRegister, setShowRegister] = useState(false)
+  const { currentUser, authLoading, logout, login, register } = useAuth()
 
   const pages = {
     dashboard: <Dashboard />,
@@ -30,33 +31,6 @@ export default function App() {
     admin: <Admin />,
   }
 
-  useEffect(() => {
-    const loadCurrentUser = async () => {
-      try {
-        const res = await apiFetch('/api/auth/me')
-        if (res.ok) {
-          const data = await res.json()
-          setCurrentUser(data)
-        } else {
-          setCurrentUser(null)
-        }
-      } catch (e) {
-        setCurrentUser(null)
-      } finally {
-        setAuthLoading(false)
-      }
-    }
-
-    loadCurrentUser()
-  }, [])
-
-  const handleLogout = async () => {
-    try {
-      await apiFetch('/api/auth/logout', { method: 'POST' })
-    } catch (e) {}
-    setCurrentUser(null)
-  }
-
   if (authLoading) {
     return (
       <div dir="rtl" lang="ar" className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-green-50">
@@ -66,7 +40,20 @@ export default function App() {
   }
 
   if (!currentUser) {
-    return <Login onLogin={setCurrentUser} />
+    if (showRegister) {
+      return (
+        <Register
+          onRegister={register}
+          onSwitchToLogin={() => setShowRegister(false)}
+        />
+      )
+    }
+    return (
+      <Login
+        onLogin={login}
+        onSwitchToRegister={() => setShowRegister(true)}
+      />
+    )
   }
 
   return (
@@ -104,7 +91,7 @@ export default function App() {
                 </span>
               </div>
               <button
-                onClick={handleLogout}
+                onClick={logout}
                 className="text-xs md:text-sm px-3 py-1 rounded-full bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 transition"
               >
                 تسجيل الخروج
@@ -123,5 +110,13 @@ export default function App() {
         </main>
       </div>
     </div>
+  )
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   )
 }

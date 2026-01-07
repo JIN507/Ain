@@ -7,6 +7,7 @@ export default function Admin() {
   const [error, setError] = useState('')
   const [creating, setCreating] = useState(false)
   const [form, setForm] = useState({ name: '', email: '', role: 'USER', password: '' })
+  const [passwordModal, setPasswordModal] = useState({ open: false, userId: null, userName: '', newPassword: '' })
 
   const loadUsers = async () => {
     setLoading(true)
@@ -55,6 +56,29 @@ export default function Admin() {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error || 'فشل حذف المستخدم')
       }
+      await loadUsers()
+    } catch (e) {
+      setError(e.message || 'خطأ غير متوقع')
+    }
+  }
+
+  const handlePasswordChange = async () => {
+    if (!passwordModal.newPassword.trim()) {
+      setError('يرجى إدخال كلمة المرور الجديدة')
+      return
+    }
+    try {
+      const res = await apiFetch(`/api/admin/users/${passwordModal.userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: passwordModal.newPassword }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'فشل تغيير كلمة المرور')
+      }
+      setPasswordModal({ open: false, userId: null, userName: '', newPassword: '' })
+      setError('')
       await loadUsers()
     } catch (e) {
       setError(e.message || 'خطأ غير متوقع')
@@ -228,11 +252,11 @@ export default function Admin() {
                   <td className="py-2 px-3 space-x-1 space-x-reverse">
                     <button
                       onClick={() =>
-                        handleChangeUser(u.id, { reset_password: true })
+                        setPasswordModal({ open: true, userId: u.id, userName: u.name || u.email, newPassword: '' })
                       }
                       className="inline-flex items-center px-2 py-1 rounded-md bg-blue-50 text-blue-700 border border-blue-200 text-xs mr-1"
                     >
-                      إعادة تعيين كلمة المرور (0000)
+                      تغيير كلمة المرور
                     </button>
                     <button
                       onClick={() => handleDeleteUser(u.id)}
@@ -247,6 +271,46 @@ export default function Admin() {
           </table>
         )}
       </div>
+
+      {/* Password Change Modal */}
+      {passwordModal.open && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              تغيير كلمة المرور للمستخدم: {passwordModal.userName}
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  كلمة المرور الجديدة
+                </label>
+                <input
+                  type="password"
+                  value={passwordModal.newPassword}
+                  onChange={(e) => setPasswordModal({ ...passwordModal, newPassword: e.target.value })}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  placeholder="أدخل كلمة المرور الجديدة"
+                  autoFocus
+                />
+              </div>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setPasswordModal({ open: false, userId: null, userName: '', newPassword: '' })}
+                  className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 text-sm hover:bg-gray-50"
+                >
+                  إلغاء
+                </button>
+                <button
+                  onClick={handlePasswordChange}
+                  className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold"
+                >
+                  حفظ
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

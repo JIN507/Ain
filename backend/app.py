@@ -1,11 +1,12 @@
 """
 Flask API for Ain News Monitor
 """
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, send_file
 from flask_cors import CORS
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_wtf.csrf import CSRFProtect, generate_csrf
-from models import init_db, get_db, Country, Source, Keyword, Article, User, AuditLog, ExportRecord
+from models import init_db, get_db, Country, Source, Keyword, Article, User, AuditLog, ExportRecord, UserFile, SearchHistory
+import uuid
 from rss_service import fetch_all_feeds, fetch_feed
 from translation_service import (
     translate_keyword, 
@@ -175,48 +176,110 @@ def admin_audit_logs():
 @app.route('/api/exports', methods=['GET'])
 @login_required
 def list_exports():
-    """List export history for the current user."""
+    """List export history. Admins see all files, users see only their own."""
     db = get_db()
     try:
-        exports = db.query(ExportRecord).filter(
-            ExportRecord.user_id == current_user.id
-        ).order_by(ExportRecord.created_at.desc()).all()
+        is_admin = current_user.role == 'ADMIN'
+        
+        if is_admin:
+            # Admin sees all exports with user info
+            exports = db.query(ExportRecord).order_by(ExportRecord.created_at.desc()).all()
+        else:
+            # Regular user sees only their exports
+            exports = db.query(ExportRecord).filter(
+                ExportRecord.user_id == current_user.id
+            ).order_by(ExportRecord.created_at.desc()).all()
+        
+        # Build user lookup for admin view
+        user_map = {}
+        if is_admin:
+            user_ids = set(rec.user_id for rec in exports)
+            users = db.query(User).filter(User.id.in_(user_ids)).all()
+            user_map = {u.id: u.name for u in users}
+        
         result = []
         for rec in exports:
             try:
                 filters = json.loads(rec.filters_json) if rec.filters_json else None
             except Exception:
                 filters = None
-            result.append({
+            item = {
                 'id': rec.id,
                 'article_count': rec.article_count,
                 'filters': filters,
+                'filename': rec.filename,
+                'file_size': rec.file_size,
+                'has_file': bool(rec.stored_filename),
                 'created_at': rec.created_at.isoformat() if rec.created_at else None,
-            })
+            }
+            if is_admin:
+                item['user_id'] = rec.user_id
+                item['user_name'] = user_map.get(rec.user_id, 'مستخدم غير معروف')
+            result.append(item)
         return jsonify(result)
     finally:
         db.close()
+
+
+EXPORTS_FOLDER = os.path.join(os.path.dirname(__file__), 'exports')
+os.makedirs(EXPORTS_FOLDER, exist_ok=True)
+
+def get_user_exports_folder(user_id):
+    """Get or create user-specific exports folder"""
+    user_folder = os.path.join(EXPORTS_FOLDER, str(user_id))
+    os.makedirs(user_folder, exist_ok=True)
+    return user_folder
 
 
 @app.route('/api/exports', methods=['POST'])
 @login_required
 @csrf.exempt
 def create_export_record():
-    """Create an export record for the current user.
+    """Create an export record for the current user with optional file upload.
 
-    Expects JSON: {filters: object, article_count: int}
+    Accepts multipart form data with:
+    - file: PDF file (optional)
+    - filters: JSON string of filters
+    - article_count: number of articles
     """
-    data = request.get_json() or {}
-    filters = data.get('filters') or {}
-    article_count = int(data.get('article_count') or 0)
+    # Handle both JSON and multipart form data
+    if request.content_type and 'multipart/form-data' in request.content_type:
+        filters_str = request.form.get('filters', '{}')
+        article_count = int(request.form.get('article_count', 0))
+        source_type = request.form.get('source_type', 'dashboard')
+        file = request.files.get('file')
+        try:
+            filters = json.loads(filters_str)
+        except:
+            filters = {}
+    else:
+        data = request.get_json() or {}
+        filters = data.get('filters') or {}
+        article_count = int(data.get('article_count') or 0)
+        source_type = data.get('source_type', 'dashboard')
+        file = None
 
     db = get_db()
     try:
         rec = ExportRecord(
             user_id=current_user.id,
-            filters_json=json.dumps(filters, ensure_ascii=False) if filters is not None else None,
+            filters_json=json.dumps(filters, ensure_ascii=False) if filters else None,
             article_count=article_count,
+            source_type=source_type,
         )
+        
+        # Handle file upload
+        if file and file.filename:
+            ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else 'pdf'
+            stored_filename = f"{uuid.uuid4().hex}.{ext}"
+            user_folder = get_user_exports_folder(current_user.id)
+            file_path = os.path.join(user_folder, stored_filename)
+            file.save(file_path)
+            
+            rec.filename = file.filename
+            rec.stored_filename = stored_filename
+            rec.file_size = os.path.getsize(file_path)
+        
         db.add(rec)
         db.commit()
         try:
@@ -225,9 +288,305 @@ def create_export_record():
                 'article_count': article_count,
             })
         except Exception:
-            # Ignore audit logging failures
             pass
         return jsonify({'success': True, 'id': rec.id}), 201
+    finally:
+        db.close()
+
+
+@app.route('/api/exports/<int:export_id>/download', methods=['GET'])
+@login_required
+def download_export(export_id):
+    """Download an exported file. Admins can download any file."""
+    db = get_db()
+    try:
+        is_admin = current_user.role == 'ADMIN'
+        
+        if is_admin:
+            # Admin can download any file
+            rec = db.query(ExportRecord).filter(ExportRecord.id == export_id).first()
+        else:
+            # Regular user can only download their own files
+            rec = db.query(ExportRecord).filter(
+                ExportRecord.id == export_id,
+                ExportRecord.user_id == current_user.id
+            ).first()
+        
+        if not rec:
+            return jsonify({'error': 'السجل غير موجود'}), 404
+        
+        if not rec.stored_filename:
+            return jsonify({'error': 'لا يوجد ملف مرفق'}), 404
+        
+        # Use the file owner's folder, not current_user
+        user_folder = get_user_exports_folder(rec.user_id)
+        file_path = os.path.join(user_folder, rec.stored_filename)
+        
+        if not os.path.exists(file_path):
+            return jsonify({'error': 'الملف غير موجود'}), 404
+        
+        return send_file(
+            file_path,
+            as_attachment=True,
+            download_name=rec.filename or f"export_{export_id}.pdf"
+        )
+    finally:
+        db.close()
+
+
+@app.route('/api/exports/<int:export_id>', methods=['DELETE'])
+@login_required
+@csrf.exempt
+def delete_export(export_id):
+    """Delete an export record and its file. Admins can delete any file."""
+    db = get_db()
+    try:
+        is_admin = current_user.role == 'ADMIN'
+        
+        if is_admin:
+            rec = db.query(ExportRecord).filter(ExportRecord.id == export_id).first()
+        else:
+            rec = db.query(ExportRecord).filter(
+                ExportRecord.id == export_id,
+                ExportRecord.user_id == current_user.id
+            ).first()
+        
+        if not rec:
+            return jsonify({'error': 'السجل غير موجود'}), 404
+        
+        # Delete file if exists - use file owner's folder
+        if rec.stored_filename:
+            user_folder = get_user_exports_folder(rec.user_id)
+            file_path = os.path.join(user_folder, rec.stored_filename)
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        
+        db.delete(rec)
+        db.commit()
+        return jsonify({'success': True})
+    finally:
+        db.close()
+
+
+# ==================== User Files APIs ====================
+UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads')
+ALLOWED_EXTENSIONS = {'pdf', 'xlsx', 'xls', 'csv', 'doc', 'docx', 'txt', 'png', 'jpg', 'jpeg'}
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def get_user_upload_folder(user_id):
+    """Get or create user-specific upload folder"""
+    user_folder = os.path.join(UPLOAD_FOLDER, str(user_id))
+    os.makedirs(user_folder, exist_ok=True)
+    return user_folder
+
+
+@app.route('/api/files', methods=['GET'])
+@login_required
+def list_user_files():
+    """List files for the current user."""
+    db = get_db()
+    try:
+        files = db.query(UserFile).filter(
+            UserFile.user_id == current_user.id
+        ).order_by(UserFile.created_at.desc()).all()
+        result = []
+        for f in files:
+            result.append({
+                'id': f.id,
+                'filename': f.filename,
+                'file_type': f.file_type,
+                'file_size': f.file_size,
+                'description': f.description,
+                'created_at': f.created_at.isoformat() if f.created_at else None,
+            })
+        return jsonify(result)
+    finally:
+        db.close()
+
+
+@app.route('/api/files', methods=['POST'])
+@login_required
+@csrf.exempt
+def upload_user_file():
+    """Upload a file for the current user."""
+    if 'file' not in request.files:
+        return jsonify({'error': 'لم يتم تحديد ملف'}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'لم يتم تحديد ملف'}), 400
+    
+    if not allowed_file(file.filename):
+        return jsonify({'error': 'نوع الملف غير مسموح'}), 400
+    
+    # Generate unique stored filename
+    ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+    stored_filename = f"{uuid.uuid4().hex}.{ext}" if ext else uuid.uuid4().hex
+    
+    # Save file to user folder
+    user_folder = get_user_upload_folder(current_user.id)
+    file_path = os.path.join(user_folder, stored_filename)
+    file.save(file_path)
+    
+    # Get file size
+    file_size = os.path.getsize(file_path)
+    
+    # Get description from form data
+    description = request.form.get('description', '')
+    
+    db = get_db()
+    try:
+        user_file = UserFile(
+            user_id=current_user.id,
+            filename=file.filename,
+            stored_filename=stored_filename,
+            file_type=ext,
+            file_size=file_size,
+            description=description,
+        )
+        db.add(user_file)
+        db.commit()
+        return jsonify({
+            'success': True,
+            'id': user_file.id,
+            'filename': user_file.filename,
+        }), 201
+    finally:
+        db.close()
+
+
+@app.route('/api/files/<int:file_id>', methods=['GET'])
+@login_required
+def download_user_file(file_id):
+    """Download a user file."""
+    db = get_db()
+    try:
+        user_file = db.query(UserFile).filter(
+            UserFile.id == file_id,
+            UserFile.user_id == current_user.id
+        ).first()
+        if not user_file:
+            return jsonify({'error': 'الملف غير موجود'}), 404
+        
+        user_folder = get_user_upload_folder(current_user.id)
+        file_path = os.path.join(user_folder, user_file.stored_filename)
+        
+        if not os.path.exists(file_path):
+            return jsonify({'error': 'الملف غير موجود على الخادم'}), 404
+        
+        from flask import send_file
+        return send_file(
+            file_path,
+            download_name=user_file.filename,
+            as_attachment=True
+        )
+    finally:
+        db.close()
+
+
+@app.route('/api/files/<int:file_id>', methods=['DELETE'])
+@login_required
+@csrf.exempt
+def delete_user_file(file_id):
+    """Delete a user file."""
+    db = get_db()
+    try:
+        user_file = db.query(UserFile).filter(
+            UserFile.id == file_id,
+            UserFile.user_id == current_user.id
+        ).first()
+        if not user_file:
+            return jsonify({'error': 'الملف غير موجود'}), 404
+        
+        # Delete physical file
+        user_folder = get_user_upload_folder(current_user.id)
+        file_path = os.path.join(user_folder, user_file.stored_filename)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        
+        # Delete database record
+        db.delete(user_file)
+        db.commit()
+        return jsonify({'success': True})
+    finally:
+        db.close()
+
+
+# ==================== Search History APIs ====================
+
+@app.route('/api/search-history', methods=['GET'])
+@login_required
+def list_search_history():
+    """List search history for the current user."""
+    db = get_db()
+    try:
+        history = db.query(SearchHistory).filter(
+            SearchHistory.user_id == current_user.id
+        ).order_by(SearchHistory.created_at.desc()).limit(50).all()
+        result = []
+        for h in history:
+            try:
+                filters = json.loads(h.filters_json) if h.filters_json else None
+            except Exception:
+                filters = None
+            result.append({
+                'id': h.id,
+                'search_type': h.search_type,
+                'query': h.query,
+                'filters': filters,
+                'results_count': h.results_count,
+                'created_at': h.created_at.isoformat() if h.created_at else None,
+            })
+        return jsonify(result)
+    finally:
+        db.close()
+
+
+@app.route('/api/search-history', methods=['POST'])
+@login_required
+@csrf.exempt
+def create_search_history():
+    """Record a search in history."""
+    data = request.get_json() or {}
+    search_type = data.get('search_type', 'keyword')
+    query = data.get('query', '')
+    filters = data.get('filters') or {}
+    results_count = int(data.get('results_count') or 0)
+
+    db = get_db()
+    try:
+        rec = SearchHistory(
+            user_id=current_user.id,
+            search_type=search_type,
+            query=query,
+            filters_json=json.dumps(filters, ensure_ascii=False) if filters else None,
+            results_count=results_count,
+        )
+        db.add(rec)
+        db.commit()
+        return jsonify({'success': True, 'id': rec.id}), 201
+    finally:
+        db.close()
+
+
+@app.route('/api/search-history/<int:history_id>', methods=['DELETE'])
+@login_required
+@csrf.exempt
+def delete_search_history(history_id):
+    """Delete a search history entry."""
+    db = get_db()
+    try:
+        rec = db.query(SearchHistory).filter(
+            SearchHistory.id == history_id,
+            SearchHistory.user_id == current_user.id
+        ).first()
+        if not rec:
+            return jsonify({'error': 'السجل غير موجود'}), 404
+        db.delete(rec)
+        db.commit()
+        return jsonify({'success': True})
     finally:
         db.close()
 
@@ -501,8 +860,10 @@ def login():
     db = get_db()
     try:
         user = db.query(User).filter(User.email == email).first()
-        if not user or not user.is_active or not verify_password(password, user.password_hash):
-            return jsonify({"error": "Invalid credentials"}), 401
+        if not user or not verify_password(password, user.password_hash):
+            return jsonify({"error": "بيانات الدخول غير صحيحة"}), 401
+        if not user.is_active:
+            return jsonify({"error": "حسابك غير مفعل. يرجى انتظار موافقة الإدارة"}), 403
         login_user(user)
         try:
             print(f"[AUTH] login success: id={user.id}, email={user.email}, role={user.role}")
@@ -611,6 +972,7 @@ def get_sources():
         db.close()
 
 @app.route('/api/sources', methods=['POST'])
+@csrf.exempt
 def add_source():
     """Add new RSS source"""
     data = request.get_json()
@@ -637,6 +999,7 @@ def add_source():
         db.close()
 
 @app.route('/api/sources/<int:source_id>', methods=['PUT'])
+@csrf.exempt
 def update_source(source_id):
     """Update source"""
     db = get_db()
@@ -663,6 +1026,7 @@ def update_source(source_id):
         db.close()
 
 @app.route('/api/sources/<int:source_id>', methods=['DELETE'])
+@csrf.exempt
 def delete_source(source_id):
     """Delete source"""
     db = get_db()
@@ -1390,28 +1754,6 @@ def export_and_reset():
         
     finally:
         db.close()
-
-@app.route('/api/exports/download/<filename>')
-def download_export(filename):
-    """Download exported Excel file"""
-    from flask import send_file
-    import os
-    
-    # Security: prevent directory traversal
-    if '..' in filename or '/' in filename or '\\' in filename:
-        return jsonify({"error": "Invalid filename"}), 400
-    
-    filepath = os.path.join(os.getcwd(), 'exports', filename)
-    
-    if not os.path.exists(filepath):
-        return jsonify({"error": "File not found"}), 404
-    
-    return send_file(
-        filepath,
-        as_attachment=True,
-        download_name=filename,
-        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
 
 # ==================== Diagnostics ====================
 

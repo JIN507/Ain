@@ -122,7 +122,39 @@ class ExportRecord(Base):
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
     filters_json = Column(Text, nullable=True)
     article_count = Column(Integer, default=0)
+    filename = Column(String(255), nullable=True)  # Original filename
+    stored_filename = Column(String(255), nullable=True)  # UUID filename on disk
+    file_size = Column(Integer, nullable=True)  # File size in bytes
+    source_type = Column(String(50), nullable=True)  # dashboard, top_headlines, etc.
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class UserFile(Base):
+    """User uploaded files - for 'My Files' feature"""
+    __tablename__ = 'user_files'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    filename = Column(String(255), nullable=False)  # Original filename
+    stored_filename = Column(String(255), nullable=False)  # UUID-based stored name
+    file_type = Column(String(50), nullable=True)  # pdf, xlsx, csv, etc.
+    file_size = Column(Integer, default=0)  # Size in bytes
+    description = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class SearchHistory(Base):
+    """Per-user search history tracking"""
+    __tablename__ = 'search_history'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    search_type = Column(String(50), nullable=False)  # 'keyword', 'direct', 'headlines'
+    query = Column(Text, nullable=True)  # Search query or keyword
+    filters_json = Column(Text, nullable=True)  # JSON of applied filters
+    results_count = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 
 # Database setup
 DATABASE_URL = "sqlite:///ain_news.db"

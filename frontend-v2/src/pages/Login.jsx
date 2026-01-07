@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { apiFetch } from '../apiClient'
 
-export default function Login({ onLogin }) {
+export default function Login({ onLogin, onSwitchToRegister }) {
   const [mode, setMode] = useState('login') // 'login' or 'signup'
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -22,26 +22,9 @@ export default function Login({ onLogin }) {
 
     setLoading(true)
     try {
-      const res = await apiFetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ email, password })
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        setError(data.error || 'فشل تسجيل الدخول')
-        return
-      }
-
-      if (onLogin) {
-        onLogin(data)
-      }
+      await onLogin(email, password)
     } catch (err) {
-      setError('حدث خطأ غير متوقع')
+      setError(err.message || 'حدث خطأ غير متوقع')
     } finally {
       setLoading(false)
     }
@@ -107,7 +90,13 @@ export default function Login({ onLogin }) {
             </button>
             <button
               type="button"
-              onClick={() => { setMode('signup'); setError(''); setInfo('') }}
+              onClick={() => { 
+                if (onSwitchToRegister) {
+                  onSwitchToRegister()
+                } else {
+                  setMode('signup'); setError(''); setInfo('') 
+                }
+              }}
               className={`flex-1 py-2 rounded-lg ${mode === 'signup' ? 'bg-white text-emerald-700 font-semibold shadow-sm' : 'text-emerald-600'}`}
             >
               إنشاء حساب

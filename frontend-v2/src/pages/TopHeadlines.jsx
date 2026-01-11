@@ -105,12 +105,12 @@ export default function TopHeadlines() {
 <head>
   <meta charset="UTF-8">
   <title>تقرير أهم العناوين - ${selectedCountry}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&display=swap" rel="stylesheet">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&display=swap');
-    @import url('https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&display=swap');
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: 'Cairo', 'Amiri', sans-serif;
+      font-family: 'Cairo', 'Segoe UI', Tahoma, Arial, sans-serif;
       direction: rtl;
       padding: 0;
       background: #ffffff;
@@ -328,7 +328,19 @@ export default function TopHeadlines() {
 </html>
       `
 
-      // Open print preview window for user to review
+      // Create hidden iframe for PDF generation (maintains full document context)
+      const pdfIframe = document.createElement('iframe')
+      pdfIframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:210mm;height:297mm;border:none;'
+      document.body.appendChild(pdfIframe)
+      
+      const iframeDoc = pdfIframe.contentDocument || pdfIframe.contentWindow?.document
+      if (iframeDoc) {
+        iframeDoc.open()
+        iframeDoc.write(printContent)
+        iframeDoc.close()
+      }
+      
+      // Open print preview window
       const printWindow = window.open('', '_blank')
       if (printWindow) {
         printWindow.document.write(printContent)
@@ -338,61 +350,53 @@ export default function TopHeadlines() {
         }, 500)
       }
       
-      // Generate PDF using html2pdf and upload to server
-      let iframe = null
+      // Generate PDF from iframe
       try {
-        iframe = document.createElement('iframe')
-        iframe.style.cssText = 'position:fixed;top:0;left:0;width:210mm;height:297mm;opacity:0;pointer-events:none;z-index:-1;'
-        document.body.appendChild(iframe)
-        
-        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document
-        if (!iframeDoc) throw new Error('Cannot access iframe document')
-        
-        iframeDoc.open()
-        iframeDoc.write(printContent)
-        iframeDoc.close()
-        
-        await new Promise(resolve => setTimeout(resolve, 2000))
-        
         const html2pdf = (await import('html2pdf.js')).default
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
         const filename = `تقرير_أهم_العناوين_${selectedCountry}_${timestamp}.pdf`
         
-        const pdfBlob = await html2pdf()
-          .set({
-            margin: [10, 10, 10, 10],
-            filename: filename,
-            image: { type: 'jpeg', quality: 0.95 },
-            html2canvas: { 
-              scale: 2, 
-              useCORS: true,
-              logging: false,
-              allowTaint: true,
-              windowWidth: 794,
-              windowHeight: 1123
-            },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-            pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+        // Wait for content to render
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        
+        if (iframeDoc && iframeDoc.body) {
+          const pdfBlob = await html2pdf()
+            .set({
+              margin: [10, 10, 10, 10],
+              filename: filename,
+              image: { type: 'jpeg', quality: 0.98 },
+              html2canvas: { 
+                scale: 2, 
+                useCORS: true,
+                logging: false,
+                allowTaint: true,
+                backgroundColor: '#ffffff',
+                windowWidth: pdfIframe.contentWindow?.innerWidth || 794
+              },
+              jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+              pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+            })
+            .from(iframeDoc.body)
+            .outputPdf('blob')
+          
+          // Upload PDF to server
+          const formData = new FormData()
+          formData.append('file', pdfBlob, filename)
+          formData.append('filters', JSON.stringify({ country: selectedCountry, type: 'top_headlines' }))
+          formData.append('article_count', totalArticles.toString())
+          formData.append('source_type', 'top_headlines')
+          
+          await apiFetch('/api/exports', {
+            method: 'POST',
+            body: formData,
           })
-          .from(iframeDoc.body)
-          .outputPdf('blob')
-        
-        // Upload PDF to server with user context
-        const formData = new FormData()
-        formData.append('file', pdfBlob, filename)
-        formData.append('filters', JSON.stringify({ country: selectedCountry, type: 'top_headlines' }))
-        formData.append('article_count', totalArticles.toString())
-        formData.append('source_type', 'top_headlines')
-        
-        await apiFetch('/api/exports', {
-          method: 'POST',
-          body: formData,
-        })
+        }
       } catch (e) {
         console.error('Failed to save export:', e)
       } finally {
-        if (iframe && iframe.parentNode) {
-          iframe.parentNode.removeChild(iframe)
+        // Cleanup
+        if (pdfIframe.parentNode) {
+          pdfIframe.parentNode.removeChild(pdfIframe)
         }
       }
     } catch (error) {

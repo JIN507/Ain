@@ -8,7 +8,7 @@ export default function Sidebar({ currentPage, setCurrentPage, sidebarOpen, setS
     { id: 'myfiles', label: 'ملفاتي', icon: Newspaper },
     { id: 'countries', label: 'الدول', icon: Globe },
     { id: 'keywords', label: 'الكلمات المفتاحية', icon: Key },
-    { id: 'settings', label: 'تشغيل النظام', icon: Settings },
+    { id: 'settings', label: 'تشغيل وايقاف النظام', icon: Settings },
   ]
 
   const adminItems = isAdmin

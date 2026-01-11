@@ -1,17 +1,44 @@
-import { useState, useEffect, useRef } from 'react'
-import { Search, ChevronDown, ChevronUp, Loader as LoaderIcon, Download, Loader2 } from 'lucide-react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { Search, ChevronDown, ChevronUp, Loader as LoaderIcon, Download, Loader2, Newspaper, TrendingUp, Archive, BarChart3, Filter } from 'lucide-react'
 import ArticleCard from '../components/ArticleCard'
 import Loader from '../components/Loader'
+import QueryBuilder from '../components/QueryBuilder'
+import ArabicOperatorHelper, { validateQuery, normalizeQuery } from '../components/ArabicOperatorHelper'
 import { apiFetch } from '../apiClient'
 
 export default function DirectSearch() {
+  // Search mode: 'simple' or 'builder'
+  const [searchMode, setSearchMode] = useState('simple')
+  
+  // Endpoint selection
+  const [endpoint, setEndpoint] = useState('latest')
+  
   // Search state
   const [keyword, setKeyword] = useState('')
+  const [builtQuery, setBuiltQuery] = useState('')
   const [titleOnly, setTitleOnly] = useState(false)
   const [timeframe, setTimeframe] = useState('')
   const [selectedCountries, setSelectedCountries] = useState([])
   const [selectedLanguages, setSelectedLanguages] = useState([])
   const [showAdvanced, setShowAdvanced] = useState(false)
+  
+  // Extended filters
+  const [selectedCategories, setSelectedCategories] = useState([])
+  const [excludeCountries, setExcludeCountries] = useState([])
+  const [domain, setDomain] = useState('')
+  const [excludeDomain, setExcludeDomain] = useState('')
+  const [hasImage, setHasImage] = useState(false)
+  const [hasVideo, setHasVideo] = useState(false)
+  const [removeDuplicate, setRemoveDuplicate] = useState(true)
+  const [sentiment, setSentiment] = useState('')
+  
+  // Archive-specific
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
+  
+  // Crypto/Market specific
+  const [coin, setCoin] = useState('')
+  const [symbol, setSymbol] = useState('')
   
   // Results state
   const [results, setResults] = useState([])
@@ -24,6 +51,10 @@ export default function DirectSearch() {
   // Performance optimization
   const searchButtonRef = useRef(null)
   const abortControllerRef = useRef(null)
+  const searchInputRef = useRef(null)
+  
+  // Query preview from last search
+  const [queryPreview, setQueryPreview] = useState('')
   
   const availableCountries = [
     { code: 'us', name: 'أمريكا' },
@@ -37,7 +68,11 @@ export default function DirectSearch() {
     { code: 'ae', name: 'الإمارات' },
     { code: 'eg', name: 'مصر' },
     { code: 'qa', name: 'قطر' },
-    { code: 'tr', name: 'تركيا' }
+    { code: 'tr', name: 'تركيا' },
+    { code: 'in', name: 'الهند' },
+    { code: 'br', name: 'البرازيل' },
+    { code: 'au', name: 'أستراليا' },
+    { code: 'ca', name: 'كندا' }
   ]
   
   const availableLanguages = [
@@ -48,11 +83,51 @@ export default function DirectSearch() {
     { code: 'ru', name: 'الروسية' },
     { code: 'ja', name: 'اليابانية' },
     { code: 'de', name: 'الألمانية' },
-    { code: 'es', name: 'الإسبانية' }
+    { code: 'es', name: 'الإسبانية' },
+    { code: 'pt', name: 'البرتغالية' },
+    { code: 'it', name: 'الإيطالية' },
+    { code: 'hi', name: 'الهندية' },
+    { code: 'ko', name: 'الكورية' }
   ]
   
+  const availableCategories = [
+    { code: 'business', name: 'أعمال' },
+    { code: 'entertainment', name: 'ترفيه' },
+    { code: 'environment', name: 'بيئة' },
+    { code: 'food', name: 'طعام' },
+    { code: 'health', name: 'صحة' },
+    { code: 'politics', name: 'سياسة' },
+    { code: 'science', name: 'علوم' },
+    { code: 'sports', name: 'رياضة' },
+    { code: 'technology', name: 'تقنية' },
+    { code: 'top', name: 'أهم الأخبار' },
+    { code: 'world', name: 'عالمي' }
+  ]
+  
+  const endpoints = [
+    { id: 'latest', name: 'آخر الأخبار', icon: Newspaper, description: 'آخر 48 ساعة' },
+    { id: 'crypto', name: 'عملات رقمية', icon: TrendingUp, description: 'أخبار العملات المشفرة' },
+    { id: 'archive', name: 'الأرشيف', icon: Archive, description: 'البحث التاريخي' },
+    { id: 'market', name: 'الأسواق', icon: BarChart3, description: 'أخبار مالية' }
+  ]
+  
+  const sentimentOptions = [
+    { value: '', name: 'الكل' },
+    { value: 'positive', name: 'إيجابي' },
+    { value: 'negative', name: 'سلبي' },
+    { value: 'neutral', name: 'محايد' }
+  ]
+  
+  // Handle query builder changes
+  const handleQueryChange = useCallback((query) => {
+    setBuiltQuery(query)
+  }, [])
+  
   const handleSearch = async (isLoadMore = false) => {
-    if (!keyword.trim() && !isLoadMore) {
+    // Determine which query to use
+    const searchQuery = searchMode === 'builder' ? builtQuery : keyword.trim()
+    
+    if (!searchQuery && !isLoadMore) {
       setError('الرجاء إدخال كلمة البحث')
       return
     }
@@ -61,12 +136,16 @@ export default function DirectSearch() {
     setError('')
     
     try {
-      // Build query params
+      // Build query params for the new advanced API
       const params = new URLSearchParams()
+      params.append('endpoint', endpoint)
       
       if (!isLoadMore) {
-        params.append('q', keyword.trim())
-        if (titleOnly) params.append('qInTitle', 'true')
+        // Query
+        if (searchQuery) params.append('q', searchQuery)
+        if (titleOnly) params.append('qInTitle', searchQuery)
+        
+        // Basic filters
         if (timeframe) params.append('timeframe', timeframe)
         if (selectedCountries.length > 0) {
           params.append('country', selectedCountries.join(','))
@@ -74,16 +153,44 @@ export default function DirectSearch() {
         if (selectedLanguages.length > 0) {
           params.append('language', selectedLanguages.join(','))
         }
+        if (selectedCategories.length > 0) {
+          params.append('category', selectedCategories.join(','))
+        }
+        
+        // Extended filters
+        if (excludeCountries.length > 0) {
+          params.append('excludeCountry', excludeCountries.join(','))
+        }
+        if (domain) params.append('domain', domain)
+        if (excludeDomain) params.append('excludeDomain', excludeDomain)
+        if (hasImage) params.append('image', 'true')
+        if (hasVideo) params.append('video', 'true')
+        if (removeDuplicate) params.append('removeDuplicate', 'true')
+        if (sentiment) params.append('sentiment', sentiment)
+        
+        // Archive-specific
+        if (endpoint === 'archive') {
+          if (fromDate) params.append('fromDate', fromDate)
+          if (toDate) params.append('toDate', toDate)
+        }
+        
+        // Crypto/Market specific
+        if (endpoint === 'crypto' && coin) params.append('coin', coin)
+        if (endpoint === 'market' && symbol) params.append('symbol', symbol)
+        
+        setSearchPerformed(true)
       } else {
         if (nextPage) {
           params.append('page', nextPage)
+          params.append('endpoint', endpoint)
         }
       }
       
-      const response = await apiFetch(`/api/direct-search?${params}`)
+      // Use new advanced API endpoint
+      const response = await apiFetch(`/api/newsdata/search?${params}`)
       const data = await response.json()
       
-      if (!response.ok) {
+      if (!response.ok || !data.success) {
         if (response.status === 429) {
           throw new Error('قلّل سرعة الطلبات - حاول مرة أخرى بعد قليل')
         }
@@ -94,6 +201,7 @@ export default function DirectSearch() {
         setResults([...results, ...data.results])
       } else {
         setResults(data.results)
+        setQueryPreview(data.query_preview || searchQuery)
       }
       
       setNextPage(data.nextPage || null)
@@ -103,6 +211,14 @@ export default function DirectSearch() {
     } finally {
       setLoading(false)
     }
+  }
+  
+  const toggleCategory = (code) => {
+    setSelectedCategories(prev =>
+      prev.includes(code)
+        ? prev.filter(c => c !== code)
+        : [...prev, code]
+    )
   }
   
   const handleKeyPress = (e) => {
@@ -132,17 +248,18 @@ export default function DirectSearch() {
     setExporting(true)
     
     try {
+      // Use Google Fonts link instead of @import for better compatibility
       const printContent = `
 <!DOCTYPE html>
 <html dir="rtl" lang="ar">
 <head>
   <meta charset="UTF-8">
   <title>نتائج البحث - ${keyword}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&display=swap');
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: 'Cairo', sans-serif;
+      font-family: 'Cairo', 'Segoe UI', Tahoma, Arial, sans-serif;
       direction: rtl;
       padding: 0;
       background: #ffffff;
@@ -181,8 +298,8 @@ export default function DirectSearch() {
       border-radius: 8px;
     }
     .report-info {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
+      display: flex;
+      flex-wrap: wrap;
       gap: 15px;
       margin-top: 20px;
       padding: 20px;
@@ -191,6 +308,7 @@ export default function DirectSearch() {
       border: 1px solid #3b82f6;
     }
     .info-item {
+      flex: 1 1 45%;
       display: flex;
       align-items: center;
       gap: 10px;
@@ -226,8 +344,10 @@ export default function DirectSearch() {
     }
     .article-meta {
       display: flex;
+      flex-wrap: wrap;
       justify-content: space-between;
       align-items: center;
+      gap: 10px;
       padding-top: 10px;
       border-top: 1px solid #e5e7eb;
       font-size: 12px;
@@ -261,8 +381,14 @@ export default function DirectSearch() {
     <div class="logo-section">
       <h1>🔍 نتائج البحث المباشر</h1>
     </div>
-    <div class="search-term">كلمة البحث: "${keyword}"</div>
+    <div class="search-term">
+      ${queryPreview ? `الاستعلام: <code dir="ltr">${queryPreview}</code>` : `كلمة البحث: "${searchMode === 'builder' ? builtQuery : keyword}"`}
+    </div>
     <div class="report-info">
+      <div class="info-item">
+        <span class="info-label">نقطة النهاية:</span>
+        <span>${endpoints.find(e => e.id === endpoint)?.name || endpoint}</span>
+      </div>
       <div class="info-item">
         <span class="info-label">تاريخ التقرير:</span>
         <span>${new Date().toLocaleDateString('ar-SA', { timeZone: 'Asia/Riyadh', year: 'numeric', month: 'long', day: 'numeric' })}</span>
@@ -279,6 +405,8 @@ export default function DirectSearch() {
         <span class="info-label">المصدر:</span>
         <span>NewsData.io</span>
       </div>
+      ${selectedCountries.length > 0 ? `<div class="info-item"><span class="info-label">الدول:</span><span>${selectedCountries.join(', ')}</span></div>` : ''}
+      ${selectedCategories.length > 0 ? `<div class="info-item"><span class="info-label">التصنيفات:</span><span>${selectedCategories.join(', ')}</span></div>` : ''}
     </div>
   </div>
 
@@ -304,6 +432,18 @@ export default function DirectSearch() {
 </html>
       `
 
+      // Create hidden iframe for PDF generation (maintains full document context)
+      const pdfIframe = document.createElement('iframe')
+      pdfIframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:210mm;height:297mm;border:none;'
+      document.body.appendChild(pdfIframe)
+      
+      const iframeDoc = pdfIframe.contentDocument || pdfIframe.contentWindow?.document
+      if (iframeDoc) {
+        iframeDoc.open()
+        iframeDoc.write(printContent)
+        iframeDoc.close()
+      }
+
       // Open print preview window
       const printWindow = window.open('', '_blank')
       if (printWindow) {
@@ -314,62 +454,53 @@ export default function DirectSearch() {
         }, 500)
       }
 
-      // Generate PDF and upload to server
-      let iframe = null
+      // Generate PDF from iframe
       try {
-        iframe = document.createElement('iframe')
-        iframe.style.cssText = 'position:fixed;top:0;left:0;width:210mm;height:297mm;opacity:0;pointer-events:none;z-index:-1;'
-        document.body.appendChild(iframe)
-        
-        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document
-        if (!iframeDoc) throw new Error('Cannot access iframe document')
-        
-        iframeDoc.open()
-        iframeDoc.write(printContent)
-        iframeDoc.close()
-        
-        await new Promise(resolve => setTimeout(resolve, 2000))
-        
         const html2pdf = (await import('html2pdf.js')).default
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
         const filename = `بحث_${keyword}_${timestamp}.pdf`
         
-        const pdfBlob = await html2pdf()
-          .set({
-            margin: [10, 10, 10, 10],
-            filename: filename,
-            image: { type: 'jpeg', quality: 0.95 },
-            html2canvas: { 
-              scale: 2, 
-              useCORS: true,
-              logging: false,
-              allowTaint: true,
-              windowWidth: 794,
-              windowHeight: 1123
-            },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-            pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+        // Wait for content to render
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        
+        if (iframeDoc && iframeDoc.body) {
+          const pdfBlob = await html2pdf()
+            .set({
+              margin: [10, 10, 10, 10],
+              filename: filename,
+              image: { type: 'jpeg', quality: 0.98 },
+              html2canvas: { 
+                scale: 2, 
+                useCORS: true,
+                logging: false,
+                allowTaint: true,
+                backgroundColor: '#ffffff',
+                windowWidth: pdfIframe.contentWindow?.innerWidth || 794
+              },
+              jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+              pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+            })
+            .from(iframeDoc.body)
+            .outputPdf('blob')
+          
+          // Upload to server
+          const formData = new FormData()
+          formData.append('file', pdfBlob, filename)
+          formData.append('filters', JSON.stringify({ keyword, type: 'direct_search' }))
+          formData.append('article_count', results.length.toString())
+          formData.append('source_type', 'direct_search')
+          
+          await apiFetch('/api/exports', {
+            method: 'POST',
+            body: formData,
           })
-          .from(iframeDoc.body)
-          .outputPdf('blob')
-        
-        // Upload to server
-        const formData = new FormData()
-        formData.append('file', pdfBlob, filename)
-        formData.append('filters', JSON.stringify({ keyword, type: 'direct_search' }))
-        formData.append('article_count', results.length.toString())
-        formData.append('source_type', 'direct_search')
-        
-        await apiFetch('/api/exports', {
-          method: 'POST',
-          body: formData,
-        })
+        }
       } catch (e) {
         console.error('Failed to save export:', e)
       } finally {
-        // Always cleanup iframe
-        if (iframe && iframe.parentNode) {
-          iframe.parentNode.removeChild(iframe)
+        // Cleanup
+        if (pdfIframe.parentNode) {
+          pdfIframe.parentNode.removeChild(pdfIframe)
         }
       }
 
@@ -392,53 +523,192 @@ export default function DirectSearch() {
         </p>
       </div>
       
+      {/* Endpoint Tabs */}
+      <div className="card p-4">
+        <div className="flex flex-wrap gap-2">
+          {endpoints.map(ep => {
+            const Icon = ep.icon
+            return (
+              <button
+                key={ep.id}
+                onClick={() => setEndpoint(ep.id)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                  endpoint === ep.id
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                <span className="font-medium">{ep.name}</span>
+                <span className="text-xs opacity-75">({ep.description})</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+      
       {/* Search Box */}
       <div className="card p-6 space-y-4">
-        {/* Main Search */}
-        <div className="flex gap-3">
-          <div className="flex-1 relative">
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="اكتب كلمة البحث بالعربية..."
-              className="input pr-10 w-full"
-              maxLength={100}
-            />
+        {/* Search Mode Toggle */}
+        <div className="flex items-center gap-4 mb-4">
+          <span className="text-sm font-medium text-gray-700">وضع البحث:</span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setSearchMode('simple')}
+              className={`px-3 py-1 rounded text-sm ${
+                searchMode === 'simple'
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              بسيط
+            </button>
+            <button
+              onClick={() => setSearchMode('builder')}
+              className={`px-3 py-1 rounded text-sm ${
+                searchMode === 'builder'
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              منشئ الاستعلام (AND/OR/NOT)
+            </button>
           </div>
-          <button
-            onClick={() => handleSearch(false)}
-            disabled={loading || !keyword.trim()}
-            className="btn disabled:opacity-50 disabled:cursor-not-allowed min-w-[120px]"
-          >
-            {loading && !nextPage ? (
-              <>
-                <LoaderIcon className="w-4 h-4 animate-spin" />
-                جاري البحث...
-              </>
-            ) : (
-              <>
-                <Search className="w-4 h-4" />
-                ابحث
-              </>
-            )}
-          </button>
         </div>
+        
+        {/* Simple Search Mode */}
+        {searchMode === 'simple' ? (
+          <div className="space-y-3">
+            {/* Arabic Operator Helper - Smart Join */}
+            <ArabicOperatorHelper
+              query={keyword}
+              onQueryChange={setKeyword}
+              inputRef={searchInputRef}
+            />
+            
+            {/* Search Input Row */}
+            <div className="flex gap-3">
+              <div className="flex-1 relative">
+                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={keyword}
+                  onChange={(e) => setKeyword(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder="اكتب كلمات البحث ثم استخدم أدوات البحث أعلاه..."
+                  className="input pr-10 w-full"
+                  maxLength={512}
+                />
+              </div>
+              <button
+                onClick={() => handleSearch(false)}
+                disabled={loading || !keyword.trim() || !!validateQuery(keyword)}
+                className="btn disabled:opacity-50 disabled:cursor-not-allowed min-w-[120px]"
+              >
+                {loading && !nextPage ? (
+                  <>
+                    <LoaderIcon className="w-4 h-4 animate-spin" />
+                    جاري البحث...
+                  </>
+                ) : (
+                  <>
+                    <Search className="w-4 h-4" />
+                    ابحث
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* Query Builder Mode */
+          <div className="space-y-4">
+            <QueryBuilder onQueryChange={handleQueryChange} maxLength={512} />
+            <button
+              onClick={() => handleSearch(false)}
+              disabled={loading || !builtQuery.trim()}
+              className="btn disabled:opacity-50 disabled:cursor-not-allowed w-full"
+            >
+              {loading && !nextPage ? (
+                <>
+                  <LoaderIcon className="w-4 h-4 animate-spin" />
+                  جاري البحث...
+                </>
+              ) : (
+                <>
+                  <Search className="w-4 h-4" />
+                  ابحث باستخدام الاستعلام المُنشأ
+                </>
+              )}
+            </button>
+          </div>
+        )}
         
         {/* Advanced Filters Toggle */}
         <button
           onClick={() => setShowAdvanced(!showAdvanced)}
           className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
         >
+          <Filter className="w-4 h-4" />
           {showAdvanced ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          خيارات متقدمة
+          فلاتر متقدمة
         </button>
         
         {/* Advanced Filters */}
         {showAdvanced && (
           <div className="border-t pt-4 space-y-4">
+            {/* Archive Date Range */}
+            {endpoint === 'archive' && (
+              <div className="grid grid-cols-2 gap-4 p-3 bg-purple-50 rounded-lg border border-purple-200">
+                <div>
+                  <label className="block text-sm font-medium text-purple-700 mb-1">من تاريخ</label>
+                  <input
+                    type="date"
+                    value={fromDate}
+                    onChange={(e) => setFromDate(e.target.value)}
+                    className="input w-full"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-purple-700 mb-1">إلى تاريخ</label>
+                  <input
+                    type="date"
+                    value={toDate}
+                    onChange={(e) => setToDate(e.target.value)}
+                    className="input w-full"
+                  />
+                </div>
+              </div>
+            )}
+            
+            {/* Crypto-specific */}
+            {endpoint === 'crypto' && (
+              <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                <label className="block text-sm font-medium text-yellow-700 mb-1">العملة (Coin)</label>
+                <input
+                  type="text"
+                  value={coin}
+                  onChange={(e) => setCoin(e.target.value)}
+                  placeholder="مثال: bitcoin, ethereum"
+                  className="input w-full"
+                />
+              </div>
+            )}
+            
+            {/* Market-specific */}
+            {endpoint === 'market' && (
+              <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <label className="block text-sm font-medium text-blue-700 mb-1">رمز السهم (Symbol)</label>
+                <input
+                  type="text"
+                  value={symbol}
+                  onChange={(e) => setSymbol(e.target.value)}
+                  placeholder="مثال: AAPL, GOOGL, TSLA"
+                  className="input w-full"
+                />
+              </div>
+            )}
+            
             {/* Title Only Toggle */}
             <label className="flex items-center gap-2 cursor-pointer">
               <input
@@ -447,21 +717,42 @@ export default function DirectSearch() {
                 onChange={(e) => setTitleOnly(e.target.checked)}
                 className="w-4 h-4"
               />
-              <span className="text-sm text-gray-700">العنوان فقط (qInTitle)</span>
+              <span className="text-sm text-gray-700">البحث في العنوان فقط</span>
             </label>
             
             {/* Timeframe */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                الإطار الزمني
-              </label>
-              <select
-                value={timeframe}
-                onChange={(e) => setTimeframe(e.target.value)}
-                className="input"
-              >
-                <option value="">البحث في اخر 48 ساعة</option>
+              <label className="block text-sm font-medium text-gray-700 mb-2">الإطار الزمني</label>
+              <select value={timeframe} onChange={(e) => setTimeframe(e.target.value)} className="input">
+                <option value="">الافتراضي (48 ساعة)</option>
+                <option value="1">ساعة واحدة</option>
+                <option value="6">6 ساعات</option>
+                <option value="12">12 ساعة</option>
+                <option value="24">24 ساعة</option>
+                <option value="48">48 ساعة</option>
               </select>
+            </div>
+            
+            {/* Categories */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                التصنيفات {selectedCategories.length > 0 && `(${selectedCategories.length} محدد)`}
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {availableCategories.map(cat => (
+                  <button
+                    key={cat.code}
+                    onClick={() => toggleCategory(cat.code)}
+                    className={`px-3 py-1 rounded-full text-sm transition-colors ${
+                      selectedCategories.includes(cat.code)
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    {cat.name}
+                  </button>
+                ))}
+              </div>
             </div>
             
             {/* Countries */}

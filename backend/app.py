@@ -87,20 +87,24 @@ def admin_required(fn):
 def scoped(query, Model):
     """Scope queries to the current user for models that have user_id.
 
-    - ADMIN sees all rows.
-    - Regular users see only rows where Model.user_id == current_user.id.
-    - Anonymous users get the original query (public/global data only).
+    STRICT ISOLATION: Every user (including ADMIN) only sees their OWN data.
+    - Authenticated users see only rows where Model.user_id == current_user.id.
+    - Anonymous/unauthenticated users see NOTHING (empty result).
     """
     try:
         if not current_user.is_authenticated:
+            # Unauthenticated users see nothing - filter to impossible condition
+            if hasattr(Model, "user_id"):
+                return query.filter(Model.user_id == -1)  # No user has id=-1
             return query
-        if getattr(current_user, "role", "USER") == "ADMIN":
-            return query
+        # ALL authenticated users (including ADMIN) only see their own data
         if hasattr(Model, "user_id"):
             return query.filter(Model.user_id == current_user.id)
         return query
     except RuntimeError:
-        # Outside request context; just return original query
+        # Outside request context; return empty for safety
+        if hasattr(Model, "user_id"):
+            return query.filter(Model.user_id == -1)
         return query
 
 
@@ -210,6 +214,7 @@ def list_exports():
                 'filename': rec.filename,
                 'file_size': rec.file_size,
                 'has_file': bool(rec.stored_filename),
+                'source_type': rec.source_type or 'dashboard',
                 'created_at': rec.created_at.isoformat() if rec.created_at else None,
             }
             if is_admin:
@@ -297,10 +302,16 @@ def create_export_record():
 @app.route('/api/exports/<int:export_id>/download', methods=['GET'])
 @login_required
 def download_export(export_id):
-    """Download an exported file. Admins can download any file."""
+    """Download an exported file. Admins can download any file.
+    
+    Query params:
+    - view=1: View inline (for PDF preview)
+    - (default): Download as attachment
+    """
     db = get_db()
     try:
         is_admin = current_user.role == 'ADMIN'
+        view_mode = request.args.get('view', '0') == '1'
         
         if is_admin:
             # Admin can download any file
@@ -327,7 +338,8 @@ def download_export(export_id):
         
         return send_file(
             file_path,
-            as_attachment=True,
+            mimetype='application/pdf',
+            as_attachment=not view_mode,
             download_name=rec.filename or f"export_{export_id}.pdf"
         )
     finally:
@@ -1092,14 +1104,15 @@ def get_keywords():
         db.close()
 
 @app.route('/api/keywords/expanded', methods=['GET'])
+@login_required
 def get_keywords_expanded():
-    """Get all keywords with their multilingual expansions"""
+    """Get current user's keywords with their multilingual expansions"""
     db = get_db()
     try:
-        # Get all enabled keywords
-        keywords = db.query(Keyword).filter(Keyword.enabled == True).all()
+        # Get current user's enabled keywords only (strict isolation)
+        keywords = scoped(db.query(Keyword), Keyword).filter(Keyword.enabled == True).all()
         
-        # Load/generate expansions for all keywords
+        # Load/generate expansions for user's keywords
         expansions = load_expansions_from_keywords(keywords)
         
         return jsonify(expansions)
@@ -1215,9 +1228,39 @@ def toggle_keyword(keyword_id):
     finally:
         db.close()
 
-# ==================== Monitoring ====================
+# ==================== Monitoring Scheduler (Per-User) ====================
+
+from scheduler import scheduler_manager
+
+@app.route('/api/monitor/status', methods=['GET'])
+@login_required
+def get_monitor_status():
+    """Get the current status of the monitoring scheduler for this user"""
+    user_id = current_user.id
+    return jsonify(scheduler_manager.get_status(user_id))
+
+@app.route('/api/monitor/start', methods=['POST'])
+@csrf.exempt
+@login_required
+def start_monitoring_scheduler():
+    """Start the continuous monitoring scheduler for this user (runs every 10 minutes)"""
+    user_id = current_user.id
+    result = scheduler_manager.start(user_id)
+    return jsonify(result)
+
+@app.route('/api/monitor/stop', methods=['POST'])
+@csrf.exempt
+@login_required
+def stop_monitoring_scheduler():
+    """Stop the continuous monitoring scheduler for this user"""
+    user_id = current_user.id
+    result = scheduler_manager.stop(user_id)
+    return jsonify(result)
+
+# ==================== Monitoring (Manual) ====================
 
 @app.route('/api/monitor/run', methods=['POST'])
+@login_required
 @csrf.exempt
 def run_monitoring():
     """
@@ -1227,15 +1270,15 @@ def run_monitoring():
     db = get_db()
     
     try:
-        # Get ALL enabled sources and keywords (no country bias!)
+        # Get ALL enabled sources (shared) and CURRENT USER's keywords (isolated)
         sources = db.query(Source).filter(Source.enabled == True).all()
-        keywords = db.query(Keyword).filter(Keyword.enabled == True).all()
+        keywords = scoped(db.query(Keyword), Keyword).filter(Keyword.enabled == True).all()
         
         if not sources:
             return jsonify({"error": "No enabled sources"}), 400
         
         if not keywords:
-            return jsonify({"error": "No enabled keywords"}), 400
+            return jsonify({"error": "No enabled keywords for this user"}), 400
         
         # Log sources breakdown by country (for transparency)
         print("\n📊 Enabled Sources Breakdown:")
@@ -1566,30 +1609,32 @@ def health_check_translation():
         }), 500
 
 @app.route('/api/articles/stats', methods=['GET'])
+@login_required
 def get_article_stats():
-    """Get article statistics"""
+    """Get article statistics - scoped to current user"""
     db = get_db()
     try:
-        total = db.query(Article).count()
-        
-        # Count using Arabic sentiment labels (check both new and old columns)
+        # Scope ALL queries to current user for strict isolation
         from sqlalchemy import or_
         
-        positive = db.query(Article).filter(
+        base_query = scoped(db.query(Article), Article)
+        total = base_query.count()
+        
+        positive = scoped(db.query(Article), Article).filter(
             or_(
                 Article.sentiment_label == 'إيجابي',
                 Article.sentiment == 'إيجابي'
             )
         ).count()
         
-        negative = db.query(Article).filter(
+        negative = scoped(db.query(Article), Article).filter(
             or_(
                 Article.sentiment_label == 'سلبي',
                 Article.sentiment == 'سلبي'
             )
         ).count()
         
-        neutral = db.query(Article).filter(
+        neutral = scoped(db.query(Article), Article).filter(
             or_(
                 Article.sentiment_label == 'محايد',
                 Article.sentiment == 'محايد'
@@ -1606,14 +1651,16 @@ def get_article_stats():
         db.close()
 
 @app.route('/api/articles/clear', methods=['POST'])
+@login_required
 def clear_articles():
-    """Clear all articles"""
+    """Clear current user's articles only - strict isolation"""
     db = get_db()
     try:
-        db.query(Article).delete()
+        # Only delete articles belonging to current user
+        deleted_count = db.query(Article).filter(Article.user_id == current_user.id).delete()
         db.commit()
         
-        return jsonify({"success": True})
+        return jsonify({"success": True, "deleted": deleted_count})
     finally:
         db.close()
 
@@ -1634,9 +1681,9 @@ def export_and_reset():
     export_path = None
     
     try:
-        # Step 1: Fetch all articles
-        print("📊 Fetching all articles for export...")
-        articles = db.query(Article).order_by(Article.created_at.desc()).all()
+        # Step 1: Fetch current user's articles only (strict isolation)
+        print(f"📊 Fetching articles for user {current_user.id}...")
+        articles = db.query(Article).filter(Article.user_id == current_user.id).order_by(Article.created_at.desc()).all()
         article_count = len(articles)
         
         if article_count == 0:
@@ -1716,15 +1763,15 @@ def export_and_reset():
         
         print(f"   ✅ Export verified: {exported_rows} rows")
         
-        # Step 4: Delete all data (atomic transaction)
-        print("🗑️ Starting atomic delete transaction...")
+        # Step 4: Delete current user's data only (atomic transaction)
+        print(f"🗑️ Starting atomic delete for user {current_user.id}...")
         
-        # Delete in single transaction
-        db.query(Article).delete()
-        db.query(Keyword).delete()
+        # Delete only current user's data in single transaction
+        db.query(Article).filter(Article.user_id == current_user.id).delete()
+        db.query(Keyword).filter(Keyword.user_id == current_user.id).delete()
         db.commit()
         
-        print("   ✅ All data deleted from database")
+        print(f"   ✅ User {current_user.id} data deleted from database")
         
         # Step 5: Clear in-memory caches
         from translation_service import clear_all_caches
@@ -2067,6 +2114,170 @@ def direct_search():
         "totalResults": len(results)
     }), 200
 
+
+# ==================== NewsData.io Advanced API Endpoints ====================
+
+from newsdata_client import newsdata_client
+
+@app.route('/api/newsdata/search', methods=['GET', 'POST'])
+@csrf.exempt
+def newsdata_search():
+    """
+    Advanced NewsData.io search supporting multiple endpoints and query builder.
+    
+    Query params (GET) or JSON body (POST):
+    - endpoint: 'latest' (default), 'crypto', 'archive', 'market'
+    - q: search query (can use AND/OR/NOT operators)
+    - qInTitle: search in title only
+    - mustInclude: comma-separated terms (joined with AND)
+    - anyOf: comma-separated terms (joined with OR)
+    - exactPhrase: exact phrase to search
+    - exclude: comma-separated terms (prefixed with NOT)
+    - country, excludeCountry, language, excludeLanguage
+    - category, excludeCategory, domain, excludeDomain
+    - timeframe, timezone, fromDate, toDate (archive only)
+    - fullContent, image, video, removeDuplicate
+    - sentiment, tag, region (AI filters)
+    - coin, symbol, exchange (crypto/market specific)
+    - page: pagination token
+    """
+    
+    # Get params from either GET query string or POST JSON body
+    if request.method == 'POST':
+        params = request.get_json() or {}
+    else:
+        params = request.args.to_dict()
+    
+    # Determine endpoint
+    endpoint = params.get('endpoint', 'latest').lower()
+    
+    # Build query string from query builder params or use raw q
+    raw_q = params.get('q', '').strip()
+    must_include = [t.strip() for t in params.get('mustInclude', '').split(',') if t.strip()]
+    any_of = [t.strip() for t in params.get('anyOf', '').split(',') if t.strip()]
+    exact_phrase = params.get('exactPhrase', '').strip()
+    exclude_terms = [t.strip() for t in params.get('exclude', '').split(',') if t.strip()]
+    
+    # Use query builder if builder params provided, otherwise use raw q
+    if must_include or any_of or exact_phrase or exclude_terms:
+        q = newsdata_client.build_query_string(
+            must_include=must_include,
+            any_of=any_of,
+            exact_phrase=exact_phrase,
+            exclude=exclude_terms
+        )
+    else:
+        q = newsdata_client.build_query_string(raw_query=raw_q) if raw_q else ''
+    
+    # Validate query
+    page = params.get('page', '').strip()
+    if not q and not page and endpoint != 'sources':
+        return jsonify({
+            "success": False,
+            "error": "الرجاء إدخال كلمة البحث",
+            "results": [],
+            "nextPage": None,
+            "query_preview": ""
+        }), 400
+    
+    # Build search params
+    search_params = {
+        'q': q if not params.get('qInTitle') else None,
+        'q_in_title': params.get('qInTitle', '').strip() or None,
+        'country': params.get('country', '').strip() or None,
+        'exclude_country': params.get('excludeCountry', '').strip() or None,
+        'language': params.get('language', '').strip() or None,
+        'exclude_language': params.get('excludeLanguage', '').strip() or None,
+        'category': params.get('category', '').strip() or None,
+        'exclude_category': params.get('excludeCategory', '').strip() or None,
+        'domain': params.get('domain', '').strip() or None,
+        'exclude_domain': params.get('excludeDomain', '').strip() or None,
+        'timeframe': params.get('timeframe', '').strip() or None,
+        'timezone': params.get('timezone', '').strip() or None,
+        'full_content': params.get('fullContent', '').lower() == 'true' if params.get('fullContent') else None,
+        'image': params.get('image', '').lower() == 'true' if params.get('image') else None,
+        'video': params.get('video', '').lower() == 'true' if params.get('video') else None,
+        'remove_duplicate': params.get('removeDuplicate', '').lower() == 'true' if params.get('removeDuplicate') else None,
+        'sentiment': params.get('sentiment', '').strip() or None,
+        'tag': params.get('tag', '').strip() or None,
+        'region': params.get('region', '').strip() or None,
+        'page': page or None,
+    }
+    
+    # Endpoint-specific params
+    if endpoint == 'crypto':
+        search_params['coin'] = params.get('coin', '').strip() or None
+    elif endpoint == 'archive':
+        search_params['from_date'] = params.get('fromDate', '').strip() or None
+        search_params['to_date'] = params.get('toDate', '').strip() or None
+    elif endpoint == 'market':
+        search_params['symbol'] = params.get('symbol', '').strip() or None
+        search_params['exchange'] = params.get('exchange', '').strip() or None
+    
+    # Remove None values
+    search_params = {k: v for k, v in search_params.items() if v is not None}
+    
+    # Execute search
+    result = newsdata_client.search(endpoint=endpoint, **search_params)
+    
+    # Add query preview to response
+    result['query_preview'] = q
+    result['endpoint'] = endpoint
+    result['filters_applied'] = {k: v for k, v in search_params.items() if k not in ['q', 'page']}
+    
+    return jsonify(result), 200 if result.get('success') else 400
+
+
+@app.route('/api/newsdata/build-query', methods=['POST'])
+@csrf.exempt
+def build_query():
+    """
+    Build a NewsData.io query string from structured inputs.
+    Returns the generated query for preview without executing search.
+    """
+    data = request.get_json() or {}
+    
+    must_include = data.get('mustInclude', [])
+    any_of = data.get('anyOf', [])
+    exact_phrase = data.get('exactPhrase', '')
+    exclude = data.get('exclude', [])
+    
+    # Handle both array and comma-separated string inputs
+    if isinstance(must_include, str):
+        must_include = [t.strip() for t in must_include.split(',') if t.strip()]
+    if isinstance(any_of, str):
+        any_of = [t.strip() for t in any_of.split(',') if t.strip()]
+    if isinstance(exclude, str):
+        exclude = [t.strip() for t in exclude.split(',') if t.strip()]
+    
+    query = newsdata_client.build_query_string(
+        must_include=must_include,
+        any_of=any_of,
+        exact_phrase=exact_phrase,
+        exclude=exclude
+    )
+    
+    return jsonify({
+        "query": query,
+        "length": len(query),
+        "valid": len(query) <= 512  # NewsData.io query limit
+    })
+
+
+@app.route('/api/newsdata/sources', methods=['GET'])
+def get_newsdata_sources():
+    """Get available NewsData.io sources with filters."""
+    country = request.args.get('country', '').strip() or None
+    language = request.args.get('language', '').strip() or None
+    category = request.args.get('category', '').strip() or None
+    
+    result = newsdata_client.get_sources(
+        country=country,
+        language=language,
+        category=category
+    )
+    
+    return jsonify(result), 200 if result.get('success') else 400
 
 
 @app.route('/api/headlines/top', methods=['GET'])

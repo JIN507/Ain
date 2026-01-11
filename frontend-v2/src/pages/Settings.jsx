@@ -1,32 +1,61 @@
-import { useState } from 'react'
-import { Play, Loader2, Check, AlertCircle, Download, Trash2 } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { Play, Square, Loader2, Check, AlertCircle, Download, RefreshCw, Clock } from 'lucide-react'
 import { apiFetch } from '../apiClient'
 
 export default function Settings() {
-  const [running, setRunning] = useState(false)
-  const [result, setResult] = useState(null)
+  const [status, setStatus] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [actionLoading, setActionLoading] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [exportResult, setExportResult] = useState(null)
 
-  const runMonitoring = async () => {
-    setRunning(true)
-    setResult(null)
-
+  // Fetch scheduler status
+  const fetchStatus = useCallback(async () => {
     try {
-      const res = await apiFetch('/api/monitor/run', { method: 'POST' })
-      
-      if (!res.ok) {
-        const error = await res.json()
-        throw new Error(error.error || 'فشل تشغيل المراقبة')
+      const res = await apiFetch('/api/monitor/status')
+      if (res.ok) {
+        const data = await res.json()
+        setStatus(data)
       }
-
-      const data = await res.json()
-      setResult(data)
     } catch (error) {
-      console.error('Error running monitoring:', error)
-      setResult({ error: error.message })
+      console.error('Error fetching status:', error)
     } finally {
-      setRunning(false)
+      setLoading(false)
+    }
+  }, [])
+
+  // Poll status every 30 seconds when running
+  useEffect(() => {
+    fetchStatus()
+    const interval = setInterval(fetchStatus, 30000)
+    return () => clearInterval(interval)
+  }, [fetchStatus])
+
+  const startMonitoring = async () => {
+    setActionLoading(true)
+    try {
+      const res = await apiFetch('/api/monitor/start', { method: 'POST' })
+      if (res.ok) {
+        await fetchStatus()
+      }
+    } catch (error) {
+      console.error('Error starting monitoring:', error)
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const stopMonitoring = async () => {
+    setActionLoading(true)
+    try {
+      const res = await apiFetch('/api/monitor/stop', { method: 'POST' })
+      if (res.ok) {
+        await fetchStatus()
+      }
+    } catch (error) {
+      console.error('Error stopping monitoring:', error)
+    } finally {
+      setActionLoading(false)
     }
   }
 
@@ -67,12 +96,24 @@ export default function Settings() {
     }
   }
 
+  const formatDate = (isoString) => {
+    if (!isoString) return '--'
+    const date = new Date(isoString)
+    return date.toLocaleString('ar-SA', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl md:text-4xl font-bold text-gray-900">الإعدادات</h1>
-        <p className="text-gray-600 mt-1">تشغيل المراقبة وإدارة النظام</p>
+        <h1 className="text-3xl md:text-4xl font-bold text-gray-900">تشغيل وإيقاف النظام</h1>
+        <p className="text-gray-600 mt-1">المراقبة المستمرة للأخبار كل 10 دقائق</p>
       </div>
 
       {/* Info Alert */}
@@ -80,106 +121,152 @@ export default function Settings() {
         <div className="flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
           <div className="text-sm text-blue-800">
-            <p className="font-semibold mb-1">معلومات هامة:</p>
+            <p className="font-semibold mb-1">نظام المراقبة المستمرة:</p>
             <ul className="list-disc list-inside space-y-1 mr-3">
-              <li>يتم جلب الأخبار من جميع المصادر المفعلة</li>
-              <li>تتم مطابقة الأخبار مع الكلمات المفتاحية المضافة</li>
-              <li>يستخدم مكتبة Google Translate لترجمة النصوص</li>
-              <li>قد تستغرق العملية عدة دقائق حسب عدد المصادر</li>
-              <li>يتم حفظ النتائج في قاعدة البيانات</li>
-              <li>يمكنك عرض النتائج من صفحة الخلاصة</li>
+              <li>عند التشغيل، يتم البحث تلقائياً كل <strong>10 دقائق</strong></li>
+              <li>يعمل النظام في الخلفية حتى عند إغلاق المتصفح</li>
+              <li>يمكن لعدة مستخدمين الوصول للنتائج في نفس الوقت</li>
+              <li>يتم حفظ جميع النتائج في قاعدة البيانات</li>
+              <li>يمكنك إيقاف النظام في أي وقت</li>
             </ul>
           </div>
         </div>
       </div>
 
-      {/* Main Action Card */}
+      {/* Main Control Card */}
       <div className="card p-8">
-        <div className="text-center space-y-6">
-          {/* Main Button */}
-          <button
-            onClick={runMonitoring}
-            disabled={running}
-            className="btn text-lg px-8 py-4 mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {running ? (
-              <>
-                <Loader2 className="w-6 h-6 animate-spin" />
-                جاري مراقبة المصادر...
-              </>
-            ) : (
-              <>
-                <Play className="w-6 h-6" />
-                تشغيل نظام عين 
-              </>
+        {loading ? (
+          <div className="text-center py-8">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto text-emerald-600" />
+            <p className="text-gray-600 mt-2">جاري تحميل حالة النظام...</p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {/* Status Indicator */}
+            <div className="flex items-center justify-center gap-4">
+              <div className={`w-4 h-4 rounded-full ${status?.running ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
+              <span className={`text-2xl font-bold ${status?.running ? 'text-green-600' : 'text-gray-600'}`}>
+                {status?.running ? 'النظام يعمل' : 'النظام متوقف'}
+              </span>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex justify-center gap-4">
+              {!status?.running ? (
+                <button
+                  onClick={startMonitoring}
+                  disabled={actionLoading}
+                  className="btn text-lg px-8 py-4 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {actionLoading ? (
+                    <>
+                      <Loader2 className="w-6 h-6 animate-spin" />
+                      جاري التشغيل...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-6 h-6" />
+                      تشغيل نظام عين
+                    </>
+                  )}
+                </button>
+              ) : (
+                <button
+                  onClick={stopMonitoring}
+                  disabled={actionLoading}
+                  className="btn text-lg px-8 py-4 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {actionLoading ? (
+                    <>
+                      <Loader2 className="w-6 h-6 animate-spin" />
+                      جاري الإيقاف...
+                    </>
+                  ) : (
+                    <>
+                      <Square className="w-6 h-6" />
+                      إيقاف النظام
+                    </>
+                  )}
+                </button>
+              )}
+              
+              <button
+                onClick={fetchStatus}
+                className="btn text-lg px-4 py-4 bg-gray-200 hover:bg-gray-300 text-gray-700"
+                title="تحديث الحالة"
+              >
+                <RefreshCw className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Running Status Details */}
+            {status?.running && (
+              <div className="mt-6 p-4 bg-green-50 rounded-lg border border-green-200">
+                <div className="flex items-center justify-center gap-2 text-green-700">
+                  <Clock className="w-5 h-5" />
+                  <span>يتم الفحص كل <strong>{status.interval_minutes}</strong> دقيقة</span>
+                </div>
+              </div>
             )}
-          </button>
-
-          {/* Progress Bar */}
-          {running && (
-            <div className="w-full">
-              <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                <div 
-                  className="bg-gradient-to-r from-emerald-500 to-emerald-600 h-3 rounded-full transition-all duration-300"
-                  style={{ width: '100%', animation: 'shimmer 2s infinite' }}
-                />
-              </div>
-              <p className="text-sm text-gray-600 mt-2">يرجى الانتظار...</p>
-            </div>
-          )}
-
-          {/* Results */}
-          {result && !result.error && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <div className="text-3xl font-bold text-blue-600">{result.total_fetched || 0}</div>
-                <div className="text-sm text-blue-800">تم الفحص</div>
-              </div>
-              <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-200">
-                <div className="text-3xl font-bold text-emerald-600">{result.total_processed || 0}</div>
-                <div className="text-sm text-emerald-800">تمت المعالجة</div>
-              </div>
-              <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                <div className="text-3xl font-bold text-green-600">
-                  <Check className="w-8 h-8 inline" />
-                </div>
-                <div className="text-sm text-green-800">اكتمل</div>
-              </div>
-              <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
-                <div className="text-3xl font-bold text-purple-600">
-                  {result.total_processed > 0 ? Math.round((result.total_processed / result.total_fetched) * 100) : 0}%
-                </div>
-                <div className="text-sm text-purple-800">معدل القبول</div>
-              </div>
-            </div>
-          )}
-
-          {/* Error */}
-          {result && result.error && (
-            <div className="p-4 bg-red-50 rounded-lg border border-red-200">
-              <p className="text-red-800">❌ {result.error}</p>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
-      {/* System Status */}
+      {/* System Statistics */}
       <div className="card p-6">
-        <h3 className="text-xl font-bold text-gray-900 mb-4">حالة النظام</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="p-4 bg-gray-50 rounded-lg">
-            <div className="text-sm text-gray-600">المصادر النشطة</div>
-            <div className="text-2xl font-bold text-gray-900">--</div>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xl font-bold text-gray-900">إحصائيات النظام</h3>
+          {status?.running && (
+            <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-semibold">
+              يعمل الآن
+            </span>
+          )}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="text-sm text-blue-600">عدد الفحوصات</div>
+            <div className="text-3xl font-bold text-blue-700">{status?.run_count || 0}</div>
           </div>
-          <div className="p-4 bg-gray-50 rounded-lg">
-            <div className="text-sm text-gray-600">الكلمات المفتاحية</div>
-            <div className="text-2xl font-bold text-gray-900">--</div>
+          <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-200">
+            <div className="text-sm text-emerald-600">آخر فحص</div>
+            <div className="text-lg font-bold text-emerald-700">{formatDate(status?.last_run)}</div>
           </div>
-          <div className="p-4 bg-gray-50 rounded-lg">
-            <div className="text-sm text-gray-600">آخر تحديث</div>
-            <div className="text-2xl font-bold text-gray-900">--</div>
+          <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+            <div className="text-sm text-purple-600">الفحص القادم</div>
+            <div className="text-lg font-bold text-purple-700">{formatDate(status?.next_run)}</div>
+          </div>
+          <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+            <div className="text-sm text-orange-600">الأخطاء</div>
+            <div className="text-3xl font-bold text-orange-700">{status?.error_count || 0}</div>
           </div>
         </div>
+
+        {/* Last Result */}
+        {status?.last_result && (
+          <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+            <h4 className="font-semibold text-gray-700 mb-2">نتيجة آخر فحص:</h4>
+            {status.last_result.success ? (
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div>
+                  <div className="text-2xl font-bold text-blue-600">{status.last_result.total_fetched || 0}</div>
+                  <div className="text-sm text-gray-600">تم جلبها</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-emerald-600">{status.last_result.total_matches || 0}</div>
+                  <div className="text-sm text-gray-600">مطابقة</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-green-600">{status.last_result.total_saved || 0}</div>
+                  <div className="text-sm text-gray-600">تم حفظها</div>
+                </div>
+              </div>
+            ) : status.last_result.skipped ? (
+              <p className="text-yellow-700">⚠️ تم تخطي الفحص: {status.last_result.reason}</p>
+            ) : (
+              <p className="text-red-700">❌ خطأ: {status.last_result.error}</p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Export & Reset */}

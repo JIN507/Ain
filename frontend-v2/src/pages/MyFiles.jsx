@@ -52,7 +52,7 @@ export default function MyFiles() {
 
   const handleView = async (exportId) => {
     try {
-      const res = await apiFetch(`/api/exports/${exportId}/download`)
+      const res = await apiFetch(`/api/exports/${exportId}/download?view=1`)
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error || 'فشل عرض الملف')
@@ -100,6 +100,39 @@ export default function MyFiles() {
     return parts.join(' • ')
   }
 
+  const getSourceTypeInfo = (sourceType) => {
+    switch (sourceType) {
+      case 'direct_search':
+        return {
+          label: 'البحث المباشر',
+          icon: '🔍',
+          bgColor: 'bg-blue-100',
+          textColor: 'text-blue-700',
+          borderColor: 'border-blue-300',
+          iconBg: 'bg-blue-500'
+        }
+      case 'top_headlines':
+        return {
+          label: 'أهم العناوين',
+          icon: '📰',
+          bgColor: 'bg-purple-100',
+          textColor: 'text-purple-700',
+          borderColor: 'border-purple-300',
+          iconBg: 'bg-purple-500'
+        }
+      case 'dashboard':
+      default:
+        return {
+          label: 'لوحة المتابعة',
+          icon: '📊',
+          bgColor: 'bg-emerald-100',
+          textColor: 'text-emerald-700',
+          borderColor: 'border-emerald-300',
+          iconBg: 'bg-emerald-500'
+        }
+    }
+  }
+
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
@@ -134,14 +167,22 @@ export default function MyFiles() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {exportsList.map((rec) => (
+            {exportsList.map((rec) => {
+              const sourceInfo = getSourceTypeInfo(rec.source_type)
+              return (
               <div
                 key={rec.id}
-                className="border border-gray-200 rounded-xl p-4 hover:shadow-md transition bg-white"
+                className={`border rounded-xl p-4 hover:shadow-md transition bg-white ${sourceInfo.borderColor}`}
               >
+                {/* Source Type Badge */}
+                <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold mb-3 ${sourceInfo.bgColor} ${sourceInfo.textColor}`}>
+                  <span>{sourceInfo.icon}</span>
+                  <span>{sourceInfo.label}</span>
+                </div>
+                
                 <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0">
-                    <FileText className="w-10 h-10 text-red-500" />
+                  <div className={`flex-shrink-0 w-10 h-10 rounded-lg ${sourceInfo.iconBg} flex items-center justify-center`}>
+                    <FileText className="w-5 h-5 text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="text-sm font-semibold text-gray-900">
@@ -154,7 +195,7 @@ export default function MyFiles() {
                       {summarizeFilters(rec.filters)}
                     </p>
                     {rec.user_name && (
-                      <p className="text-xs text-blue-600 mt-1 font-medium">
+                      <p className="text-xs text-indigo-600 mt-1 font-medium">
                         👤 {rec.user_name}
                       </p>
                     )}
@@ -187,10 +228,12 @@ export default function MyFiles() {
                   </button>
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
     </div>
   )
 }
+

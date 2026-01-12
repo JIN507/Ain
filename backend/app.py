@@ -2918,7 +2918,7 @@ def external_headlines():
 
 
 def auto_initialize():
-    """Auto-initialize database with admin user and migrations on startup.
+    """Auto-initialize database with admin user, countries, and sources on startup.
     
     This ensures the web service has necessary data even on Render where
     shell and web service don't share the same container.
@@ -2954,15 +2954,28 @@ def auto_initialize():
             db.commit()
             print("[INIT] ✅ Admin user verified: elite@local")
         
+        # Check if we have countries, if not seed them
+        country_count = db.query(Country).count()
+        if country_count == 0:
+            print("[INIT] Seeding countries...")
+            from seed_data import seed_database
+            seed_database()
+            country_count = db.query(Country).count()
+            print(f"[INIT] ✅ Seeded {country_count} countries")
+        else:
+            print(f"[INIT] ✅ Countries: {country_count}")
+        
         # Check if we have sources
         source_count = db.query(Source).count()
         if source_count == 0:
-            print("[INIT] ⚠️ No sources found. Run add_global_sources.py manually.")
+            print("[INIT] ⚠️ No sources found - seeding should have added them")
         else:
             print(f"[INIT] ✅ Sources: {source_count}")
             
     except Exception as e:
         print(f"[INIT] ❌ Error during initialization: {e}")
+        import traceback
+        traceback.print_exc()
     finally:
         db.close()
 

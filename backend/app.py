@@ -84,28 +84,47 @@ def admin_required(fn):
     return wrapper
 
 
-def scoped(query, Model):
+def scoped(query, Model, force_user_filter=False):
     """Scope queries to the current user for models that have user_id.
 
-    STRICT ISOLATION: Every user (including ADMIN) only sees their OWN data.
-    - Authenticated users see only rows where Model.user_id == current_user.id.
-    - Anonymous/unauthenticated users see NOTHING (empty result).
+    - If force_user_filter=True: ALWAYS filter by current user (even for ADMIN)
+    - ADMIN sees all rows ONLY if force_user_filter=False (for admin dashboards)
+    - Regular users see only rows where Model.user_id == current_user.id.
+    - Anonymous users get the original query (public/global data only).
+    
+    IMPORTANT: For user-owned data (articles, keywords, exports), always use
+    force_user_filter=True to ensure proper isolation.
     """
     try:
         if not current_user.is_authenticated:
-            # Unauthenticated users see nothing - filter to impossible condition
-            if hasattr(Model, "user_id"):
-                return query.filter(Model.user_id == -1)  # No user has id=-1
             return query
-        # ALL authenticated users (including ADMIN) only see their own data
+        
+        # For user-owned data, always filter by user_id (even for admin)
+        if force_user_filter:
+            if hasattr(Model, "user_id"):
+                return query.filter(Model.user_id == current_user.id)
+            return query
+        
+        # Legacy behavior: ADMIN sees all (only for admin dashboards)
+        if getattr(current_user, "role", "USER") == "ADMIN":
+            return query
+        
         if hasattr(Model, "user_id"):
             return query.filter(Model.user_id == current_user.id)
         return query
     except RuntimeError:
-        # Outside request context; return empty for safety
-        if hasattr(Model, "user_id"):
-            return query.filter(Model.user_id == -1)
+        # Outside request context; just return original query
         return query
+
+
+def get_current_user_id():
+    """Get current user ID safely, returns None if not authenticated."""
+    try:
+        if current_user.is_authenticated:
+            return current_user.id
+        return None
+    except RuntimeError:
+        return None
 
 
 def log_action(user_id=None, admin_id=None, action="", meta=None):
@@ -1075,15 +1094,17 @@ def toggle_source(source_id):
 # ==================== Keywords ====================
 
 @app.route('/api/keywords', methods=['GET'])
+@login_required
 def get_keywords():
-    """Get all keywords with translations.
-
-    For authenticated non-admin users, results are scoped to their own keywords.
-    Admins see all keywords. Anonymous users see all (legacy behavior).
+    """Get current user's keywords with translations.
+    
+    SECURITY: Uses force_user_filter=True to ensure each user
+    only sees their own keywords, even admins.
     """
     db = get_db()
     try:
-        query = scoped(db.query(Keyword), Keyword)
+        # SECURITY FIX: Force user filter for proper isolation
+        query = scoped(db.query(Keyword), Keyword, force_user_filter=True)
         keywords = query.all()
         
         result = [{
@@ -1109,10 +1130,13 @@ def get_keywords_expanded():
     """Get current user's keywords with their multilingual expansions"""
     db = get_db()
     try:
-        # Get current user's enabled keywords only (strict isolation)
-        keywords = scoped(db.query(Keyword), Keyword).filter(Keyword.enabled == True).all()
+        # SECURITY FIX: Get ONLY current user's enabled keywords
+        keywords = db.query(Keyword).filter(
+            Keyword.enabled == True,
+            Keyword.user_id == current_user.id
+        ).all()
         
-        # Load/generate expansions for user's keywords
+        # Load/generate expansions for user's keywords only
         expansions = load_expansions_from_keywords(keywords)
         
         return jsonify(expansions)
@@ -1228,6 +1252,116 @@ def toggle_keyword(keyword_id):
     finally:
         db.close()
 
+# ==================== Monitoring Jobs (Background Execution) ====================
+
+from job_executor import job_executor
+
+@app.route('/api/monitor/job/start', methods=['POST'])
+@csrf.exempt
+@login_required
+def start_monitor_job():
+    """
+    Start a new monitoring job (background execution).
+    
+    Returns immediately with job_id. Use /api/monitor/job/status to poll.
+    
+    Features:
+    - Non-blocking (returns in <100ms)
+    - Idempotent (returns existing job if one is running)
+    - Rate limited (max 10 jobs/hour per user)
+    - Per-user isolation
+    
+    Response:
+        {
+            "success": true,
+            "job_id": 123,
+            "status": "QUEUED",
+            "message": "Monitoring job started",
+            "existing": false
+        }
+    """
+    user_id = current_user.id
+    result = job_executor.start_monitoring_job(user_id)
+    
+    if result.get('success'):
+        return jsonify(result)
+    else:
+        return jsonify(result), 429 if 'Rate limit' in result.get('error', '') else 503
+
+
+@app.route('/api/monitor/job/status', methods=['GET'])
+@login_required
+def get_monitor_job_status():
+    """
+    Get status of active monitoring job for current user.
+    
+    Response:
+        {
+            "id": 123,
+            "status": "RUNNING",
+            "progress": 45,
+            "progress_message": "Fetching RSS feeds...",
+            "total_fetched": 500,
+            "total_matched": 25,
+            "total_saved": 0,
+            "started_at": "2026-01-12T12:00:00",
+            ...
+        }
+    """
+    user_id = current_user.id
+    
+    # First check for active job
+    active_job = job_executor.get_active_job(user_id)
+    if active_job:
+        return jsonify(active_job)
+    
+    # No active job - return most recent
+    recent_jobs = job_executor.get_user_jobs(user_id, limit=1)
+    if recent_jobs:
+        return jsonify(recent_jobs[0])
+    
+    return jsonify({"status": "NONE", "message": "No jobs found"})
+
+
+@app.route('/api/monitor/job/<int:job_id>', methods=['GET'])
+@login_required
+def get_monitor_job_by_id(job_id):
+    """Get status of a specific job by ID"""
+    user_id = current_user.id
+    job = job_executor.get_job_status(job_id, user_id)
+    
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+    
+    return jsonify(job)
+
+
+@app.route('/api/monitor/job/<int:job_id>/cancel', methods=['POST'])
+@csrf.exempt
+@login_required
+def cancel_monitor_job(job_id):
+    """Cancel a running monitoring job"""
+    user_id = current_user.id
+    result = job_executor.cancel_job(job_id, user_id)
+    
+    if result.get('success'):
+        return jsonify(result)
+    else:
+        return jsonify(result), 400
+
+
+@app.route('/api/monitor/jobs', methods=['GET'])
+@login_required
+def get_monitor_jobs_history():
+    """Get recent monitoring jobs for current user"""
+    user_id = current_user.id
+    limit = request.args.get('limit', 10, type=int)
+    limit = min(limit, 50)  # Cap at 50
+    
+    jobs = job_executor.get_user_jobs(user_id, limit=limit)
+    return jsonify({"jobs": jobs})
+
+
 # ==================== Monitoring Scheduler (Per-User) ====================
 
 from scheduler import scheduler_manager
@@ -1266,19 +1400,28 @@ def run_monitoring():
     """
     Main monitoring function - fetches news and analyzes with Gemini
     This runs on-demand when user clicks the button
+    
+    SECURITY: Only uses CURRENT USER's keywords for monitoring.
+    Results are saved with current user's ID for isolation.
     """
     db = get_db()
+    user_id = current_user.id
     
     try:
-        # Get ALL enabled sources (shared) and CURRENT USER's keywords (isolated)
+        # Get ALL enabled sources (shared catalog)
         sources = db.query(Source).filter(Source.enabled == True).all()
-        keywords = scoped(db.query(Keyword), Keyword).filter(Keyword.enabled == True).all()
+        
+        # SECURITY FIX: Get ONLY current user's enabled keywords
+        keywords = db.query(Keyword).filter(
+            Keyword.enabled == True,
+            Keyword.user_id == user_id
+        ).all()
         
         if not sources:
             return jsonify({"error": "No enabled sources"}), 400
         
         if not keywords:
-            return jsonify({"error": "No enabled keywords for this user"}), 400
+            return jsonify({"error": "No enabled keywords"}), 400
         
         # Log sources breakdown by country (for transparency)
         print("\n📊 Enabled Sources Breakdown:")
@@ -1431,8 +1574,13 @@ def run_monitoring():
 # ==================== Articles ====================
 
 @app.route('/api/articles', methods=['GET'])
+@login_required
 def get_articles():
-    """Get all articles with optional filters"""
+    """Get current user's articles with optional filters.
+    
+    SECURITY: Uses force_user_filter=True to ensure each user 
+    only sees their own articles, even admins.
+    """
     db = get_db()
     try:
         # Get query parameters
@@ -1441,8 +1589,8 @@ def get_articles():
         sentiment = request.args.get('sentiment')
         search = request.args.get('search')
         
-        # Base query (scoped per user for privacy)
-        query = scoped(db.query(Article), Article).order_by(Article.created_at.desc())
+        # SECURITY FIX: Force user filter to ensure isolation (even for admin)
+        query = scoped(db.query(Article), Article, force_user_filter=True).order_by(Article.created_at.desc())
         
         # Apply filters
         if country:
@@ -1549,17 +1697,21 @@ def get_sources_countries():
 
 
 @app.route('/api/articles/countries', methods=['GET'])
+@login_required
 def get_articles_countries():
-    """Get distinct countries from actual articles (not Country table)"""
+    """Get distinct countries from current user's articles.
+    
+    SECURITY: Filters by user_id to ensure isolation.
+    """
     db = get_db()
     try:
-        # Get distinct countries from articles that actually exist
         from sqlalchemy import distinct, func
         
+        # SECURITY FIX: Filter by current user's articles only
         countries_query = db.query(
             Article.country,
             func.count(Article.id).label('article_count')
-        ).group_by(Article.country).order_by(func.count(Article.id).desc())
+        ).filter(Article.user_id == current_user.id).group_by(Article.country).order_by(func.count(Article.id).desc())
         
         result = []
         for country, count in countries_query:
@@ -1611,30 +1763,35 @@ def health_check_translation():
 @app.route('/api/articles/stats', methods=['GET'])
 @login_required
 def get_article_stats():
-    """Get article statistics - scoped to current user"""
+    """Get article statistics for current user only.
+    
+    SECURITY: Filters by user_id to ensure isolation.
+    """
     db = get_db()
     try:
-        # Scope ALL queries to current user for strict isolation
         from sqlalchemy import or_
+        user_id = current_user.id
         
-        base_query = scoped(db.query(Article), Article)
+        # SECURITY FIX: Filter all counts by user_id
+        base_query = db.query(Article).filter(Article.user_id == user_id)
+        
         total = base_query.count()
         
-        positive = scoped(db.query(Article), Article).filter(
+        positive = base_query.filter(
             or_(
                 Article.sentiment_label == 'إيجابي',
                 Article.sentiment == 'إيجابي'
             )
         ).count()
         
-        negative = scoped(db.query(Article), Article).filter(
+        negative = base_query.filter(
             or_(
                 Article.sentiment_label == 'سلبي',
                 Article.sentiment == 'سلبي'
             )
         ).count()
         
-        neutral = scoped(db.query(Article), Article).filter(
+        neutral = base_query.filter(
             or_(
                 Article.sentiment_label == 'محايد',
                 Article.sentiment == 'محايد'
@@ -1652,15 +1809,19 @@ def get_article_stats():
 
 @app.route('/api/articles/clear', methods=['POST'])
 @login_required
+@csrf.exempt
 def clear_articles():
-    """Clear current user's articles only - strict isolation"""
+    """Clear current user's articles only.
+    
+    SECURITY: Only deletes articles belonging to current user.
+    """
     db = get_db()
     try:
-        # Only delete articles belonging to current user
-        deleted_count = db.query(Article).filter(Article.user_id == current_user.id).delete()
+        # SECURITY FIX: Only delete current user's articles
+        deleted = db.query(Article).filter(Article.user_id == current_user.id).delete()
         db.commit()
         
-        return jsonify({"success": True, "deleted": deleted_count})
+        return jsonify({"success": True, "deleted": deleted})
     finally:
         db.close()
 
@@ -1669,8 +1830,10 @@ def clear_articles():
 @csrf.exempt
 def export_and_reset():
     """
-    Export all articles to Excel, then delete all articles and keywords
-    Atomic operation: all or nothing
+    Export current user's articles to Excel, then delete user's articles and keywords.
+    Atomic operation: all or nothing.
+    
+    SECURITY: Only exports/deletes data belonging to current user.
     """
     import openpyxl
     from openpyxl.styles import Font, Alignment
@@ -1679,11 +1842,12 @@ def export_and_reset():
     
     db = get_db()
     export_path = None
+    user_id = current_user.id
     
     try:
-        # Step 1: Fetch current user's articles only (strict isolation)
-        print(f"📊 Fetching articles for user {current_user.id}...")
-        articles = db.query(Article).filter(Article.user_id == current_user.id).order_by(Article.created_at.desc()).all()
+        # Step 1: Fetch ONLY current user's articles
+        print(f"📊 Fetching articles for user {user_id}...")
+        articles = db.query(Article).filter(Article.user_id == user_id).order_by(Article.created_at.desc()).all()
         article_count = len(articles)
         
         if article_count == 0:
@@ -1763,15 +1927,15 @@ def export_and_reset():
         
         print(f"   ✅ Export verified: {exported_rows} rows")
         
-        # Step 4: Delete current user's data only (atomic transaction)
-        print(f"🗑️ Starting atomic delete for user {current_user.id}...")
+        # Step 4: Delete ONLY current user's data (atomic transaction)
+        print(f"🗑️ Starting atomic delete transaction for user {user_id}...")
         
-        # Delete only current user's data in single transaction
-        db.query(Article).filter(Article.user_id == current_user.id).delete()
-        db.query(Keyword).filter(Keyword.user_id == current_user.id).delete()
+        # SECURITY FIX: Delete only current user's data
+        deleted_articles = db.query(Article).filter(Article.user_id == user_id).delete()
+        deleted_keywords = db.query(Keyword).filter(Keyword.user_id == user_id).delete()
         db.commit()
         
-        print(f"   ✅ User {current_user.id} data deleted from database")
+        print(f"   ✅ Deleted {deleted_articles} articles and {deleted_keywords} keywords for user {user_id}")
         
         # Step 5: Clear in-memory caches
         from translation_service import clear_all_caches

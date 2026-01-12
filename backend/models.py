@@ -1,4 +1,11 @@
-"""Database models for Ain News Monitor"""
+"""Database models for Ain News Monitor
+
+This file defines all SQLAlchemy ORM models that map to the actual database schema.
+All tables in the DB must have a corresponding model here to prevent schema mismatch.
+
+IMPORTANT: Do not modify table structures here without a migration plan.
+"""
+import os
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Text, ForeignKey, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
@@ -156,15 +163,176 @@ class SearchHistory(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
-# Database setup
-DATABASE_URL = "sqlite:///ain_news.db"
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+# ==============================================================================
+# Junction Tables (for per-user preferences on shared catalog data)
+# These tables exist in DB but are currently NOT actively used by app logic.
+# Kept here for schema completeness. Future use: per-user source/country prefs.
+# ==============================================================================
+
+class UserArticle(Base):
+    """Junction table linking users to articles with per-user metadata.
+    
+    NOTE: Currently NOT used by application code. articles.user_id is the
+    active mechanism for article ownership. This table exists in DB with
+    historical data but the app reads/writes articles.user_id directly.
+    
+    Future use: could support shared articles with per-user notes/stars.
+    """
+    __tablename__ = 'user_articles'
+    __table_args__ = (
+        UniqueConstraint('user_id', 'article_id', name='uq_user_article'),
+    )
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    article_id = Column(Integer, ForeignKey('articles.id'), nullable=False, index=True)
+    keyword_id = Column(Integer, ForeignKey('keywords.id'), nullable=True)
+    keyword_original = Column(String(200), nullable=True)
+    keywords_translations = Column(Text, nullable=True)
+    sentiment_label = Column(String(50), nullable=True)
+    sentiment_score = Column(String(20), nullable=True)
+    is_read = Column(Boolean, default=False)
+    is_starred = Column(Boolean, default=False)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class UserCountry(Base):
+    """Junction table for per-user country preferences.
+    
+    NOTE: Currently NOT used by application code. Countries are shared
+    catalog data. This table exists in DB with historical data.
+    
+    Future use: per-user enabled/disabled countries for filtering.
+    """
+    __tablename__ = 'user_countries'
+    __table_args__ = (
+        UniqueConstraint('user_id', 'country_id', name='uq_user_country'),
+    )
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    country_id = Column(Integer, ForeignKey('countries.id'), nullable=False, index=True)
+    enabled = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class UserSource(Base):
+    """Junction table for per-user source preferences.
+    
+    NOTE: Currently NOT used by application code. Sources are shared
+    catalog data. This table exists in DB with historical data.
+    
+    Future use: per-user enabled/disabled sources for monitoring.
+    """
+    __tablename__ = 'user_sources'
+    __table_args__ = (
+        UniqueConstraint('user_id', 'source_id', name='uq_user_source'),
+    )
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    source_id = Column(Integer, ForeignKey('sources.id'), nullable=False, index=True)
+    enabled = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# ==============================================================================
+# Monitor Jobs - Background Job Tracking
+# ==============================================================================
+
+class MonitorJob(Base):
+    """
+    Tracks monitoring job execution for async/background processing.
+    
+    Status flow: QUEUED → RUNNING → SUCCEEDED/FAILED/CANCELLED
+    
+    This enables:
+    - Non-blocking API responses
+    - Per-user job limits (one active job at a time)
+    - Job status tracking and progress
+    - Persistence across server restarts
+    """
+    __tablename__ = 'monitor_jobs'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    
+    # Job status
+    status = Column(String(20), nullable=False, default='QUEUED')  # QUEUED, RUNNING, SUCCEEDED, FAILED, CANCELLED
+    
+    # Progress tracking
+    progress = Column(Integer, default=0)  # 0-100
+    progress_message = Column(String(255), nullable=True)
+    
+    # Timing
+    created_at = Column(DateTime, default=datetime.utcnow)
+    started_at = Column(DateTime, nullable=True)
+    finished_at = Column(DateTime, nullable=True)
+    
+    # Results
+    total_fetched = Column(Integer, default=0)
+    total_matched = Column(Integer, default=0)
+    total_saved = Column(Integer, default=0)
+    
+    # Error handling
+    error_message = Column(Text, nullable=True)
+    
+    # Metadata (JSON)
+    meta_json = Column(Text, nullable=True)  # Additional stats/info
+    
+    def to_dict(self):
+        """Convert to dictionary for JSON response"""
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'status': self.status,
+            'progress': self.progress,
+            'progress_message': self.progress_message,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'started_at': self.started_at.isoformat() if self.started_at else None,
+            'finished_at': self.finished_at.isoformat() if self.finished_at else None,
+            'total_fetched': self.total_fetched,
+            'total_matched': self.total_matched,
+            'total_saved': self.total_saved,
+            'error_message': self.error_message,
+        }
+
+
+# ==============================================================================
+# Database Connection Setup
+# ==============================================================================
+
+# Priority: ENV variable > fallback to SQLite for local dev
+# For production, set DATABASE_URL env var to PostgreSQL connection string
+DATABASE_URL = os.environ.get('DATABASE_URL', 'sqlite:///ain_news.db')
+
+# SQLite-specific settings
+_connect_args = {}
+if DATABASE_URL.startswith('sqlite'):
+    _connect_args = {"check_same_thread": False}
+
+engine = create_engine(DATABASE_URL, connect_args=_connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+
 def init_db():
-    """Initialize database tables"""
+    """Initialize database tables.
+    
+    WARNING: This will create tables that don't exist but won't modify
+    existing tables. For schema changes, use migration scripts.
+    """
     Base.metadata.create_all(bind=engine)
 
+
 def get_db():
-    """Get database session - use as context manager or close manually"""
+    """Get database session.
+    
+    Usage:
+        db = get_db()
+        try:
+            # ... use db ...
+        finally:
+            db.close()
+    """
     return SessionLocal()

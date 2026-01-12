@@ -2917,6 +2917,60 @@ def external_headlines():
         db.close()
 
 
+def auto_initialize():
+    """Auto-initialize database with admin user and migrations on startup.
+    
+    This ensures the web service has necessary data even on Render where
+    shell and web service don't share the same container.
+    """
+    from auth_utils import hash_password
+    
+    print("[INIT] Running auto-initialization...")
+    
+    # Initialize database tables
+    init_db()
+    
+    db = get_db()
+    try:
+        # Check if admin exists
+        admin = db.query(User).filter(User.email == "elite@local").first()
+        if not admin:
+            admin = User(
+                name="عبدالله الكلثمي",
+                email="elite@local",
+                password_hash=hash_password("135813581234"),
+                role="ADMIN",
+                is_active=True,
+            )
+            db.add(admin)
+            db.commit()
+            print("[INIT] ✅ Admin user created: elite@local")
+        else:
+            # Ensure admin is active and has correct role
+            admin.is_active = True
+            admin.role = "ADMIN"
+            if not admin.password_hash or len(admin.password_hash) < 10:
+                admin.password_hash = hash_password("135813581234")
+            db.commit()
+            print("[INIT] ✅ Admin user verified: elite@local")
+        
+        # Check if we have sources
+        source_count = db.query(Source).count()
+        if source_count == 0:
+            print("[INIT] ⚠️ No sources found. Run add_global_sources.py manually.")
+        else:
+            print(f"[INIT] ✅ Sources: {source_count}")
+            
+    except Exception as e:
+        print(f"[INIT] ❌ Error during initialization: {e}")
+    finally:
+        db.close()
+
+
+# Run auto-initialization when module loads (for Gunicorn)
+auto_initialize()
+
+
 if __name__ == '__main__':
     print("\n" + "="*50)
     print("🌍 عين (Ain) - News Monitor")

@@ -307,12 +307,20 @@ class MonitorJob(Base):
 # For production, set DATABASE_URL env var to PostgreSQL connection string
 DATABASE_URL = os.environ.get('DATABASE_URL', 'sqlite:///ain_news.db')
 
-# SQLite-specific settings
+# Fix Render's postgres:// to postgresql:// (SQLAlchemy requires postgresql://)
+if DATABASE_URL.startswith('postgres://'):
+    DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
+
+# Log which database we're using
+_db_type = 'PostgreSQL' if 'postgresql' in DATABASE_URL else 'SQLite'
+print(f"[DB] Using {_db_type} database")
+
+# Database-specific settings
 _connect_args = {}
 if DATABASE_URL.startswith('sqlite'):
     _connect_args = {"check_same_thread": False}
 
-engine = create_engine(DATABASE_URL, connect_args=_connect_args)
+engine = create_engine(DATABASE_URL, connect_args=_connect_args, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 

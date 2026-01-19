@@ -1,42 +1,26 @@
 """
-Translation Caching Service
-Caches article translations to Arabic to avoid redundant API calls
+Translation Service for Articles
+Translates article text to Arabic using Google Translate
+
+PHASE 3 UPDATE: Removed in-memory cache to reduce RAM usage.
+Translations are saved directly to Article model (title_ar, summary_ar).
+No need for RAM cache since articles are stored in database.
 """
-import hashlib
-from datetime import datetime, timedelta
+from datetime import datetime
 from googletrans import Translator
 from arabic_utils import is_arabic_text
 import os
 
 # Configuration
-TRANSLATION_TTL_DAYS = int(os.getenv('TRANSLATION_TTL_DAYS', '30'))
 TRANSLATION_TIMEOUT_S = int(os.getenv('TRANSLATION_TIMEOUT_S', '8'))
 
 # Initialize translator
 translator = Translator()
 
-# In-memory cache for translations
-_translation_cache = {}
 
-
-def get_text_hash(text):
+def translate_to_arabic(text, source_lang='auto'):
     """
-    Generate a hash for text to use as cache key
-    
-    Args:
-        text: Text to hash
-        
-    Returns:
-        MD5 hash string
-    """
-    if not text:
-        return None
-    return hashlib.md5(text.encode('utf-8')).hexdigest()
-
-
-def translate_to_arabic_cached(text, source_lang='auto'):
-    """
-    Translate text to Arabic with caching
+    Translate text to Arabic (no caching - saves RAM)
     
     Args:
         text: Text to translate
@@ -47,7 +31,7 @@ def translate_to_arabic_cached(text, source_lang='auto'):
             'original': str,
             'translated': str,
             'source_lang': str,
-            'translation_status': 'cached' | 'success' | 'failed' | 'skipped',
+            'translation_status': 'success' | 'failed' | 'skipped',
             'updated_at': str
         }
     """
@@ -60,7 +44,7 @@ def translate_to_arabic_cached(text, source_lang='auto'):
             'updated_at': datetime.utcnow().isoformat()
         }
     
-    # Check if already Arabic
+    # Check if already Arabic - no translation needed
     if is_arabic_text(text):
         return {
             'original': text,
@@ -70,34 +54,18 @@ def translate_to_arabic_cached(text, source_lang='auto'):
             'updated_at': datetime.utcnow().isoformat()
         }
     
-    # Check cache
-    text_hash = get_text_hash(text)
-    cache_key = f"{text_hash}_ar"
-    
-    if cache_key in _translation_cache:
-        cached = _translation_cache[cache_key]
-        cache_time = datetime.fromisoformat(cached['updated_at'])
-        if datetime.utcnow() - cache_time < timedelta(days=TRANSLATION_TTL_DAYS):
-            cached['translation_status'] = 'cached'
-            return cached
-    
-    # Translate
+    # Translate directly (no cache)
     try:
         result = translator.translate(text, src=source_lang, dest='ar')
         
         if result and result.text:
-            translation_result = {
+            return {
                 'original': text,
                 'translated': result.text,
                 'source_lang': result.src if hasattr(result, 'src') else source_lang,
                 'translation_status': 'success',
                 'updated_at': datetime.utcnow().isoformat()
             }
-            
-            # Cache it
-            _translation_cache[cache_key] = translation_result
-            
-            return translation_result
         else:
             return {
                 'original': text,
@@ -119,6 +87,12 @@ def translate_to_arabic_cached(text, source_lang='auto'):
         }
 
 
+# Backward compatibility alias
+def translate_to_arabic_cached(text, source_lang='auto'):
+    """Alias for backward compatibility - now just calls translate_to_arabic"""
+    return translate_to_arabic(text, source_lang)
+
+
 def translate_article_to_arabic(title, summary, detected_lang='auto'):
     """
     Translate article title and summary to Arabic
@@ -138,10 +112,10 @@ def translate_article_to_arabic(title, summary, detected_lang='auto'):
         }
     """
     # Translate title
-    title_result = translate_to_arabic_cached(title, detected_lang)
+    title_result = translate_to_arabic(title, detected_lang)
     
     # Translate summary
-    summary_result = translate_to_arabic_cached(summary, detected_lang) if summary else {
+    summary_result = translate_to_arabic(summary, detected_lang) if summary else {
         'translated': '',
         'translation_status': 'skipped'
     }
@@ -150,7 +124,7 @@ def translate_article_to_arabic(title, summary, detected_lang='auto'):
     title_status = title_result['translation_status']
     summary_status = summary_result['translation_status']
     
-    if title_status in ['success', 'cached', 'skipped'] and summary_status in ['success', 'cached', 'skipped']:
+    if title_status in ['success', 'skipped'] and summary_status in ['success', 'skipped']:
         overall_status = 'success'
     elif title_status == 'failed' and summary_status == 'failed':
         overall_status = 'failed'
@@ -168,16 +142,16 @@ def translate_article_to_arabic(title, summary, detected_lang='auto'):
 
 
 def clear_translation_cache():
-    """Clear the translation cache"""
-    _translation_cache.clear()
-    print("🧹 Cleared translation cache")
+    """No-op - cache removed in Phase 3"""
+    print("ℹ️ Translation cache removed (Phase 3) - no action needed")
 
 
 def get_cache_stats():
-    """Get cache statistics"""
+    """Return empty stats - cache removed in Phase 3"""
     return {
-        'total_entries': len(_translation_cache),
-        'cache_size_kb': len(str(_translation_cache)) / 1024
+        'total_entries': 0,
+        'cache_size_kb': 0,
+        'note': 'RAM cache removed in Phase 3 - translations saved directly to articles'
     }
 
 

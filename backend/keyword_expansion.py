@@ -134,26 +134,33 @@ def get_expansion_from_db(keyword_obj):
     Returns:
         Expansion dict or None if not available
     """
-    if not keyword_obj.translations_json:
+    # Defensive: Check if column exists (handles pre-migration state)
+    translations_json = getattr(keyword_obj, 'translations_json', None)
+    translations_updated_at = getattr(keyword_obj, 'translations_updated_at', None)
+    
+    if not translations_json:
         return None
     
     # Check if translations are still valid (not expired)
-    if keyword_obj.translations_updated_at:
-        age = datetime.utcnow() - keyword_obj.translations_updated_at
-        if age > timedelta(days=EXPANSION_TTL_DAYS):
-            print(f"   ⏰ Translations expired for: {keyword_obj.text_ar}")
-            return None
+    if translations_updated_at:
+        try:
+            age = datetime.utcnow() - translations_updated_at
+            if age > timedelta(days=EXPANSION_TTL_DAYS):
+                print(f"   ⏰ Translations expired for: {keyword_obj.text_ar}")
+                return None
+        except (TypeError, AttributeError):
+            pass  # Handle edge cases with datetime comparison
     
     try:
-        translations = json.loads(keyword_obj.translations_json)
+        translations = json.loads(translations_json)
         return {
             'original_ar': keyword_obj.text_ar,
             'normalized_ar': normalize_arabic(keyword_obj.text_ar),
             'translations': translations,
-            'updated_at': keyword_obj.translations_updated_at.isoformat() if keyword_obj.translations_updated_at else None,
+            'updated_at': translations_updated_at.isoformat() if translations_updated_at else None,
             'status': 'success' if len(translations) >= 10 else 'partial'
         }
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, TypeError):
         return None
 
 

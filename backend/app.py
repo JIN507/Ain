@@ -2924,11 +2924,40 @@ def auto_initialize():
     shell and web service don't share the same container.
     """
     from auth_utils import hash_password
+    from models import engine, DATABASE_URL
+    from sqlalchemy import text
     
     print("[INIT] Running auto-initialization...")
     
     # Initialize database tables
     init_db()
+    
+    # Run column migrations (safe to run multiple times)
+    print("[INIT] Checking column migrations...")
+    try:
+        with engine.connect() as conn:
+            is_postgres = 'postgresql' in DATABASE_URL or 'postgres' in DATABASE_URL
+            
+            if is_postgres:
+                # PostgreSQL: Add columns if not exist
+                conn.execute(text("ALTER TABLE keywords ADD COLUMN IF NOT EXISTS translations_json TEXT"))
+                conn.execute(text("ALTER TABLE keywords ADD COLUMN IF NOT EXISTS translations_updated_at TIMESTAMP"))
+                conn.execute(text("ALTER TABLE articles ALTER COLUMN url TYPE VARCHAR(2000)"))
+                conn.execute(text("ALTER TABLE articles ALTER COLUMN image_url TYPE VARCHAR(2000)"))
+                conn.execute(text("ALTER TABLE sources ALTER COLUMN url TYPE VARCHAR(2000)"))
+                conn.commit()
+                print("[INIT] ✅ PostgreSQL columns migrated")
+            else:
+                # SQLite: Check and add columns
+                result = conn.execute(text("PRAGMA table_info(keywords)"))
+                columns = [row[1] for row in result]
+                if 'translations_json' not in columns:
+                    conn.execute(text("ALTER TABLE keywords ADD COLUMN translations_json TEXT"))
+                    conn.execute(text("ALTER TABLE keywords ADD COLUMN translations_updated_at TIMESTAMP"))
+                    conn.commit()
+                    print("[INIT] ✅ SQLite columns migrated")
+    except Exception as e:
+        print(f"[INIT] ⚠️ Column migration note: {str(e)[:100]}")
     
     db = get_db()
     try:

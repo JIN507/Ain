@@ -45,7 +45,7 @@ class Source(Base):
     country_id = Column(Integer, nullable=False)
     country_name = Column(String(100), nullable=False)
     name = Column(String(200), nullable=False)
-    url = Column(String(500), nullable=False, unique=True)
+    url = Column(String(2000), nullable=False, unique=True)
     enabled = Column(Boolean, default=True)
     last_checked = Column(DateTime, nullable=True)
     fail_count = Column(Integer, default=0)
@@ -79,13 +79,13 @@ class Article(Base):
     # Source info
     country = Column(String(100), nullable=False)
     source_name = Column(String(200), nullable=False)
-    url = Column(String(500), nullable=False, unique=True)
+    url = Column(String(2000), nullable=False, unique=True)
     
     # Original content
     title_original = Column(Text, nullable=False)
     summary_original = Column(Text, nullable=True)
     original_language = Column(String(10), nullable=True)  # Detected language (en, ar, fr, etc.)
-    image_url = Column(String(1000), nullable=True)  # Article image/thumbnail
+    image_url = Column(String(2000), nullable=True)  # Article image/thumbnail
     
     # Arabic translation
     title_ar = Column(Text, nullable=True)

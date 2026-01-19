@@ -1192,15 +1192,15 @@ def add_keyword():
         
         print(f"   ✅ Keyword saved to database (ID: {keyword.id})")
         
-        # Step 2: Expand keyword to 32 languages for comprehensive multilingual matching
+        # Step 2: Expand keyword to 32 languages and SAVE TO DATABASE
         print(f"🔄 Step 2: Expanding keyword to 32 languages for global search...")
-        expansion = expand_keyword(keyword_ar)
+        expansion = expand_keyword(keyword_ar, keyword_obj=keyword, db=db)
         
         if expansion['status'] == 'success':
-            print(f"   ✅ Expanded successfully to {len(expansion['translations'])} languages")
+            print(f"   ✅ Expanded successfully to {len(expansion['translations'])} languages (saved to DB)")
             print(f"   📋 Coverage: en, fr, es, de, ru, zh-cn, ja, hi, id, pt, tr, ko, it, nl, vi, th, ms, fa, ur, +more")
         elif expansion['status'] == 'partial':
-            print(f"   ⚠️  Partially expanded to {len(expansion['translations'])} languages")
+            print(f"   ⚠️  Partially expanded to {len(expansion['translations'])} languages (saved to DB)")
         else:
             print(f"   ❌ Expansion failed")
         

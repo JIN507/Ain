@@ -59,7 +59,7 @@ class Keyword(Base):
     user_id = Column(Integer, ForeignKey('users.id'), nullable=True, index=True)
     text_ar = Column(String(200), nullable=False)
     
-    # Translations in different languages
+    # Translations in different languages (legacy columns - kept for compatibility)
     text_en = Column(String(200), nullable=True)  # English
     text_fr = Column(String(200), nullable=True)  # French
     text_tr = Column(String(200), nullable=True)  # Turkish
@@ -67,6 +67,10 @@ class Keyword(Base):
     text_zh = Column(String(200), nullable=True)  # Chinese
     text_ru = Column(String(200), nullable=True)  # Russian
     text_es = Column(String(200), nullable=True)  # Spanish
+    
+    # NEW: All translations as JSON (supports 33+ languages)
+    translations_json = Column(Text, nullable=True)  # {"en": "...", "fr": "...", ...}
+    translations_updated_at = Column(DateTime, nullable=True)  # When translations were last updated
     
     enabled = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)

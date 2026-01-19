@@ -1,7 +1,9 @@
 """
 Keyword Expansion Service
 Translates Arabic keywords to multiple languages using Google Translate
-Includes caching to avoid redundant translations
+
+PHASE 2 UPDATE: Translations now stored in DATABASE (keywords.translations_json)
+instead of RAM cache. This fixes the "No keyword expansions" error after restarts.
 """
 import os
 from datetime import datetime, timedelta
@@ -22,16 +24,15 @@ TRANSLATION_TIMEOUT_S = int(os.getenv('TRANSLATION_TIMEOUT_S', '8'))
 # Initialize Google Translator
 translator = Translator()
 
-# In-memory cache for expansions
-_expansion_cache = {}
 
-
-def expand_keyword(keyword_ar):
+def expand_keyword(keyword_ar, keyword_obj=None, db=None):
     """
-    Expand Arabic keyword to multiple languages
+    Expand Arabic keyword to multiple languages and save to database.
     
     Args:
         keyword_ar: Arabic keyword to expand
+        keyword_obj: Optional Keyword model object to save translations to
+        db: Optional database session (required if keyword_obj provided)
         
     Returns:
         dict: {
@@ -42,16 +43,6 @@ def expand_keyword(keyword_ar):
             'status': 'success' | 'partial' | 'failed'
         }
     """
-    # Check cache first
-    cache_key = keyword_ar
-    if cache_key in _expansion_cache:
-        cached = _expansion_cache[cache_key]
-        # Check if cache is still valid
-        cache_time = datetime.fromisoformat(cached['updated_at'])
-        if datetime.utcnow() - cache_time < timedelta(days=EXPANSION_TTL_DAYS):
-            print(f"   📦 Using cached expansion for: {keyword_ar}")
-            return cached
-    
     print(f"   🔄 Expanding keyword: {keyword_ar}")
     
     # Normalize Arabic
@@ -59,13 +50,9 @@ def expand_keyword(keyword_ar):
     
     # Check if this is a known proper noun
     proper_noun_forms = get_proper_noun_forms(keyword_ar)
-    is_known_proper_noun = proper_noun_forms is not None
+    is_proper_noun = proper_noun_forms is not None
     
-    # Auto-detect if keyword looks like a proper noun (capitalized, starts with capital, etc.)
-    # For now, rely on the manual map but could add heuristics
-    # TODO: Add automatic proper noun detection for names not in map
-    
-    if is_known_proper_noun:
+    if is_proper_noun:
         print(f"   📌 Known proper noun - using curated translations")
     
     # Translate to target languages
@@ -74,18 +61,13 @@ def expand_keyword(keyword_ar):
     
     for target_lang in TRANSLATE_TARGETS:
         try:
-            # Clean target lang code
             lang_code = target_lang.strip().lower()
             
             # Use proper noun form if available, otherwise use Google Translate
-            if is_known_proper_noun and lang_code in proper_noun_forms:
+            if is_proper_noun and lang_code in proper_noun_forms:
                 translations[lang_code] = proper_noun_forms[lang_code]
                 print(f"      ✅ {lang_code.upper()}: {proper_noun_forms[lang_code]} (curated)")
             else:
-                # Use Google Translate for non-proper nouns
-                # WARNING: For proper nouns not in our map, Google Translate may give
-                # generic translations (e.g., "ترامب" → "Atout" in French meaning "trump card")
-                # To fix: Add the proper noun to proper_noun_rules.py
                 result = translator.translate(keyword_ar, src='ar', dest=lang_code)
                 
                 if result and result.text:
@@ -107,106 +89,152 @@ def expand_keyword(keyword_ar):
     else:
         status = 'failed'
     
+    now = datetime.utcnow()
+    
     # Create expansion result
     expansion = {
         'original_ar': keyword_ar,
         'normalized_ar': normalized_ar,
         'translations': translations,
-        'updated_at': datetime.utcnow().isoformat(),
+        'updated_at': now.isoformat(),
         'status': status,
         'failed_langs': failed_langs if failed_langs else None
     }
     
-    # Cache the result
-    _expansion_cache[cache_key] = expansion
+    # Save to database if keyword object provided
+    if keyword_obj and db:
+        try:
+            keyword_obj.translations_json = json.dumps(translations, ensure_ascii=False)
+            keyword_obj.translations_updated_at = now
+            # Also update legacy columns for backward compatibility
+            keyword_obj.text_en = translations.get('en', '')[:200] if translations.get('en') else None
+            keyword_obj.text_fr = translations.get('fr', '')[:200] if translations.get('fr') else None
+            keyword_obj.text_es = translations.get('es', '')[:200] if translations.get('es') else None
+            keyword_obj.text_ru = translations.get('ru', '')[:200] if translations.get('ru') else None
+            keyword_obj.text_tr = translations.get('tr', '')[:200] if translations.get('tr') else None
+            keyword_obj.text_zh = translations.get('zh-cn', '')[:200] if translations.get('zh-cn') else None
+            keyword_obj.text_ur = translations.get('ur', '')[:200] if translations.get('ur') else None
+            db.commit()
+            print(f"   💾 Saved translations to database")
+        except Exception as e:
+            print(f"   ⚠️ Failed to save to database: {e}")
     
     print(f"   ✅ Expansion complete: {status} ({len(translations)}/{len(TRANSLATE_TARGETS)} languages)")
     
     return expansion
 
 
-def get_cached_expansion(keyword_ar):
+def get_expansion_from_db(keyword_obj):
     """
-    Get cached expansion if available and valid
+    Get expansion from database for a Keyword object.
     
     Args:
-        keyword_ar: Arabic keyword
+        keyword_obj: Keyword model object
         
     Returns:
-        Cached expansion or None
+        Expansion dict or None if not available
     """
-    if keyword_ar in _expansion_cache:
-        cached = _expansion_cache[keyword_ar]
-        cache_time = datetime.fromisoformat(cached['updated_at'])
-        if datetime.utcnow() - cache_time < timedelta(days=EXPANSION_TTL_DAYS):
-            return cached
-    return None
+    if not keyword_obj.translations_json:
+        return None
+    
+    # Check if translations are still valid (not expired)
+    if keyword_obj.translations_updated_at:
+        age = datetime.utcnow() - keyword_obj.translations_updated_at
+        if age > timedelta(days=EXPANSION_TTL_DAYS):
+            print(f"   ⏰ Translations expired for: {keyword_obj.text_ar}")
+            return None
+    
+    try:
+        translations = json.loads(keyword_obj.translations_json)
+        return {
+            'original_ar': keyword_obj.text_ar,
+            'normalized_ar': normalize_arabic(keyword_obj.text_ar),
+            'translations': translations,
+            'updated_at': keyword_obj.translations_updated_at.isoformat() if keyword_obj.translations_updated_at else None,
+            'status': 'success' if len(translations) >= 10 else 'partial'
+        }
+    except json.JSONDecodeError:
+        return None
 
 
 def get_all_expansions():
     """
-    Get all cached expansions
+    Get all expansions from database.
     
     Returns:
         list of expansion dicts
     """
-    # Filter out expired entries
-    valid_expansions = []
-    now = datetime.utcnow()
+    from models import get_db, Keyword
     
-    for keyword_ar, expansion in _expansion_cache.items():
-        cache_time = datetime.fromisoformat(expansion['updated_at'])
-        if now - cache_time < timedelta(days=EXPANSION_TTL_DAYS):
-            valid_expansions.append(expansion)
-    
-    return valid_expansions
+    db = get_db()
+    try:
+        keywords = db.query(Keyword).filter(
+            Keyword.enabled == True,
+            Keyword.translations_json.isnot(None)
+        ).all()
+        
+        expansions = []
+        for kw in keywords:
+            expansion = get_expansion_from_db(kw)
+            if expansion:
+                expansions.append(expansion)
+        
+        return expansions
+    finally:
+        db.close()
 
 
 def clear_expansion_cache():
-    """Clear the expansion cache"""
-    _expansion_cache.clear()
-    print("🧹 Cleared expansion cache")
+    """Clear all keyword translations in database (use with caution)"""
+    from models import get_db, Keyword
+    
+    db = get_db()
+    try:
+        db.query(Keyword).update({
+            Keyword.translations_json: None,
+            Keyword.translations_updated_at: None
+        })
+        db.commit()
+        print("🧹 Cleared all keyword translations from database")
+    finally:
+        db.close()
 
 
 def load_expansions_from_keywords(keywords):
     """
-    Load cached expansions for keywords - NEVER translates during runtime!
+    Load expansions from DATABASE for keywords - NEVER translates during runtime!
     
     CRITICAL: This function is called during monitoring and must be FAST.
-    It ONLY loads pre-cached expansions. If expansion is missing, it skips
-    the keyword with a warning.
+    It ONLY loads pre-stored expansions from the database. If expansion is 
+    missing, it skips the keyword with a warning.
     
     Translation/expansion happens ONLY when adding keywords via /api/keywords.
     
     Args:
-        keywords: List of Keyword objects with text_ar field
+        keywords: List of Keyword objects with text_ar and translations_json fields
         
     Returns:
-        List of cached expansions (skips keywords without cache)
+        List of expansions (skips keywords without translations)
     """
     expansions = []
     skipped = []
     
     for kw in keywords:
-        keyword_ar = kw.text_ar
-        
-        # ONLY load from cache - NEVER translate during runtime!
-        expansion = get_cached_expansion(keyword_ar)
+        # Load from DATABASE instead of RAM cache
+        expansion = get_expansion_from_db(kw)
         
         if expansion:
             expansions.append(expansion)
         else:
-            # Skip keyword if not cached (should have been expanded when added)
-            skipped.append(keyword_ar)
-            print(f"⚠️  WARNING: Keyword '{keyword_ar}' has no cached expansion (skipping)")
-            print(f"   → Add this keyword again via frontend to generate expansion")
+            skipped.append(kw.text_ar)
+            print(f"⚠️  Keyword '{kw.text_ar}' has no translations (skipping)")
     
     if skipped:
-        print(f"\n⚠️  {len(skipped)} keywords skipped (no cached expansions)")
-        print(f"   Skipped: {', '.join(skipped[:3])}")
-        if len(skipped) > 3:
-            print(f"   ... and {len(skipped) - 3} more")
-        print(f"   → To fix: Re-add these keywords via frontend\n")
+        print(f"\n⚠️  {len(skipped)} keywords skipped (no translations in database)")
+        print(f"   Skipped: {', '.join(skipped[:5])}")
+        if len(skipped) > 5:
+            print(f"   ... and {len(skipped) - 5} more")
+        print(f"   → To fix: Re-add these keywords via frontend to generate translations\n")
     
     return expansions
 

@@ -15,8 +15,11 @@ logger = logging.getLogger(__name__)
 
 class SimpleCache:
     """
-    Simple in-memory cache with TTL (Time To Live)
+    Simple in-memory cache with TTL and SIZE LIMIT to prevent RAM overflow
+    PHASE 3: Added max_size limit
     """
+    
+    MAX_SIZE = 100  # Maximum entries to prevent RAM overflow
     
     def __init__(self):
         self._cache = {}
@@ -49,12 +52,21 @@ class SimpleCache:
     
     def set(self, key: str, value: Any):
         """
-        Set value in cache
+        Set value in cache with size limit
         
         Args:
             key: Cache key
             value: Value to cache
         """
+        # PHASE 3: Enforce size limit to prevent RAM overflow
+        if len(self._cache) >= self.MAX_SIZE:
+            # Remove oldest entry
+            if self._timestamps:
+                oldest_key = min(self._timestamps, key=self._timestamps.get)
+                del self._cache[oldest_key]
+                del self._timestamps[oldest_key]
+                logger.debug(f"🗑️  Cache EVICTED oldest: {oldest_key}")
+        
         self._cache[key] = value
         self._timestamps[key] = time.time()
         logger.debug(f"💾 Cache SET: {key}")
@@ -82,9 +94,11 @@ class SimpleCache:
 
 class RateLimiter:
     """
-    Simple rate limiter
-    Limits requests per IP address
+    Simple rate limiter with SIZE LIMIT to prevent RAM overflow
+    PHASE 3: Added max tracked clients limit
     """
+    
+    MAX_CLIENTS = 100  # Maximum clients to track
     
     def __init__(self):
         self._requests = {}  # {ip: [timestamps]}
@@ -120,6 +134,14 @@ class RateLimiter:
         
         # Add current timestamp
         timestamps.append(now)
+        
+        # PHASE 3: Limit tracked clients to prevent RAM overflow
+        if len(self._requests) > self.MAX_CLIENTS:
+            # Remove oldest client
+            oldest_client = min(self._requests.keys(), 
+                key=lambda k: max(self._requests[k]) if self._requests[k] else 0)
+            del self._requests[oldest_client]
+        
         return True
     
     def get_stats(self) -> Dict:

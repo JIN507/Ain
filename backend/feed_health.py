@@ -23,7 +23,10 @@ logger = logging.getLogger(__name__)
 class FeedHealthTracker:
     """
     Track health metrics for RSS feeds.
+    PHASE 3: Added size limit to prevent RAM overflow
     """
+    
+    MAX_SOURCES = 50  # Limit tracked sources to prevent RAM overflow
     
     def __init__(self, persistence_file=None):
         """
@@ -38,7 +41,7 @@ class FeedHealthTracker:
             'successful': 0,
             'failed': 0,
             'empty': 0,
-            'per_source': {}  # source_name -> metrics
+            'per_source': {}  # source_name -> metrics (limited to MAX_SOURCES)
         }
         
         # Load previous data if available
@@ -61,8 +64,15 @@ class FeedHealthTracker:
             articles_count: Number of articles fetched
             error: Error message if failed
         """
-        # Initialize source if new
+        # Initialize source if new (with size limit)
         if source_name not in self.stats['per_source']:
+            # PHASE 3: Enforce size limit to prevent RAM overflow
+            if len(self.stats['per_source']) >= self.MAX_SOURCES:
+                # Remove oldest entry (by total_runs)
+                oldest = min(self.stats['per_source'].keys(),
+                    key=lambda k: self.stats['per_source'][k].get('total_runs', 0))
+                del self.stats['per_source'][oldest]
+            
             self.stats['per_source'][source_name] = {
                 'total_runs': 0,
                 'successful_runs': 0,

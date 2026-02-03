@@ -46,10 +46,10 @@ class AsyncRSSFetcher:
         self.max_concurrent = max_concurrent
         self.default_timeout = default_timeout
         self.max_retries = max_retries
-        self.enable_cache = enable_cache
+        self.enable_cache = False  # PHASE 3: Disabled cache to prevent RAM overflow
         
-        # Cache for ETags and Last-Modified headers
-        self.cache = {} if enable_cache else None
+        # PHASE 3: ETag cache disabled - was causing RAM overflow
+        self.cache = None
         
         # Performance metrics
         self.metrics = {

@@ -9,16 +9,12 @@ from langdetect import detect, LangDetectException
 # Initialize Google Translator (free, no API key needed)
 translator = Translator()
 
-# In-memory cache for session
-_translation_cache = {}
-_language_detection_cache = {}
+# PHASE 3: Removed in-memory caches to prevent RAM overflow
+# Translations are saved to database, no need for RAM cache
 
 def clear_all_caches():
-    """Clear all in-memory caches"""
-    global _translation_cache, _language_detection_cache
-    _translation_cache.clear()
-    _language_detection_cache.clear()
-    print("🧹 Cleared all in-memory caches")
+    """No-op - caches removed in Phase 3 to save RAM"""
+    print("ℹ️ RAM caches removed (Phase 3) - no action needed")
 
 
 def detect_language(text):
@@ -34,14 +30,9 @@ def detect_language(text):
     if not text or len(text.strip()) < 3:
         return 'unknown'
     
-    # Check cache first
-    cache_key = text[:100]  # Use first 100 chars as key
-    if cache_key in _language_detection_cache:
-        return _language_detection_cache[cache_key]
-    
+    # Direct detection - no caching to save RAM
     try:
         detected = detect(text)
-        _language_detection_cache[cache_key] = detected
         return detected
     except LangDetectException as e:
         print(f"⚠️ Language detection error: {str(e)}")
@@ -63,10 +54,7 @@ def translate_keyword(keyword_ar):
     """
     print(f"🔤 Translating keyword: {keyword_ar}")
     
-    # Check cache
-    if keyword_ar in _translation_cache:
-        print(f"   ⚡ Using cached translation")
-        return _translation_cache[keyword_ar]
+    # Direct translation - no caching to save RAM (saved to DB instead)
     
     target_languages = {
         'en': 'English',

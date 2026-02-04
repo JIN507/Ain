@@ -1,0 +1,347 @@
+================================================================================
+📊 AIN NEWS MONITOR - DATABASE DISCOVERY REPORT
+Generated: 2026-01-12T14:41:21.088062
+================================================================================
+
+
+## 1. ALL TABLES IN DATABASE
+----------------------------------------
+  - articles
+  - articles_new
+  - audit_log
+  - countries
+  - exports
+  - keywords
+  - search_history
+  - sources
+  - user_articles
+  - user_countries
+  - user_files
+  - user_sources
+  - users
+
+
+## 2. DETAILED SCHEMA FOR EACH TABLE
+----------------------------------------
+
+### TABLE: articles
+  COLUMNS:
+    - id: INTEGER [PK]
+    - country: VARCHAR(100) [NOT NULL]
+    - source_name: VARCHAR(200) [NOT NULL]
+    - url: VARCHAR(500) [NOT NULL]
+    - title_original: TEXT [NOT NULL]
+    - summary_original: TEXT
+    - original_language: VARCHAR(10)
+    - title_ar: TEXT
+    - summary_ar: TEXT
+    - arabic_text: TEXT
+    - keyword: VARCHAR(200)
+    - keyword_original: VARCHAR(200)
+    - keywords_translations: TEXT
+    - sentiment: VARCHAR(50)
+    - sentiment_label: VARCHAR(50)
+    - sentiment_score: VARCHAR(20)
+    - language: VARCHAR(10)
+    - published_at: DATETIME
+    - fetched_at: DATETIME
+    - created_at: DATETIME
+    - image_url: TEXT
+    - user_id: INTEGER
+    - source_id: INTEGER
+  INDEXES:
+    - sqlite_autoindex_articles_1: (url) UNIQUE
+
+### TABLE: articles_new
+  COLUMNS:
+    - id: INTEGER [PK]
+    - country: VARCHAR(100) [NOT NULL]
+    - source_name: VARCHAR(200) [NOT NULL]
+    - url: VARCHAR(500) [NOT NULL]
+    - title_original: TEXT [NOT NULL]
+    - summary_original: TEXT
+    - original_language: VARCHAR(10)
+    - title_ar: TEXT
+    - summary_ar: TEXT
+    - arabic_text: TEXT
+    - keyword: VARCHAR(200)
+    - keyword_original: VARCHAR(200)
+    - keywords_translations: TEXT
+    - sentiment: VARCHAR(50)
+    - sentiment_label: VARCHAR(50)
+    - sentiment_score: VARCHAR(20)
+    - published_at: DATETIME
+    - fetched_at: DATETIME
+    - created_at: DATETIME
+    - language: VARCHAR(10)
+  INDEXES:
+    - sqlite_autoindex_articles_new_1: (url) UNIQUE
+
+### TABLE: audit_log
+  COLUMNS:
+    - id: INTEGER [PK, NOT NULL]
+    - user_id: INTEGER
+    - admin_id: INTEGER
+    - action: VARCHAR(100) [NOT NULL]
+    - meta_json: TEXT
+    - created_at: DATETIME
+  FOREIGN KEYS:
+    - admin_id -> users.id
+    - user_id -> users.id
+  INDEXES:
+    - ix_audit_log_user_id: (user_id) 
+    - ix_audit_log_admin_id: (admin_id) 
+
+### TABLE: countries
+  COLUMNS:
+    - id: INTEGER [PK, NOT NULL]
+    - name_ar: VARCHAR(100) [NOT NULL]
+    - enabled: BOOLEAN
+    - created_at: DATETIME
+    - user_id: INTEGER
+
+### TABLE: exports
+  COLUMNS:
+    - id: INTEGER [PK, NOT NULL]
+    - user_id: INTEGER [NOT NULL]
+    - filters_json: TEXT
+    - article_count: INTEGER
+    - created_at: DATETIME
+    - filename: TEXT
+    - stored_filename: TEXT
+    - file_size: INTEGER
+    - source_type: TEXT
+  FOREIGN KEYS:
+    - user_id -> users.id
+  INDEXES:
+    - ix_exports_user_id: (user_id) 
+
+### TABLE: keywords
+  COLUMNS:
+    - id: INTEGER [PK]
+    - user_id: INTEGER
+    - text_ar: VARCHAR(200) [NOT NULL]
+    - text_en: VARCHAR(200)
+    - text_fr: VARCHAR(200)
+    - text_tr: VARCHAR(200)
+    - text_ur: VARCHAR(200)
+    - text_zh: VARCHAR(200)
+    - text_ru: VARCHAR(200)
+    - text_es: VARCHAR(200)
+    - enabled: BOOLEAN [DEFAULT=1]
+    - created_at: DATETIME
+  INDEXES:
+    - sqlite_autoindex_keywords_1: (user_id, text_ar) UNIQUE
+
+### TABLE: search_history
+  COLUMNS:
+    - id: INTEGER [PK, NOT NULL]
+    - user_id: INTEGER [NOT NULL]
+    - search_type: VARCHAR(50) [NOT NULL]
+    - query: TEXT
+    - filters_json: TEXT
+    - results_count: INTEGER
+    - created_at: DATETIME
+  FOREIGN KEYS:
+    - user_id -> users.id
+  INDEXES:
+    - ix_search_history_user_id: (user_id) 
+
+### TABLE: sources
+  COLUMNS:
+    - id: INTEGER [PK, NOT NULL]
+    - country_id: INTEGER [NOT NULL]
+    - country_name: VARCHAR(100) [NOT NULL]
+    - name: VARCHAR(200) [NOT NULL]
+    - url: VARCHAR(500) [NOT NULL]
+    - enabled: BOOLEAN
+    - last_checked: DATETIME
+    - fail_count: INTEGER
+    - created_at: DATETIME
+  INDEXES:
+    - sqlite_autoindex_sources_1: (url) UNIQUE
+
+### TABLE: user_articles
+  COLUMNS:
+    - id: INTEGER [PK, NOT NULL]
+    - user_id: INTEGER [NOT NULL]
+    - article_id: INTEGER [NOT NULL]
+    - keyword_id: INTEGER
+    - keyword_original: VARCHAR(200)
+    - keywords_translations: TEXT
+    - sentiment_label: VARCHAR(50)
+    - sentiment_score: VARCHAR(20)
+    - is_read: BOOLEAN
+    - is_starred: BOOLEAN
+    - notes: TEXT
+    - created_at: DATETIME
+  FOREIGN KEYS:
+    - keyword_id -> keywords.id
+    - article_id -> articles.id
+    - user_id -> users.id
+  INDEXES:
+    - ix_user_articles_user_id: (user_id) 
+    - ix_user_articles_article_id: (article_id) 
+    - sqlite_autoindex_user_articles_1: (user_id, article_id) UNIQUE
+
+### TABLE: user_countries
+  COLUMNS:
+    - id: INTEGER [PK, NOT NULL]
+    - user_id: INTEGER [NOT NULL]
+    - country_id: INTEGER [NOT NULL]
+    - enabled: BOOLEAN
+    - created_at: DATETIME
+  FOREIGN KEYS:
+    - country_id -> countries.id
+    - user_id -> users.id
+  INDEXES:
+    - ix_user_countries_user_id: (user_id) 
+    - ix_user_countries_country_id: (country_id) 
+    - sqlite_autoindex_user_countries_1: (user_id, country_id) UNIQUE
+
+### TABLE: user_files
+  COLUMNS:
+    - id: INTEGER [PK, NOT NULL]
+    - user_id: INTEGER [NOT NULL]
+    - filename: VARCHAR(255) [NOT NULL]
+    - stored_filename: VARCHAR(255) [NOT NULL]
+    - file_type: VARCHAR(50)
+    - file_size: INTEGER
+    - description: TEXT
+    - created_at: DATETIME
+  FOREIGN KEYS:
+    - user_id -> users.id
+  INDEXES:
+    - ix_user_files_user_id: (user_id) 
+
+### TABLE: user_sources
+  COLUMNS:
+    - id: INTEGER [PK, NOT NULL]
+    - user_id: INTEGER [NOT NULL]
+    - source_id: INTEGER [NOT NULL]
+    - enabled: BOOLEAN
+    - created_at: DATETIME
+  FOREIGN KEYS:
+    - source_id -> sources.id
+    - user_id -> users.id
+  INDEXES:
+    - ix_user_sources_user_id: (user_id) 
+    - ix_user_sources_source_id: (source_id) 
+    - sqlite_autoindex_user_sources_1: (user_id, source_id) UNIQUE
+
+### TABLE: users
+  COLUMNS:
+    - id: INTEGER [PK, NOT NULL]
+    - email: VARCHAR(255) [NOT NULL]
+    - name: VARCHAR(255)
+    - password_hash: VARCHAR(255) [NOT NULL]
+    - role: VARCHAR(20) [NOT NULL]
+    - is_active: BOOLEAN
+    - must_change_password: BOOLEAN
+    - created_at: DATETIME
+    - updated_at: DATETIME
+  INDEXES:
+    - sqlite_autoindex_users_1: (email) UNIQUE
+
+
+## 3. ROW COUNTS
+----------------------------------------
+  articles: 71 rows
+  articles_new: 0 rows
+  audit_log: 131 rows
+  countries: 50 rows
+  exports: 1 rows
+  keywords: 3 rows
+  search_history: 0 rows
+  sources: 201 rows
+  user_articles: 423 rows
+  user_countries: 300 rows
+  user_files: 0 rows
+  user_sources: 1,212 rows
+  users: 6 rows
+
+
+## 4. USER DISTRIBUTION ANALYSIS
+----------------------------------------
+
+### Users (6 total):
+  - ID=1, Email=eli***@***, Role=ADMIN, Active=1
+  - ID=2, Email=mrs***@***, Role=USER, Active=1
+  - ID=3, Email=vvv***@***, Role=USER, Active=1
+  - ID=4, Email=ddd***@***, Role=USER, Active=1
+  - ID=5, Email=sss***@***, Role=USER, Active=1
+  - ID=6, Email=aaa***@***, Role=USER, Active=1
+
+### Keywords per User:
+  - user_id=3: 2 keywords
+  - user_id=1: 1 keywords
+  ⚠️ Keywords with NULL user_id: 0
+
+### Articles per User:
+  - user_id=1: 54 articles
+  - user_id=3: 17 articles
+  ⚠️ Articles with NULL user_id: 0
+
+
+## 5. DATA ANOMALIES & POTENTIAL ISSUES
+----------------------------------------
+  - Orphaned articles (user_id not in users): 0
+  - Orphaned keywords (user_id not in users): 0
+  - Duplicate keywords (same user_id + text_ar): 0
+  - Duplicate article URLs: 0
+
+
+## 6. SAMPLE DATA (REDACTED)
+----------------------------------------
+
+### Sample Keywords (first 5):
+  - ID=2, user_id=3, text_ar='اليمن...', enabled=1
+  - ID=3, user_id=3, text_ar='الرياض...', enabled=1
+  - ID=4, user_id=1, text_ar='عمان...', enabled=1
+
+### Sample Articles (first 5):
+  - ID=1, user_id=1, country=السعودية, source=عكاظ
+    keyword=السعودية, title='هل يحقق الهلال الـ«النصر»؟...'
+  - ID=2, user_id=1, country=السعودية, source=عكاظ
+    keyword=السعودية, title='مدرب برشلونة: الروح خلف التتويج...'
+  - ID=3, user_id=1, country=السعودية, source=عكاظ
+    keyword=السعودية, title='HISTÓRICO FINAL..
+
+BARÇA
+BARÇA
+BARÇA...'
+  - ID=4, user_id=1, country=أمريكا, source=The Intercept
+    keyword=السعودية, title='خمسة من أعضاء مجلس الشيوخ من الحزب الجمهوري يصوتون...'
+  - ID=5, user_id=1, country=بريطانيا, source=BBC العربية
+    keyword=السعودية, title='ما دور السعودية والإمارات في اليمن؟...'
+
+
+## 7. SHARED/SYSTEM DATA
+----------------------------------------
+  - Countries: 50
+  - Countries with user_id: 0
+  - Sources: 201
+  - Unique country names in sources: 50
+
+### Top 10 Countries by Source Count:
+  - أمريكا: 15 sources
+  - دولي: 12 sources
+  - بريطانيا: 11 sources
+  - السعودية: 11 sources
+  - مصر: 8 sources
+  - الإمارات: 8 sources
+  - قطر: 7 sources
+  - الهند: 7 sources
+  - لبنان: 6 sources
+  - اليابان: 6 sources
+
+
+## 8. USER ACTIVITY DATA
+----------------------------------------
+  - No search history records
+
+### Exports by User:
+  - user_id=1: 1 exports, 10 total articles
+  - No user files
+
+### Audit Log: 131 entries

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { FileText, Download, Loader2 } from 'lucide-react'
+import { FileText, Download, Loader2, AlertCircle, RotateCcw } from 'lucide-react'
 import StatsOverview from '../components/StatsOverview'
 import FilterBar from '../components/FilterBar'
 import ArticleCard from '../components/ArticleCard'
@@ -9,6 +9,8 @@ import { apiFetch } from '../apiClient'
 export default function Dashboard() {
   const [loading, setLoading] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [resetting, setResetting] = useState(false)
+  const [resetResult, setResetResult] = useState(null)
   const [articles, setArticles] = useState([])
   const [stats, setStats] = useState({ total: 0, positive: 0, negative: 0, neutral: 0 })
   const [filters, setFilters] = useState({})
@@ -93,6 +95,41 @@ export default function Dashboard() {
 
   const handleResetFilters = () => {
     setFilters({})
+  }
+
+  const exportAndReset = async () => {
+    if (!confirm('هل أنت متأكد من حفظ البيانات وإعادة تهيئة النظام؟\n\nسيتم:\n1. تصدير جميع الأخبار إلى ملف Excel\n2. حذف جميع الأخبار\n3. حذف جميع الكلمات المفتاحية\n\nهذا الإجراء لا يمكن التراجع عنه!')) {
+      return
+    }
+
+    setResetting(true)
+    setResetResult(null)
+
+    try {
+      const res = await apiFetch('/api/articles/export-and-reset', { method: 'POST' })
+      
+      if (!res.ok) {
+        const error = await res.json()
+        throw new Error(error.error || 'فشل التصدير')
+      }
+
+      const data = await res.json()
+      setResetResult(data)
+      
+      if (data.download_url) {
+        window.location.href = data.download_url
+      }
+
+      setTimeout(() => {
+        window.location.reload()
+      }, 2000)
+
+    } catch (error) {
+      console.error('Error exporting and resetting:', error)
+      setResetResult({ error: error.message })
+    } finally {
+      setResetting(false)
+    }
   }
 
   const exportToPDF = async () => {
@@ -747,12 +784,53 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Info Alert */}
-      <div className="card p-4 bg-blue-50 border-blue-200">
-        <p className="text-sm text-blue-800">
-          💡 يتم تحديث الأخبار عند تشغيل المراقبة من صفحة الإعدادات
-        </p>
-      </div>
+      {/* Reset Section */}
+      {articles.length > 0 && (
+        <div className="card p-6 border-2 border-orange-200">
+          <div className="flex items-start gap-3 mb-4">
+            <AlertCircle className="w-6 h-6 text-orange-600 mt-0.5 flex-shrink-0" />
+            <div>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">إعادة تهيئة النظام</h3>
+              <p className="text-sm text-gray-600">
+                تصدير جميع الأخبار إلى ملف Excel ثم حذف جميع البيانات والكلمات المفتاحية
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={exportAndReset}
+            disabled={resetting}
+            className="btn bg-orange-600 hover:bg-orange-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {resetting ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                جاري التصدير وإعادة التهيئة...
+              </>
+            ) : (
+              <>
+                <RotateCcw className="w-5 h-5" />
+                حفظ البيانات وإعادة تهيئة
+              </>
+            )}
+          </button>
+
+          {resetResult && !resetResult.error && (
+            <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
+              <p className="text-green-800 font-semibold">✅ تم التصدير وإعادة التهيئة بنجاح!</p>
+              <p className="text-sm text-green-700 mt-1">
+                تم تصدير {resetResult.article_count} مقالة إلى {resetResult.filename}
+              </p>
+            </div>
+          )}
+
+          {resetResult && resetResult.error && (
+            <div className="mt-4 p-4 bg-red-50 rounded-lg border border-red-200">
+              <p className="text-red-800">❌ {resetResult.error}</p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

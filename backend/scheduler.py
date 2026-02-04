@@ -18,7 +18,7 @@ class UserMonitoringScheduler:
         self.user_id = user_id
         self._running = False
         self._thread: Optional[threading.Thread] = None
-        self._interval = 1800  # 30 minutes in seconds (reduced from 10 to save server resources)
+        self._interval = 3600  # 60 minutes (1 hour) in seconds
         self._last_run: Optional[datetime] = None
         self._last_result: Optional[Dict[str, Any]] = None
         self._run_count = 0

@@ -1204,6 +1204,15 @@ def add_keyword():
         else:
             print(f"   ❌ Expansion failed")
         
+        # Step 3: Auto-start monitoring if not already running
+        user_id = getattr(current_user, 'id', None)
+        if user_id:
+            status = scheduler_manager.get_status(user_id)
+            if not status.get('running'):
+                print(f"🚀 Auto-starting monitoring for user {user_id}...")
+                scheduler_manager.start(user_id)
+                print(f"   ✅ Monitoring started automatically")
+        
         return jsonify({
             "success": True,
             "id": keyword.id,

@@ -1,14 +1,13 @@
-import { Home, Globe, Key, Settings, Newspaper, Search, Activity, Shield } from 'lucide-react'
+import { Home, Globe, Key, Newspaper, Search, Activity, Shield } from 'lucide-react'
 
 export default function Sidebar({ currentPage, setCurrentPage, sidebarOpen, setSidebarOpen, isAdmin }) {
   const navItems = [
     { id: 'dashboard', label: 'النتائج', icon: Home },
-    { id: 'directsearch', label: 'إبحث بكلمة مباشرة', icon: Search },
+    { id: 'directsearch', label: 'إبحث الآن', icon: Search },
     { id: 'topheadlines', label: 'أهم العناوين', icon: Activity },
     { id: 'myfiles', label: 'ملفاتي', icon: Newspaper },
     { id: 'countries', label: 'الدول', icon: Globe },
     { id: 'keywords', label: 'الكلمات المفتاحية', icon: Key },
-    { id: 'settings', label: 'تشغيل وايقاف النظام', icon: Settings },
   ]
 
   const adminItems = isAdmin
@@ -76,7 +75,7 @@ export default function Sidebar({ currentPage, setCurrentPage, sidebarOpen, setS
             <div className="bg-emerald-50 rounded-lg p-3 mb-3">
               <p className="text-xs text-emerald-700 font-semibold">طور بواسطة قسم الحلول التقنية</p>
               <p className="text-sm text-emerald-900">{new Date().toLocaleDateString('ar-SA', { timeZone: 'Asia/Riyadh', year: 'numeric', month: 'long', day: 'numeric' , hour: '2-digit', minute: '2-digit' })}</p>
-              <p className="text-sm text-red-900">Version 2.0</p>
+              <p className="text-sm text-red-900">Version 3.0</p>
             </div>
           </div>
         </div>

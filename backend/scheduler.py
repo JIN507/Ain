@@ -16,15 +16,16 @@ class UserMonitoringScheduler:
     """
     def __init__(self, user_id: int):
         self.user_id = user_id
+        self._interval = 3600  # 60 minutes (1 hour) in seconds
         self._running = False
         self._thread: Optional[threading.Thread] = None
-        self._interval = 3600  # 60 minutes (1 hour) in seconds
+        self._stop_event = threading.Event()
+        self._trigger_event = threading.Event()  # For triggering immediate run
+        self._status_lock = threading.Lock()
         self._last_run: Optional[datetime] = None
         self._last_result: Optional[Dict[str, Any]] = None
         self._run_count = 0
         self._error_count = 0
-        self._stop_event = threading.Event()
-        self._status_lock = threading.Lock()
         
     @property
     def is_running(self) -> bool:
@@ -92,15 +93,33 @@ class UserMonitoringScheduler:
         print("[SCHEDULER] Stopped")
         return {"success": True, "message": "Scheduler stopped"}
     
+    def trigger_now(self) -> Dict[str, Any]:
+        """Trigger an immediate monitoring run (used when new keyword added)"""
+        with self._status_lock:
+            if not self._running:
+                return {"success": False, "message": "Scheduler not running"}
+        
+        print(f"[SCHEDULER] User {self.user_id}: Triggered immediate run (new keyword added)")
+        self._trigger_event.set()
+        return {"success": True, "message": "Immediate run triggered"}
+    
     def _run_loop(self):
         """Main scheduler loop"""
         # Run immediately on start
         self._execute_monitoring()
         
         while not self._stop_event.is_set():
-            # Wait for interval or stop event
-            if self._stop_event.wait(timeout=self._interval):
-                break  # Stop event was set
+            # Wait for interval, stop event, or trigger event
+            self._trigger_event.clear()
+            
+            # Wait with ability to be interrupted by trigger
+            for _ in range(self._interval):
+                if self._stop_event.is_set():
+                    return
+                if self._trigger_event.is_set():
+                    self._trigger_event.clear()
+                    break
+                time.sleep(1)
             
             # Check if still running (could have been stopped)
             if not self._running:
@@ -245,6 +264,10 @@ class SchedulerManager:
     def stop(self, user_id: int) -> Dict[str, Any]:
         """Stop monitoring for a specific user"""
         return self.get_scheduler(user_id).stop()
+    
+    def trigger_now(self, user_id: int) -> Dict[str, Any]:
+        """Trigger immediate monitoring run for a specific user"""
+        return self.get_scheduler(user_id).trigger_now()
     
     def get_all_running(self) -> Dict[int, Dict[str, Any]]:
         """Get status of all running schedulers (for admin)"""

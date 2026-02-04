@@ -18,6 +18,7 @@ class UserMonitoringScheduler:
         self.user_id = user_id
         self._interval = 3600  # 60 minutes (1 hour) in seconds
         self._running = False
+        self._executing = False  # True while monitoring is actively running
         self._thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
         self._trigger_event = threading.Event()  # For triggering immediate run
@@ -77,8 +78,8 @@ class UserMonitoringScheduler:
         print(f"[SCHEDULER] Started - will run every {self._interval // 60} minutes")
         return {"success": True, "message": f"Scheduler started (every {self._interval // 60} minutes)"}
     
-    def stop(self) -> Dict[str, Any]:
-        """Stop the monitoring scheduler"""
+    def stop(self, wait_for_completion: bool = True) -> Dict[str, Any]:
+        """Stop the monitoring scheduler and optionally wait for current operation"""
         with self._status_lock:
             if not self._running:
                 return {"success": False, "message": "Scheduler not running"}
@@ -86,11 +87,21 @@ class UserMonitoringScheduler:
             self._running = False
             self._stop_event.set()
         
-        # Wait for thread to finish (with timeout)
+        # Wait for current monitoring to complete if requested
+        if wait_for_completion:
+            print(f"[SCHEDULER] User {self.user_id}: Waiting for current monitoring to complete...")
+            wait_count = 0
+            while self._executing and wait_count < 120:  # Max 2 minutes wait
+                time.sleep(1)
+                wait_count += 1
+            if self._executing:
+                print(f"[SCHEDULER] User {self.user_id}: Timeout waiting for monitoring to complete")
+        
+        # Wait for thread to finish
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=5)
         
-        print("[SCHEDULER] Stopped")
+        print(f"[SCHEDULER] User {self.user_id}: Stopped")
         return {"success": True, "message": "Scheduler stopped"}
     
     def trigger_now(self) -> Dict[str, Any]:
@@ -133,6 +144,9 @@ class UserMonitoringScheduler:
         from models import get_db, Source, Keyword, Article
         from keyword_expansion import load_expansions_from_keywords
         from async_monitor_wrapper import run_optimized_monitoring, save_matched_articles_sync
+        
+        # Mark as executing
+        self._executing = True
         
         print(f"\n[SCHEDULER] User {self.user_id}: Starting monitoring at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         
@@ -221,6 +235,8 @@ class UserMonitoringScheduler:
                 }
         finally:
             db.close()
+            # Mark as not executing
+            self._executing = False
 
 
 class SchedulerManager:

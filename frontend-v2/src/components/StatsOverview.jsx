@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { FileText, Globe, Clock, MapPin } from 'lucide-react'
-import { apiFetch } from '../api'
+import { apiFetch } from '../apiClient'
 
 export default function StatsOverview({ stats }) {
   const [countdown, setCountdown] = useState('--:--')

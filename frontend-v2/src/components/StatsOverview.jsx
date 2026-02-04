@@ -1,7 +1,55 @@
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { FileText, TrendingUp, AlertCircle, Globe } from 'lucide-react'
+import { FileText, Globe, Clock, MapPin } from 'lucide-react'
+import { apiFetch } from '../api'
 
 export default function StatsOverview({ stats }) {
+  const [countdown, setCountdown] = useState('--:--')
+  const [nextRunTime, setNextRunTime] = useState(null)
+
+  // Fetch scheduler status and calculate countdown
+  useEffect(() => {
+    const fetchSchedulerStatus = async () => {
+      try {
+        const res = await apiFetch('/api/monitor/status')
+        const data = await res.json()
+        if (data.next_run) {
+          setNextRunTime(new Date(data.next_run))
+        }
+      } catch (error) {
+        console.error('Error fetching scheduler status:', error)
+      }
+    }
+
+    fetchSchedulerStatus()
+    // Refresh scheduler status every 60 seconds
+    const statusInterval = setInterval(fetchSchedulerStatus, 60000)
+    return () => clearInterval(statusInterval)
+  }, [])
+
+  // Update countdown every second
+  useEffect(() => {
+    if (!nextRunTime) return
+
+    const updateCountdown = () => {
+      const now = new Date()
+      const diff = nextRunTime - now
+      
+      if (diff <= 0) {
+        setCountdown('جاري البحث...')
+        return
+      }
+      
+      const minutes = Math.floor(diff / 60000)
+      const seconds = Math.floor((diff % 60000) / 1000)
+      setCountdown(`${minutes}:${seconds.toString().padStart(2, '0')}`)
+    }
+
+    updateCountdown()
+    const countdownInterval = setInterval(updateCountdown, 1000)
+    return () => clearInterval(countdownInterval)
+  }, [nextRunTime])
+
   const statCards = [
     {
       label: 'إجمالي المقالات',
@@ -10,16 +58,16 @@ export default function StatsOverview({ stats }) {
       gradient: 'from-emerald-500 to-emerald-700'
     },
     {
-      label: 'مشاعر إيجابية',
-      value: stats.positive,
-      icon: TrendingUp,
+      label: 'الدول',
+      value: stats.uniqueCountries || stats.countries || 0,
+      icon: MapPin,
       gradient: 'from-green-500 to-green-700'
     },
     {
-      label: 'مشاعر سلبية',
-      value: stats.negative,
-      icon: AlertCircle,
-      gradient: 'from-red-500 to-pink-600'
+      label: 'البحث',
+      value: countdown,
+      icon: Clock,
+      gradient: 'from-orange-500 to-red-500'
     },
     {
       label: 'الدول المراقبة',

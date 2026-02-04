@@ -1798,11 +1798,17 @@ def get_article_stats():
             )
         ).count()
         
+        # Count unique countries with results
+        unique_countries = db.query(Article.country).filter(
+            Article.user_id == user_id
+        ).distinct().count()
+        
         return jsonify({
             'total': total,
             'positive': positive,
             'negative': negative,
-            'neutral': neutral
+            'neutral': neutral,
+            'uniqueCountries': unique_countries
         })
     finally:
         db.close()

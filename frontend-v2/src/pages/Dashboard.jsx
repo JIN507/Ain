@@ -6,7 +6,7 @@ import ArticleCard from '../components/ArticleCard'
 import Loader from '../components/Loader'
 import { apiFetch } from '../apiClient'
 
-export default function Dashboard() {
+export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
   const [loading, setLoading] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [resetting, setResetting] = useState(false)
@@ -16,6 +16,14 @@ export default function Dashboard() {
   const [filters, setFilters] = useState({})
   const [countries, setCountries] = useState([])
   const [keywords, setKeywords] = useState([])
+
+  // Apply initial keyword filter from navigation
+  useEffect(() => {
+    if (initialKeywordFilter) {
+      setFilters(prev => ({ ...prev, keyword: initialKeywordFilter }))
+      onFilterApplied?.()
+    }
+  }, [initialKeywordFilter, onFilterApplied])
 
   useEffect(() => {
     loadArticles()

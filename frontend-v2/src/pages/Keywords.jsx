@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Plus, Loader2, Trash2, RefreshCw } from 'lucide-react'
+import { Plus, Loader2, Trash2, RefreshCw, ExternalLink } from 'lucide-react'
 import { apiFetch } from '../apiClient'
 
-export default function Keywords() {
+export default function Keywords({ onKeywordClick }) {
   const [keywords, setKeywords] = useState([])
   const [newKeyword, setNewKeyword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -106,7 +106,14 @@ export default function Keywords() {
               {/* Header */}
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <span className="text-2xl font-bold text-gray-900">{keyword.text_ar}</span>
+                  <button
+                    onClick={() => onKeywordClick?.(keyword.text_ar)}
+                    className="text-2xl font-bold text-gray-900 hover:text-emerald-600 transition-colors cursor-pointer flex items-center gap-2 group"
+                    title="عرض نتائج هذه الكلمة"
+                  >
+                    {keyword.text_ar}
+                    <ExternalLink className="w-5 h-5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </button>
                   <span className="badge bg-green-100 text-green-800 border border-green-200">نشط</span>
                 </div>
                 <div className="flex items-center gap-2">

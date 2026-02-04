@@ -44,18 +44,6 @@ export default function FilterBar({ filters, setFilters, onReset, countries, key
           ))}
         </select>
 
-        {/* Sentiment */}
-        <select
-          value={filters.sentiment || ''}
-          onChange={(e) => setFilters({ ...filters, sentiment: e.target.value })}
-          className="input"
-        >
-          <option value="">جميع المشاعر</option>
-          <option value="إيجابي">إيجابي</option>
-          <option value="سلبي">سلبي</option>
-          <option value="محايد">محايد</option>
-        </select>
-
         {/* Sort Order */}
         <select
           value={filters.sortBy || 'newest'}

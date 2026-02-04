@@ -18,15 +18,22 @@ function AppContent() {
   const [currentPage, setCurrentPage] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [showRegister, setShowRegister] = useState(false)
+  const [dashboardKeywordFilter, setDashboardKeywordFilter] = useState('')
   const { currentUser, authLoading, logout, login, register } = useAuth()
+  
+  // Navigate to dashboard with keyword pre-filtered
+  const navigateToKeywordResults = (keyword) => {
+    setDashboardKeywordFilter(keyword)
+    setCurrentPage('dashboard')
+  }
 
   const pages = {
-    dashboard: <Dashboard />,
+    dashboard: <Dashboard initialKeywordFilter={dashboardKeywordFilter} onFilterApplied={() => setDashboardKeywordFilter('')} />,
     directsearch: <DirectSearch />,
     topheadlines: <TopHeadlines />,
     myfiles: <MyFiles />,
     countries: <Countries />,
-    keywords: <Keywords />,
+    keywords: <Keywords onKeywordClick={navigateToKeywordResults} />,
     settings: <Settings />,
     admin: <Admin />,
   }

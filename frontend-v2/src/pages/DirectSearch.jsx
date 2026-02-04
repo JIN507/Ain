@@ -1,40 +1,37 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { Search, ChevronDown, ChevronUp, Loader as LoaderIcon, Download, Loader2, Newspaper, Archive, Filter } from 'lucide-react'
+import { useState, useCallback, useMemo } from 'react'
+import { Search, ChevronDown, ChevronUp, Loader as LoaderIcon, Download, Loader2, Filter, Calendar, Globe, Languages, Tag, Clock, AlertCircle } from 'lucide-react'
 import ArticleCard from '../components/ArticleCard'
 import Loader from '../components/Loader'
-import QueryBuilder from '../components/QueryBuilder'
-import ArabicOperatorHelper, { validateQuery, normalizeQuery } from '../components/ArabicOperatorHelper'
+import GuidedQueryBuilder from '../components/GuidedQueryBuilder'
 import { apiFetch } from '../apiClient'
 
 export default function DirectSearch() {
-  // Search mode: 'simple' or 'builder'
-  const [searchMode, setSearchMode] = useState('simple')
+  // Query state from builder
+  const [searchQuery, setSearchQuery] = useState('')
+  const [isQueryValid, setIsQueryValid] = useState(false)
   
-  // Endpoint selection
-  const [endpoint, setEndpoint] = useState('latest')
-  
-  // Search state
-  const [keyword, setKeyword] = useState('')
-  const [builtQuery, setBuiltQuery] = useState('')
+  // Filters
   const [titleOnly, setTitleOnly] = useState(false)
   const [timeframe, setTimeframe] = useState('')
   const [selectedCountries, setSelectedCountries] = useState([])
   const [selectedLanguages, setSelectedLanguages] = useState([])
-  const [showAdvanced, setShowAdvanced] = useState(false)
-  
-  // Extended filters
   const [selectedCategories, setSelectedCategories] = useState([])
-  const [excludeCountries, setExcludeCountries] = useState([])
-  const [domain, setDomain] = useState('')
-  const [excludeDomain, setExcludeDomain] = useState('')
-  const [hasImage, setHasImage] = useState(false)
-  const [hasVideo, setHasVideo] = useState(false)
-  const [removeDuplicate, setRemoveDuplicate] = useState(true)
-  const [sentiment, setSentiment] = useState('')
+  const [showFilters, setShowFilters] = useState(false)
   
-  // Archive-specific
+  // Date range (for archive)
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  
+  // Auto-detect endpoint based on date
+  const endpoint = useMemo(() => {
+    if (fromDate) {
+      const from = new Date(fromDate)
+      const now = new Date()
+      const hoursDiff = (now - from) / (1000 * 60 * 60)
+      return hoursDiff > 48 ? 'archive' : 'latest'
+    }
+    return 'latest'
+  }, [fromDate])
   
   // Results state
   const [results, setResults] = useState([])
@@ -43,86 +40,67 @@ export default function DirectSearch() {
   const [nextPage, setNextPage] = useState(null)
   const [searchPerformed, setSearchPerformed] = useState(false)
   const [exporting, setExporting] = useState(false)
-  
-  // Performance optimization
-  const searchButtonRef = useRef(null)
-  const abortControllerRef = useRef(null)
-  const searchInputRef = useRef(null)
-  
-  // Query preview from last search
-  const [queryPreview, setQueryPreview] = useState('')
+  const [totalResults, setTotalResults] = useState(0)
   
   const availableCountries = [
-    { code: 'us', name: 'أمريكا' },
-    { code: 'gb', name: 'بريطانيا' },
-    { code: 'fr', name: 'فرنسا' },
-    { code: 'de', name: 'ألمانيا' },
-    { code: 'cn', name: 'الصين' },
-    { code: 'ru', name: 'روسيا' },
-    { code: 'jp', name: 'اليابان' },
     { code: 'sa', name: 'السعودية' },
     { code: 'ae', name: 'الإمارات' },
     { code: 'eg', name: 'مصر' },
     { code: 'qa', name: 'قطر' },
+    { code: 'kw', name: 'الكويت' },
+    { code: 'bh', name: 'البحرين' },
+    { code: 'om', name: 'عمان' },
+    { code: 'us', name: 'أمريكا' },
+    { code: 'gb', name: 'بريطانيا' },
+    { code: 'fr', name: 'فرنسا' },
+    { code: 'de', name: 'ألمانيا' },
+    { code: 'ru', name: 'روسيا' },
+    { code: 'cn', name: 'الصين' },
+    { code: 'jp', name: 'اليابان' },
     { code: 'tr', name: 'تركيا' },
-    { code: 'in', name: 'الهند' },
-    { code: 'br', name: 'البرازيل' },
-    { code: 'au', name: 'أستراليا' },
-    { code: 'ca', name: 'كندا' }
+    { code: 'in', name: 'الهند' }
   ]
   
   const availableLanguages = [
     { code: 'ar', name: 'العربية' },
     { code: 'en', name: 'الإنجليزية' },
     { code: 'fr', name: 'الفرنسية' },
-    { code: 'zh', name: 'الصينية' },
-    { code: 'ru', name: 'الروسية' },
-    { code: 'ja', name: 'اليابانية' },
     { code: 'de', name: 'الألمانية' },
     { code: 'es', name: 'الإسبانية' },
-    { code: 'pt', name: 'البرتغالية' },
-    { code: 'it', name: 'الإيطالية' },
-    { code: 'hi', name: 'الهندية' },
-    { code: 'ko', name: 'الكورية' }
+    { code: 'ru', name: 'الروسية' },
+    { code: 'zh', name: 'الصينية' },
+    { code: 'ja', name: 'اليابانية' },
+    { code: 'tr', name: 'التركية' }
   ]
   
   const availableCategories = [
-    { code: 'business', name: 'أعمال' },
-    { code: 'entertainment', name: 'ترفيه' },
-    { code: 'environment', name: 'بيئة' },
-    { code: 'food', name: 'طعام' },
-    { code: 'health', name: 'صحة' },
     { code: 'politics', name: 'سياسة' },
-    { code: 'science', name: 'علوم' },
-    { code: 'sports', name: 'رياضة' },
+    { code: 'business', name: 'اقتصاد' },
     { code: 'technology', name: 'تقنية' },
-    { code: 'top', name: 'أهم الأخبار' },
+    { code: 'sports', name: 'رياضة' },
+    { code: 'entertainment', name: 'ترفيه' },
+    { code: 'health', name: 'صحة' },
+    { code: 'science', name: 'علوم' },
     { code: 'world', name: 'عالمي' }
   ]
   
-  const endpoints = [
-    { id: 'latest', name: 'آخر الأخبار', icon: Newspaper, description: 'آخر 48 ساعة' },
-    { id: 'archive', name: 'الأرشيف', icon: Archive, description: 'البحث التاريخي' }
-  ]
-  
-  const sentimentOptions = [
-    { value: '', name: 'الكل' },
-    { value: 'positive', name: 'إيجابي' },
-    { value: 'negative', name: 'سلبي' },
-    { value: 'neutral', name: 'محايد' }
-  ]
-  
-  // Handle query builder changes
-  const handleQueryChange = useCallback((query) => {
-    setBuiltQuery(query)
+  // Handle query change from builder
+  const handleQueryChange = useCallback((query, isValid) => {
+    setSearchQuery(query)
+    setIsQueryValid(isValid)
   }, [])
   
+  // Check if search can be performed
+  const canSearch = useMemo(() => {
+    const hasQuery = searchQuery.trim().length > 0
+    const hasFilters = selectedCountries.length > 0 || selectedLanguages.length > 0 || selectedCategories.length > 0
+    return (hasQuery || hasFilters) && isQueryValid
+  }, [searchQuery, selectedCountries, selectedLanguages, selectedCategories, isQueryValid])
+  
+  // Perform search
   const handleSearch = async (isLoadMore = false) => {
-    // Determine which query to use
-    const searchQuery = searchMode === 'builder' ? builtQuery : keyword.trim()
-    
-    if (!searchQuery && !isLoadMore) {
-      setError('الرجاء إدخال كلمة البحث')
+    if (!canSearch && !isLoadMore) {
+      setError('أدخل كلمة بحث أو اختر فلتر واحد على الأقل')
       return
     }
     
@@ -130,19 +108,23 @@ export default function DirectSearch() {
     setError('')
     
     try {
-      // Build query params for the new advanced API
       const params = new URLSearchParams()
       params.append('endpoint', endpoint)
       
       if (!isLoadMore) {
         // Query
-        if (searchQuery) params.append('q', searchQuery)
-        if (titleOnly) params.append('qInTitle', searchQuery)
+        if (searchQuery) {
+          if (titleOnly) {
+            params.append('qInTitle', searchQuery)
+          } else {
+            params.append('q', searchQuery)
+          }
+        }
         
-        // Basic filters
+        // Filters
         if (timeframe) params.append('timeframe', timeframe)
         if (selectedCountries.length > 0) {
-          params.append('country', selectedCountries.join(','))
+          params.append('country', selectedCountries.slice(0, 5).join(','))
         }
         if (selectedLanguages.length > 0) {
           params.append('language', selectedLanguages.join(','))
@@ -151,48 +133,35 @@ export default function DirectSearch() {
           params.append('category', selectedCategories.join(','))
         }
         
-        // Extended filters
-        if (excludeCountries.length > 0) {
-          params.append('excludeCountry', excludeCountries.join(','))
-        }
-        if (domain) params.append('domain', domain)
-        if (excludeDomain) params.append('excludeDomain', excludeDomain)
-        if (hasImage) params.append('image', 'true')
-        if (hasVideo) params.append('video', 'true')
-        if (removeDuplicate) params.append('removeDuplicate', 'true')
-        if (sentiment) params.append('sentiment', sentiment)
-        
-        // Archive-specific
+        // Archive date range
         if (endpoint === 'archive') {
-          if (fromDate) params.append('fromDate', fromDate)
-          if (toDate) params.append('toDate', toDate)
+          if (fromDate) params.append('from_date', fromDate)
+          if (toDate) params.append('to_date', toDate)
         }
         
-        
+        params.append('removeDuplicate', 'true')
         setSearchPerformed(true)
       } else {
         if (nextPage) {
           params.append('page', nextPage)
-          params.append('endpoint', endpoint)
         }
       }
       
-      // Use new advanced API endpoint
       const response = await apiFetch(`/api/newsdata/search?${params}`)
       const data = await response.json()
       
       if (!response.ok || !data.success) {
         if (response.status === 429) {
-          throw new Error('قلّل سرعة الطلبات - حاول مرة أخرى بعد قليل')
+          throw new Error('تم تجاوز حد الطلبات. حاول مرة أخرى بعد دقيقة.')
         }
         throw new Error(data.error || 'فشل البحث')
       }
       
       if (isLoadMore) {
-        setResults([...results, ...data.results])
+        setResults(prev => [...prev, ...data.results])
       } else {
         setResults(data.results)
-        setQueryPreview(data.query_preview || searchQuery)
+        setTotalResults(data.totalResults || data.results.length)
       }
       
       setNextPage(data.nextPage || null)
@@ -204,20 +173,7 @@ export default function DirectSearch() {
     }
   }
   
-  const toggleCategory = (code) => {
-    setSelectedCategories(prev =>
-      prev.includes(code)
-        ? prev.filter(c => c !== code)
-        : [...prev, code]
-    )
-  }
-  
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter') {
-      handleSearch()
-    }
-  }
-  
+  // Toggle handlers
   const toggleCountry = (code) => {
     setSelectedCountries(prev =>
       prev.includes(code)
@@ -233,510 +189,230 @@ export default function DirectSearch() {
         : [...prev, code]
     )
   }
-
+  
+  const toggleCategory = (code) => {
+    setSelectedCategories(prev =>
+      prev.includes(code)
+        ? prev.filter(c => c !== code)
+        : [...prev, code]
+    )
+  }
+  
+  // Export to PDF
   const exportToPDF = async () => {
     if (!results.length) return
     setExporting(true)
     
     try {
-      // Use Google Fonts link instead of @import for better compatibility
       const printContent = `
 <!DOCTYPE html>
 <html dir="rtl" lang="ar">
 <head>
   <meta charset="UTF-8">
-  <title>نتائج البحث - ${keyword}</title>
-  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <title>نتائج البحث - عين</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: 'Cairo', 'Segoe UI', Tahoma, Arial, sans-serif;
+      font-family: 'Cairo', sans-serif;
       direction: rtl;
-      padding: 0;
-      background: #ffffff;
+      padding: 40px;
+      background: #fff;
       color: #1a1a1a;
       line-height: 1.8;
     }
-    .report-header {
-      border: 3px solid #3b82f6;
-      border-radius: 12px;
-      padding: 30px;
-      margin: 40px;
-      background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-      page-break-after: avoid;
-    }
-    .logo-section {
+    .header {
       text-align: center;
-      margin-bottom: 20px;
+      margin-bottom: 40px;
       padding-bottom: 20px;
-      border-bottom: 2px solid #3b82f6;
+      border-bottom: 3px solid #10b981;
     }
-    h1 {
-      color: #1e40af;
-      font-size: 32px;
-      font-weight: 800;
-      margin-bottom: 10px;
-      text-align: center;
-    }
-    .search-term {
-      text-align: center;
-      color: #3b82f6;
-      font-size: 20px;
-      font-weight: 600;
-      margin: 15px 0;
-      padding: 10px;
-      background: white;
-      border-radius: 8px;
-    }
-    .report-info {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 15px;
-      margin-top: 20px;
-      padding: 20px;
-      background: white;
-      border-radius: 8px;
-      border: 1px solid #3b82f6;
-    }
-    .info-item {
-      flex: 1 1 45%;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 14px;
-      color: #374151;
-    }
-    .info-label {
-      font-weight: 700;
-      color: #3b82f6;
-    }
-    .articles-container { margin: 30px 40px; }
+    h1 { color: #10b981; font-size: 28px; margin-bottom: 10px; }
+    .search-info { color: #666; font-size: 14px; }
     .article {
-      background: white;
-      border: 2px solid #e5e7eb;
-      border-right: 5px solid #3b82f6;
-      border-radius: 10px;
+      background: #f9fafb;
+      border-right: 4px solid #10b981;
+      border-radius: 8px;
       padding: 20px;
       margin-bottom: 20px;
       page-break-inside: avoid;
     }
-    .article-title {
-      font-size: 18px;
-      font-weight: 700;
-      color: #111827;
-      margin-bottom: 10px;
-      line-height: 1.6;
-    }
-    .article-summary {
-      font-size: 14px;
-      color: #374151;
-      line-height: 1.8;
-      margin-bottom: 15px;
-    }
-    .article-meta {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: space-between;
-      align-items: center;
-      gap: 10px;
-      padding-top: 10px;
-      border-top: 1px solid #e5e7eb;
-      font-size: 12px;
-      color: #6b7280;
-    }
-    .article-source {
-      background: #3b82f6;
-      color: white;
-      padding: 4px 12px;
-      border-radius: 20px;
-      font-weight: 600;
-    }
-    .article-link {
-      color: #3b82f6;
-      text-decoration: none;
-    }
-    .report-footer {
-      margin: 40px;
-      padding: 20px;
-      border: 2px solid #e5e7eb;
-      border-radius: 8px;
-      background: #f9fafb;
-      text-align: center;
-      font-size: 12px;
-      color: #6b7280;
-    }
+    .article-title { font-size: 16px; font-weight: 700; color: #111; margin-bottom: 10px; }
+    .article-desc { font-size: 14px; color: #444; margin-bottom: 10px; }
+    .article-meta { font-size: 12px; color: #888; display: flex; gap: 20px; flex-wrap: wrap; }
   </style>
 </head>
 <body>
-  <div class="report-header">
-    <div class="logo-section">
-      <h1>🔍 نتائج البحث المباشر</h1>
-    </div>
-    <div class="search-term">
-      ${queryPreview ? `الاستعلام: <code dir="ltr">${queryPreview}</code>` : `كلمة البحث: "${searchMode === 'builder' ? builtQuery : keyword}"`}
-    </div>
-    <div class="report-info">
-      <div class="info-item">
-        <span class="info-label">نقطة النهاية:</span>
-        <span>${endpoints.find(e => e.id === endpoint)?.name || endpoint}</span>
-      </div>
-      <div class="info-item">
-        <span class="info-label">تاريخ التقرير:</span>
-        <span>${new Date().toLocaleDateString('ar-SA', { timeZone: 'Asia/Riyadh', year: 'numeric', month: 'long', day: 'numeric' })}</span>
-      </div>
-      <div class="info-item">
-        <span class="info-label">وقت الإصدار:</span>
-        <span>${new Date().toLocaleTimeString('ar-SA', { timeZone: 'Asia/Riyadh', hour: '2-digit', minute: '2-digit' })}</span>
-      </div>
-      <div class="info-item">
-        <span class="info-label">عدد النتائج:</span>
-        <span>${results.length} خبر</span>
-      </div>
-      <div class="info-item">
-        <span class="info-label">المصدر:</span>
-        <span>NewsData.io</span>
-      </div>
-      ${selectedCountries.length > 0 ? `<div class="info-item"><span class="info-label">الدول:</span><span>${selectedCountries.join(', ')}</span></div>` : ''}
-      ${selectedCategories.length > 0 ? `<div class="info-item"><span class="info-label">التصنيفات:</span><span>${selectedCategories.join(', ')}</span></div>` : ''}
-    </div>
+  <div class="header">
+    <h1>📰 عين - نتائج البحث</h1>
+    <p class="search-info">عدد النتائج: ${results.length} | التاريخ: ${new Date().toLocaleDateString('ar-SA')}</p>
   </div>
-
-  <div class="articles-container">
-    ${results.map((article, index) => `
-      <div class="article">
-        <h2 class="article-title">${article.title_ar || article.title || ''}</h2>
-        <p class="article-summary">${article.summary_ar || article.description || article.content || ''}</p>
-        <div class="article-meta">
-          <span class="article-source">${article.source_name || article.source?.name || 'مصدر غير معروف'}</span>
-          <span>${article.published_at ? new Date(article.published_at).toLocaleDateString('ar-SA') : ''}</span>
-          ${article.url ? `<a href="${article.url}" class="article-link">المقال الأصلي</a>` : ''}
-        </div>
+  ${results.map(article => `
+    <div class="article">
+      <div class="article-title">${article.title || 'بدون عنوان'}</div>
+      ${article.description ? `<div class="article-desc">${article.description}</div>` : ''}
+      <div class="article-meta">
+        <span>📰 ${article.source_name || article.source_id || 'غير معروف'}</span>
+        ${article.country ? `<span>🌍 ${article.country}</span>` : ''}
+        ${article.pubDate ? `<span>📅 ${new Date(article.pubDate).toLocaleDateString('ar-SA')}</span>` : ''}
       </div>
-    `).join('')}
-  </div>
-
-  <div class="report-footer">
-    <p><strong>نظام أخبار عين - البحث المباشر</strong></p>
-    <p style="margin-top: 10px;">تم إنشاء هذا التقرير تلقائياً • جميع الحقوق محفوظة © ${new Date().getFullYear()}</p>
-  </div>
+    </div>
+  `).join('')}
 </body>
-</html>
-      `
+</html>`
 
-      // Create hidden iframe for PDF generation (maintains full document context)
-      const pdfIframe = document.createElement('iframe')
-      pdfIframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:210mm;height:297mm;border:none;'
-      document.body.appendChild(pdfIframe)
-      
-      const iframeDoc = pdfIframe.contentDocument || pdfIframe.contentWindow?.document
-      if (iframeDoc) {
-        iframeDoc.open()
-        iframeDoc.write(printContent)
-        iframeDoc.close()
-      }
-
-      // Open print preview window
       const printWindow = window.open('', '_blank')
-      if (printWindow) {
-        printWindow.document.write(printContent)
-        printWindow.document.close()
-        setTimeout(() => {
-          try { printWindow.print() } catch (e) { console.error('Print error:', e) }
-        }, 500)
-      }
-
-      // Generate PDF from iframe
-      try {
-        const html2pdf = (await import('html2pdf.js')).default
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-        const filename = `بحث_${keyword}_${timestamp}.pdf`
-        
-        // Wait for content to render
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        
-        if (iframeDoc && iframeDoc.body) {
-          const pdfBlob = await html2pdf()
-            .set({
-              margin: [10, 10, 10, 10],
-              filename: filename,
-              image: { type: 'jpeg', quality: 0.98 },
-              html2canvas: { 
-                scale: 2, 
-                useCORS: true,
-                logging: false,
-                allowTaint: true,
-                backgroundColor: '#ffffff',
-                windowWidth: pdfIframe.contentWindow?.innerWidth || 794
-              },
-              jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-              pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-            })
-            .from(iframeDoc.body)
-            .outputPdf('blob')
-          
-          // Upload to server
-          const formData = new FormData()
-          formData.append('file', pdfBlob, filename)
-          formData.append('filters', JSON.stringify({ keyword, type: 'direct_search' }))
-          formData.append('article_count', results.length.toString())
-          formData.append('source_type', 'direct_search')
-          
-          await apiFetch('/api/exports', {
-            method: 'POST',
-            body: formData,
-          })
-        }
-      } catch (e) {
-        console.error('Failed to save export:', e)
-      } finally {
-        // Cleanup
-        if (pdfIframe.parentNode) {
-          pdfIframe.parentNode.removeChild(pdfIframe)
-        }
-      }
-
-    } catch (error) {
-      console.error('Error exporting PDF:', error)
+      printWindow.document.write(printContent)
+      printWindow.document.close()
+      
+      setTimeout(() => {
+        printWindow.print()
+      }, 500)
+      
+    } catch (err) {
+      console.error('Export error:', err)
     } finally {
       setExporting(false)
     }
   }
+  
+  // Count active filters
+  const activeFiltersCount = selectedCountries.length + selectedLanguages.length + selectedCategories.length + (fromDate ? 1 : 0) + (titleOnly ? 1 : 0)
   
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="card p-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-2">
-          ابحث بكلمة مباشرة
+          ابحث الآن
         </h1>
         <p className="text-gray-600">
-          ابحث في الأخبار العالمية مباشرة باستخدام NewsData.io
+          ابحث في الأخبار العالمية من مصادر متعددة
         </p>
-      </div>
-      
-      {/* Endpoint Tabs */}
-      <div className="card p-4">
-        <div className="flex flex-wrap gap-2">
-          {endpoints.map(ep => {
-            const Icon = ep.icon
-            return (
-              <button
-                key={ep.id}
-                onClick={() => setEndpoint(ep.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                  endpoint === ep.id
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                <span className="font-medium">{ep.name}</span>
-                <span className="text-xs opacity-75">({ep.description})</span>
-              </button>
-            )
-          })}
-        </div>
       </div>
       
       {/* Search Box */}
       <div className="card p-6 space-y-4">
-        {/* Search Mode Toggle */}
-        <div className="flex items-center gap-4 mb-4">
-          <span className="text-sm font-medium text-gray-700">وضع البحث:</span>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setSearchMode('simple')}
-              className={`px-3 py-1 rounded text-sm ${
-                searchMode === 'simple'
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              بسيط
-            </button>
-            <button
-              onClick={() => setSearchMode('builder')}
-              className={`px-3 py-1 rounded text-sm ${
-                searchMode === 'builder'
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              منشئ الاستعلام (AND/OR/NOT)
-            </button>
-          </div>
-        </div>
+        {/* Query Builder */}
+        <GuidedQueryBuilder
+          onQueryChange={handleQueryChange}
+          maxLength={512}
+        />
         
-        {/* Simple Search Mode */}
-        {searchMode === 'simple' ? (
-          <div className="space-y-3">
-            {/* Arabic Operator Helper - Smart Join */}
-            <ArabicOperatorHelper
-              query={keyword}
-              onQueryChange={setKeyword}
-              inputRef={searchInputRef}
-            />
-            
-            {/* Search Input Row */}
-            <div className="flex gap-3">
-              <div className="flex-1 relative">
-                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  value={keyword}
-                  onChange={(e) => setKeyword(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="اكتب كلمات البحث ثم استخدم أدوات البحث أعلاه..."
-                  className="input pr-10 w-full"
-                  maxLength={512}
-                />
-              </div>
-              <button
-                onClick={() => handleSearch(false)}
-                disabled={loading || !keyword.trim() || !!validateQuery(keyword)}
-                className="btn disabled:opacity-50 disabled:cursor-not-allowed min-w-[120px]"
-              >
-                {loading && !nextPage ? (
-                  <>
-                    <LoaderIcon className="w-4 h-4 animate-spin" />
-                    جاري البحث...
-                  </>
-                ) : (
-                  <>
-                    <Search className="w-4 h-4" />
-                    ابحث
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        ) : (
-          /* Query Builder Mode */
-          <div className="space-y-4">
-            <QueryBuilder onQueryChange={handleQueryChange} maxLength={512} />
-            <button
-              onClick={() => handleSearch(false)}
-              disabled={loading || !builtQuery.trim()}
-              className="btn disabled:opacity-50 disabled:cursor-not-allowed w-full"
-            >
-              {loading && !nextPage ? (
-                <>
-                  <LoaderIcon className="w-4 h-4 animate-spin" />
-                  جاري البحث...
-                </>
-              ) : (
-                <>
-                  <Search className="w-4 h-4" />
-                  ابحث باستخدام الاستعلام المُنشأ
-                </>
-              )}
-            </button>
-          </div>
-        )}
-        
-        {/* Advanced Filters Toggle */}
+        {/* Filters Toggle */}
         <button
-          onClick={() => setShowAdvanced(!showAdvanced)}
-          className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
+          onClick={() => setShowFilters(!showFilters)}
+          className={`flex items-center gap-2 text-sm font-medium transition-colors ${
+            showFilters || activeFiltersCount > 0
+              ? 'text-emerald-600'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
         >
           <Filter className="w-4 h-4" />
-          {showAdvanced ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          فلاتر متقدمة
+          {showFilters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          <span>فلاتر إضافية</span>
+          {activeFiltersCount > 0 && (
+            <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs rounded-full">
+              {activeFiltersCount}
+            </span>
+          )}
         </button>
         
-        {/* Advanced Filters */}
-        {showAdvanced && (
-          <div className="border-t pt-4 space-y-4">
-            {/* Archive Date Range */}
-            {endpoint === 'archive' && (
-              <div className="grid grid-cols-2 gap-4 p-3 bg-purple-50 rounded-lg border border-purple-200">
+        {/* Filters Panel */}
+        {showFilters && (
+          <div className="space-y-5 p-4 bg-gray-50 rounded-xl border border-gray-200">
+            {/* Date Range */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Calendar className="w-4 h-4 text-gray-500" />
+                <label className="text-sm font-semibold text-gray-800">نطاق التاريخ</label>
+                {endpoint === 'archive' && (
+                  <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full">أرشيف</span>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-purple-700 mb-1">من تاريخ</label>
+                  <label className="block text-xs text-gray-500 mb-1">من</label>
                   <input
                     type="date"
                     value={fromDate}
                     onChange={(e) => setFromDate(e.target.value)}
-                    className="input w-full"
+                    className="input w-full text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-purple-700 mb-1">إلى تاريخ</label>
+                  <label className="block text-xs text-gray-500 mb-1">إلى</label>
                   <input
                     type="date"
                     value={toDate}
                     onChange={(e) => setToDate(e.target.value)}
-                    className="input w-full"
+                    className="input w-full text-sm"
                   />
                 </div>
               </div>
+              <p className="text-xs text-gray-500 mt-1">
+                {endpoint === 'archive' 
+                  ? '📚 سيتم البحث في الأرشيف (أكثر من 48 ساعة)'
+                  : '⚡ سيتم البحث في آخر 48 ساعة'
+                }
+              </p>
+            </div>
+            
+            {/* Timeframe */}
+            {endpoint === 'latest' && !fromDate && (
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Clock className="w-4 h-4 text-gray-500" />
+                  <label className="text-sm font-semibold text-gray-800">الإطار الزمني</label>
+                </div>
+                <select
+                  value={timeframe}
+                  onChange={(e) => setTimeframe(e.target.value)}
+                  className="input w-full text-sm"
+                >
+                  <option value="">الكل (48 ساعة)</option>
+                  <option value="1">ساعة واحدة</option>
+                  <option value="6">6 ساعات</option>
+                  <option value="12">12 ساعة</option>
+                  <option value="24">24 ساعة</option>
+                </select>
+              </div>
             )}
             
-            {/* Title Only Toggle */}
+            {/* Title Only */}
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
                 checked={titleOnly}
                 onChange={(e) => setTitleOnly(e.target.checked)}
-                className="w-4 h-4"
+                className="w-4 h-4 text-emerald-600 rounded"
               />
               <span className="text-sm text-gray-700">البحث في العنوان فقط</span>
             </label>
             
-            {/* Timeframe */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">الإطار الزمني</label>
-              <select value={timeframe} onChange={(e) => setTimeframe(e.target.value)} className="input">
-                <option value="">الافتراضي (48 ساعة)</option>
-                <option value="1">ساعة واحدة</option>
-                <option value="6">6 ساعات</option>
-                <option value="12">12 ساعة</option>
-                <option value="24">24 ساعة</option>
-                <option value="48">48 ساعة</option>
-              </select>
-            </div>
-            
-            {/* Categories */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                التصنيفات {selectedCategories.length > 0 && `(${selectedCategories.length} محدد)`}
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {availableCategories.map(cat => (
-                  <button
-                    key={cat.code}
-                    onClick={() => toggleCategory(cat.code)}
-                    className={`px-3 py-1 rounded-full text-sm transition-colors ${
-                      selectedCategories.includes(cat.code)
-                        ? 'bg-purple-600 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    {cat.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-            
             {/* Countries */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                الدول {selectedCountries.length > 0 && `(${selectedCountries.length} محدد)`}
-              </label>
+              <div className="flex items-center gap-2 mb-2">
+                <Globe className="w-4 h-4 text-gray-500" />
+                <label className="text-sm font-semibold text-gray-800">
+                  الدول
+                  {selectedCountries.length > 0 && (
+                    <span className="text-gray-500 font-normal mr-1">({selectedCountries.length})</span>
+                  )}
+                </label>
+              </div>
               {selectedCountries.length > 5 && (
-                <div className="mb-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
-                  ⚠️ سيتم استخدام أول 5 دول فقط (حد NewsData.io)
-                </div>
+                <p className="text-xs text-amber-600 mb-2">⚠️ سيتم استخدام أول 5 دول فقط</p>
               )}
               <div className="flex flex-wrap gap-2">
                 {availableCountries.map(country => (
                   <button
                     key={country.code}
                     onClick={() => toggleCountry(country.code)}
-                    className={`px-3 py-1 rounded-full text-sm transition-colors ${
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
                       selectedCountries.includes(country.code)
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'bg-white text-gray-700 border border-gray-200 hover:border-emerald-400'
                     }`}
                   >
                     {country.name}
@@ -747,18 +423,24 @@ export default function DirectSearch() {
             
             {/* Languages */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                اللغات
-              </label>
+              <div className="flex items-center gap-2 mb-2">
+                <Languages className="w-4 h-4 text-gray-500" />
+                <label className="text-sm font-semibold text-gray-800">
+                  اللغات
+                  {selectedLanguages.length > 0 && (
+                    <span className="text-gray-500 font-normal mr-1">({selectedLanguages.length})</span>
+                  )}
+                </label>
+              </div>
               <div className="flex flex-wrap gap-2">
                 {availableLanguages.map(lang => (
                   <button
                     key={lang.code}
                     onClick={() => toggleLanguage(lang.code)}
-                    className={`px-3 py-1 rounded-full text-sm transition-colors ${
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
                       selectedLanguages.includes(lang.code)
-                        ? 'bg-green-600 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : 'bg-white text-gray-700 border border-gray-200 hover:border-blue-400'
                     }`}
                   >
                     {lang.name}
@@ -766,37 +448,90 @@ export default function DirectSearch() {
                 ))}
               </div>
             </div>
+            
+            {/* Categories */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Tag className="w-4 h-4 text-gray-500" />
+                <label className="text-sm font-semibold text-gray-800">
+                  التصنيفات
+                  {selectedCategories.length > 0 && (
+                    <span className="text-gray-500 font-normal mr-1">({selectedCategories.length})</span>
+                  )}
+                </label>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {availableCategories.map(cat => (
+                  <button
+                    key={cat.code}
+                    onClick={() => toggleCategory(cat.code)}
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                      selectedCategories.includes(cat.code)
+                        ? 'bg-purple-600 text-white shadow-sm'
+                        : 'bg-white text-gray-700 border border-gray-200 hover:border-purple-400'
+                    }`}
+                  >
+                    {cat.name}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         )}
+        
+        {/* Search Button */}
+        <button
+          onClick={() => handleSearch(false)}
+          disabled={loading || !canSearch}
+          className="btn w-full py-3 text-base disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {loading && !nextPage ? (
+            <>
+              <LoaderIcon className="w-5 h-5 animate-spin" />
+              جاري البحث...
+            </>
+          ) : (
+            <>
+              <Search className="w-5 h-5" />
+              ابحث
+            </>
+          )}
+        </button>
       </div>
       
       {/* Error Message */}
       {error && (
         <div className="card p-4 bg-red-50 border-red-200">
-          <p className="text-sm text-red-800">{error}</p>
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 text-red-600" />
+            <p className="text-sm text-red-800">{error}</p>
+          </div>
         </div>
       )}
       
       {/* Results */}
       {loading && results.length === 0 ? (
-        <Loader text="جاري البحث في الأخبار العالمية..." />
-      ) : results.length === 0 && keyword ? (
+        <Loader text="جاري البحث في الأخبار..." />
+      ) : searchPerformed && results.length === 0 ? (
         <div className="card p-12 text-center">
-          <Search className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-xl font-bold text-gray-900 mb-2">لا توجد نتائج للبحث</h3>
-          <p className="text-gray-600">جرّب صياغة أخرى أو زمن أوسع</p>
+          <Search className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-xl font-bold text-gray-900 mb-2">لا توجد نتائج</h3>
+          <p className="text-gray-600">جرّب كلمات مختلفة أو وسّع نطاق البحث</p>
         </div>
       ) : results.length > 0 ? (
         <>
-          {/* Results Count and Export Button */}
+          {/* Results Header */}
           <div className="flex items-center justify-between">
             <div className="text-sm text-gray-600">
-              النتائج: {results.length} خبر
+              <span className="font-semibold text-gray-900">{results.length}</span> نتيجة
+              {totalResults > results.length && (
+                <span className="text-gray-400"> من {totalResults}</span>
+              )}
             </div>
             <button
               onClick={exportToPDF}
               disabled={exporting}
-              className="btn disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn-outline text-sm disabled:opacity-50"
             >
               {exporting ? (
                 <>
@@ -815,7 +550,7 @@ export default function DirectSearch() {
           {/* Results Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {results.map((article, index) => (
-              <ArticleCard key={`${article.url}-${index}`} article={article} />
+              <ArticleCard key={`${article.article_id || article.link}-${index}`} article={article} />
             ))}
           </div>
           
@@ -825,7 +560,7 @@ export default function DirectSearch() {
               <button
                 onClick={() => handleSearch(true)}
                 disabled={loading}
-                className="btn-outline disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-outline disabled:opacity-50"
               >
                 {loading ? (
                   <>
@@ -840,13 +575,6 @@ export default function DirectSearch() {
           )}
         </>
       ) : null}
-      
-      {/* Info Alert */}
-      <div className="card p-4 bg-blue-50 border-blue-200">
-        <p className="text-sm text-blue-800">
-          💡 يتم البحث في الأخبار العالمية من آخر 48 ساعة باستخدام NewsData.io
-        </p>
-      </div>
     </div>
   )
 }

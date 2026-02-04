@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { X, Plus, ChevronDown, ChevronUp, Sparkles, Copy, Check, AlertCircle, Lightbulb, Search } from 'lucide-react'
+import { X, Plus, ChevronDown, ChevronUp, Copy, Check, AlertCircle, Lightbulb, Search } from 'lucide-react'
 
 /**
  * compileToQ - Compile structured query state into a valid boolean search string
@@ -88,49 +88,6 @@ export function validateQuery(builder, basicText = '') {
   return { valid: true, error: null }
 }
 
-// Quick search templates
-const SEARCH_TEMPLATES = [
-  { 
-    id: 'saudi-economy',
-    name: 'الاقتصاد السعودي',
-    icon: '💰',
-    builder: { 
-      must: ['السعودية'], 
-      any: ['الاقتصاد', 'الميزانية', 'رؤية 2030', 'الاستثمار'], 
-      exclude: [] 
-    }
-  },
-  { 
-    id: 'gulf-politics',
-    name: 'سياسة الخليج',
-    icon: '🏛️',
-    builder: { 
-      must: [], 
-      any: ['السعودية', 'الإمارات', 'قطر', 'الكويت', 'البحرين', 'عمان'], 
-      exclude: [] 
-    }
-  },
-  { 
-    id: 'tech-news',
-    name: 'أخبار التقنية',
-    icon: '💻',
-    builder: { 
-      must: [], 
-      any: ['ذكاء اصطناعي', 'تقنية', 'Apple', 'Google', 'Microsoft'], 
-      exclude: [] 
-    }
-  },
-  { 
-    id: 'sports',
-    name: 'الرياضة',
-    icon: '⚽',
-    builder: { 
-      must: [], 
-      any: ['كرة القدم', 'الدوري', 'كأس العالم', 'منتخب'], 
-      exclude: [] 
-    }
-  }
-]
 
 // Chip component
 const Chip = ({ text, onRemove, color = 'emerald' }) => {
@@ -229,7 +186,6 @@ export default function GuidedQueryBuilder({
   // UI state
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [copied, setCopied] = useState(false)
-  const [showTemplates, setShowTemplates] = useState(false)
   
   // Compile query
   const compiledQuery = useMemo(() => {
@@ -285,14 +241,6 @@ export default function GuidedQueryBuilder({
     }))
   }
   
-  // Apply template
-  const applyTemplate = (template) => {
-    setBuilder(template.builder)
-    setBasicText('')
-    setShowTemplates(false)
-    setShowAdvanced(true)
-  }
-  
   // Copy query
   const copyQuery = async () => {
     if (compiledQuery) {
@@ -324,33 +272,6 @@ export default function GuidedQueryBuilder({
           className="input pr-10 w-full text-base"
           maxLength={200}
         />
-      </div>
-      
-      {/* Quick Templates */}
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          onClick={() => setShowTemplates(!showTemplates)}
-          className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-emerald-600 transition-colors"
-        >
-          <Sparkles className="w-4 h-4" />
-          <span>قوالب سريعة</span>
-          {showTemplates ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-        </button>
-        
-        {showTemplates && (
-          <div className="w-full flex flex-wrap gap-2 mt-2 p-3 bg-gradient-to-r from-emerald-50 to-blue-50 rounded-lg border border-emerald-200">
-            {SEARCH_TEMPLATES.map(template => (
-              <button
-                key={template.id}
-                onClick={() => applyTemplate(template)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-full text-sm font-medium text-gray-700 border border-gray-200 hover:border-emerald-400 hover:bg-emerald-50 transition-all"
-              >
-                <span>{template.icon}</span>
-                <span>{template.name}</span>
-              </button>
-            ))}
-          </div>
-        )}
       </div>
       
       {/* Advanced Builder Toggle */}

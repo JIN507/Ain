@@ -66,6 +66,8 @@ class UserMonitoringScheduler:
             
             self._running = True
             self._stop_event.clear()
+            # Set last_run to now so next_run can be calculated immediately
+            self._last_run = datetime.now()
         
         # Start background thread
         self._thread = threading.Thread(target=self._run_loop, daemon=True)

@@ -15,6 +15,9 @@ export default function StatsOverview({ stats }) {
         const data = await res.json()
         if (data.next_run) {
           setNextRunTime(new Date(data.next_run))
+        } else if (data.running) {
+          // If running but no next_run yet, refetch soon
+          setTimeout(fetchSchedulerStatus, 3000)
         }
       } catch (error) {
         console.error('Error fetching scheduler status:', error)
@@ -22,8 +25,8 @@ export default function StatsOverview({ stats }) {
     }
 
     fetchSchedulerStatus()
-    // Refresh scheduler status every 60 seconds
-    const statusInterval = setInterval(fetchSchedulerStatus, 60000)
+    // Refresh scheduler status every 30 seconds to catch new monitoring starts
+    const statusInterval = setInterval(fetchSchedulerStatus, 30000)
     return () => clearInterval(statusInterval)
   }, [])
 

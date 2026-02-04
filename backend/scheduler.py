@@ -92,20 +92,6 @@ class UserMonitoringScheduler:
         print("[SCHEDULER] Stopped")
         return {"success": True, "message": "Scheduler stopped"}
     
-    def trigger_immediate_run(self) -> Dict[str, Any]:
-        """Trigger an immediate monitoring run (for new keywords)"""
-        with self._status_lock:
-            if not self._running:
-                return {"success": False, "message": "Scheduler not running"}
-        
-        # Run monitoring in a separate thread to not block
-        def run_now():
-            print(f"[SCHEDULER] User {self.user_id}: Triggered immediate run for new keyword")
-            self._execute_monitoring()
-        
-        threading.Thread(target=run_now, daemon=True).start()
-        return {"success": True, "message": "Immediate monitoring triggered"}
-    
     def _run_loop(self):
         """Main scheduler loop"""
         # Run immediately on start

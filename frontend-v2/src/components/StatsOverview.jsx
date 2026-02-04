@@ -6,6 +6,7 @@ import { apiFetch } from '../apiClient'
 export default function StatsOverview({ stats }) {
   const [countdown, setCountdown] = useState('--:--')
   const [nextRunTime, setNextRunTime] = useState(null)
+  const [isMonitoringRunning, setIsMonitoringRunning] = useState(false)
 
   // Fetch scheduler status and calculate countdown
   useEffect(() => {
@@ -13,15 +14,16 @@ export default function StatsOverview({ stats }) {
       try {
         const res = await apiFetch('/api/monitor/status')
         const data = await res.json()
+        setIsMonitoringRunning(data.running || false)
+        
         if (data.next_run) {
           setNextRunTime(new Date(data.next_run))
         } else if (data.running) {
           // If running but no next_run yet, refetch soon
           setTimeout(fetchSchedulerStatus, 3000)
         } else {
-          // System not running - reset timer
+          // Not running - clear next run time
           setNextRunTime(null)
-          setCountdown('--:--')
         }
       } catch (error) {
         console.error('Error fetching scheduler status:', error)
@@ -29,14 +31,23 @@ export default function StatsOverview({ stats }) {
     }
 
     fetchSchedulerStatus()
-    // Refresh scheduler status every 30 seconds to catch new monitoring starts/stops
+    // Refresh scheduler status every 30 seconds to catch new monitoring starts
     const statusInterval = setInterval(fetchSchedulerStatus, 30000)
     return () => clearInterval(statusInterval)
   }, [])
 
   // Update countdown every second
   useEffect(() => {
-    if (!nextRunTime) return
+    // If monitoring not running, show stopped state
+    if (!isMonitoringRunning) {
+      setCountdown('متوقف')
+      return
+    }
+    
+    if (!nextRunTime) {
+      setCountdown('جاري التحميل...')
+      return
+    }
 
     const updateCountdown = () => {
       const now = new Date()
@@ -55,7 +66,7 @@ export default function StatsOverview({ stats }) {
     updateCountdown()
     const countdownInterval = setInterval(updateCountdown, 1000)
     return () => clearInterval(countdownInterval)
-  }, [nextRunTime])
+  }, [nextRunTime, isMonitoringRunning])
 
   const statCards = [
     {

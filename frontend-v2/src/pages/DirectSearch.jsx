@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Search, ChevronDown, ChevronUp, Loader as LoaderIcon, Download, Loader2, Newspaper, TrendingUp, Archive, BarChart3, Filter } from 'lucide-react'
+import { Search, ChevronDown, ChevronUp, Loader as LoaderIcon, Download, Loader2, Newspaper, Archive, Filter } from 'lucide-react'
 import ArticleCard from '../components/ArticleCard'
 import Loader from '../components/Loader'
 import QueryBuilder from '../components/QueryBuilder'
@@ -35,10 +35,6 @@ export default function DirectSearch() {
   // Archive-specific
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
-  
-  // Crypto/Market specific
-  const [coin, setCoin] = useState('')
-  const [symbol, setSymbol] = useState('')
   
   // Results state
   const [results, setResults] = useState([])
@@ -106,9 +102,7 @@ export default function DirectSearch() {
   
   const endpoints = [
     { id: 'latest', name: 'آخر الأخبار', icon: Newspaper, description: 'آخر 48 ساعة' },
-    { id: 'crypto', name: 'عملات رقمية', icon: TrendingUp, description: 'أخبار العملات المشفرة' },
-    { id: 'archive', name: 'الأرشيف', icon: Archive, description: 'البحث التاريخي' },
-    { id: 'market', name: 'الأسواق', icon: BarChart3, description: 'أخبار مالية' }
+    { id: 'archive', name: 'الأرشيف', icon: Archive, description: 'البحث التاريخي' }
   ]
   
   const sentimentOptions = [
@@ -174,9 +168,6 @@ export default function DirectSearch() {
           if (toDate) params.append('toDate', toDate)
         }
         
-        // Crypto/Market specific
-        if (endpoint === 'crypto' && coin) params.append('coin', coin)
-        if (endpoint === 'market' && symbol) params.append('symbol', symbol)
         
         setSearchPerformed(true)
       } else {
@@ -678,34 +669,6 @@ export default function DirectSearch() {
                     className="input w-full"
                   />
                 </div>
-              </div>
-            )}
-            
-            {/* Crypto-specific */}
-            {endpoint === 'crypto' && (
-              <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                <label className="block text-sm font-medium text-yellow-700 mb-1">العملة (Coin)</label>
-                <input
-                  type="text"
-                  value={coin}
-                  onChange={(e) => setCoin(e.target.value)}
-                  placeholder="مثال: bitcoin, ethereum"
-                  className="input w-full"
-                />
-              </div>
-            )}
-            
-            {/* Market-specific */}
-            {endpoint === 'market' && (
-              <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <label className="block text-sm font-medium text-blue-700 mb-1">رمز السهم (Symbol)</label>
-                <input
-                  type="text"
-                  value={symbol}
-                  onChange={(e) => setSymbol(e.target.value)}
-                  placeholder="مثال: AAPL, GOOGL, TSLA"
-                  className="input w-full"
-                />
               </div>
             )}
             

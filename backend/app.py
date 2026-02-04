@@ -1204,20 +1204,30 @@ def add_keyword():
         else:
             print(f"   ❌ Expansion failed")
         
-        # Step 3: Auto-start monitoring if not already running
+        # Step 3: Auto-start monitoring or trigger immediate run for new keyword
         user_id = getattr(current_user, 'id', None)
+        monitoring_action = None
         if user_id:
             status = scheduler_manager.get_status(user_id)
             if not status.get('running'):
+                # Start the scheduler if not running
                 print(f"🚀 Auto-starting monitoring for user {user_id}...")
                 scheduler_manager.start(user_id)
                 print(f"   ✅ Monitoring started automatically")
+                monitoring_action = "started"
+            else:
+                # Trigger immediate run for the new keyword
+                print(f"🔄 Triggering immediate search for new keyword...")
+                scheduler_manager.trigger_immediate_run(user_id)
+                print(f"   ✅ Immediate search triggered")
+                monitoring_action = "triggered"
         
         return jsonify({
             "success": True,
             "id": keyword.id,
             "translations": translations,
-            "expansion": expansion  # Include expansion in response
+            "expansion": expansion,
+            "monitoring_action": monitoring_action
         })
     finally:
         db.close()
@@ -1226,7 +1236,7 @@ def add_keyword():
 @login_required
 @csrf.exempt
 def delete_keyword(keyword_id):
-    """Delete keyword"""
+    """Delete keyword and stop scheduler if no keywords remain"""
     db = get_db()
     try:
         query = scoped(db.query(Keyword), Keyword)
@@ -1238,7 +1248,18 @@ def delete_keyword(keyword_id):
         db.delete(keyword)
         db.commit()
         
-        return jsonify({"success": True})
+        # Check if any enabled keywords remain for this user
+        user_id = getattr(current_user, 'id', None)
+        remaining = scoped(db.query(Keyword), Keyword).filter(Keyword.enabled == True).count()
+        
+        # If no keywords remain, stop the scheduler
+        if remaining == 0 and user_id:
+            status = scheduler_manager.get_status(user_id)
+            if status.get('running'):
+                print(f"🛑 No keywords remaining - stopping scheduler for user {user_id}")
+                scheduler_manager.stop(user_id)
+        
+        return jsonify({"success": True, "remaining_keywords": remaining})
     finally:
         db.close()
 

@@ -18,6 +18,10 @@ export default function StatsOverview({ stats }) {
         } else if (data.running) {
           // If running but no next_run yet, refetch soon
           setTimeout(fetchSchedulerStatus, 3000)
+        } else {
+          // System not running - reset timer
+          setNextRunTime(null)
+          setCountdown('--:--')
         }
       } catch (error) {
         console.error('Error fetching scheduler status:', error)
@@ -25,7 +29,7 @@ export default function StatsOverview({ stats }) {
     }
 
     fetchSchedulerStatus()
-    // Refresh scheduler status every 30 seconds to catch new monitoring starts
+    // Refresh scheduler status every 30 seconds to catch new monitoring starts/stops
     const statusInterval = setInterval(fetchSchedulerStatus, 30000)
     return () => clearInterval(statusInterval)
   }, [])

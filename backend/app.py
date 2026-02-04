@@ -2337,7 +2337,6 @@ def newsdata_search():
     - category, excludeCategory, domain, excludeDomain
     - timeframe, timezone, fromDate, toDate (archive only)
     - fullContent, image, video, removeDuplicate
-    - sentiment, tag, region (AI filters)
     - coin, symbol, exchange (crypto/market specific)
     - page: pagination token
     """
@@ -2398,9 +2397,7 @@ def newsdata_search():
         'image': params.get('image', '').lower() == 'true' if params.get('image') else None,
         'video': params.get('video', '').lower() == 'true' if params.get('video') else None,
         'remove_duplicate': params.get('removeDuplicate', '').lower() == 'true' if params.get('removeDuplicate') else None,
-        'sentiment': params.get('sentiment', '').strip() or None,
-        'tag': params.get('tag', '').strip() or None,
-        'region': params.get('region', '').strip() or None,
+        # NOTE: sentiment, tag, region require Professional/Corporate plan - removed
         'page': page or None,
     }
     

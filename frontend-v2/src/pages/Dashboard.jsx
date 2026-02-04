@@ -13,17 +13,21 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
   const [resetResult, setResetResult] = useState(null)
   const [articles, setArticles] = useState([])
   const [stats, setStats] = useState({ total: 0, positive: 0, negative: 0, neutral: 0 })
-  const [filters, setFilters] = useState({})
+  // Initialize filters with keyword if provided from navigation
+  const [filters, setFilters] = useState(() => 
+    initialKeywordFilter ? { keyword: initialKeywordFilter } : {}
+  )
   const [countries, setCountries] = useState([])
   const [keywords, setKeywords] = useState([])
 
-  // Apply initial keyword filter from navigation
+  // Clear the navigation state after initial render (to allow re-navigation)
   useEffect(() => {
     if (initialKeywordFilter) {
-      setFilters(prev => ({ ...prev, keyword: initialKeywordFilter }))
-      onFilterApplied?.()
+      // Small delay to ensure filter is applied before clearing navigation state
+      const timer = setTimeout(() => onFilterApplied?.(), 100)
+      return () => clearTimeout(timer)
     }
-  }, [initialKeywordFilter, onFilterApplied])
+  }, [])
 
   useEffect(() => {
     loadArticles()

@@ -1154,12 +1154,16 @@ def add_keyword():
         keyword_ar = (data.get('text_ar') or '').strip()
 
         if not keyword_ar:
+            print(f"❌ Keyword add failed: empty keyword text")
             return jsonify({"error": "النص العربي للكلمة مطلوب"}), 400
         
-        # Check if keyword already exists FOR THIS USER only
-        existing = scoped(db.query(Keyword), Keyword).filter(Keyword.text_ar == keyword_ar).first()
+        # Check if keyword already exists FOR THIS USER only (force_user_filter=True)
+        existing = scoped(db.query(Keyword), Keyword, force_user_filter=True).filter(Keyword.text_ar == keyword_ar).first()
         if existing:
+            print(f"❌ Keyword add failed: '{keyword_ar}' already exists for user {current_user.id}")
             return jsonify({"error": "هذه الكلمة موجودة بالفعل لهذا المستخدم"}), 400
+        
+        print(f"✅ Adding new keyword: '{keyword_ar}' for user {current_user.id}")
         
         # Step 1: Translate keyword using Google Translate to 7 base languages (for DB storage)
         print(f"🔄 Step 1: Translating keyword to 7 base languages: {keyword_ar}")
@@ -1185,9 +1189,11 @@ def add_keyword():
             db.commit()
         except Exception as e:
             db.rollback()
-            # Handle existing global UNIQUE constraint on keywords.text_ar
-            if 'UNIQUE constraint failed: keywords.text_ar' in str(e):
-                return jsonify({"error": "هذه الكلمة موجودة مسبقاً في القاموس المشترك للنظام"}), 400
+            error_str = str(e).lower()
+            print(f"❌ Database error adding keyword: {e}")
+            # Handle existing UNIQUE constraint (SQLite or PostgreSQL)
+            if 'unique' in error_str or 'duplicate' in error_str:
+                return jsonify({"error": "هذه الكلمة موجودة مسبقاً"}), 400
             raise
         
         print(f"   ✅ Keyword saved to database (ID: {keyword.id})")

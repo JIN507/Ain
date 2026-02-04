@@ -77,11 +77,6 @@ export default function ArticleCard({ article }) {
           <span className="badge bg-white text-emerald-700 border border-emerald-200">
             📰 {article.source_name}
           </span>
-          {article.is_newsdata && (
-            <span className="badge bg-blue-100 text-blue-800 border border-blue-200">
-              🔍 NewsData.io
-            </span>
-          )}
         </div>
 
         {/* Keyword */}

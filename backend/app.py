@@ -1210,19 +1210,18 @@ def add_keyword():
         else:
             print(f"   ❌ Expansion failed")
         
-        # Step 3: Auto-start monitoring OR trigger immediate search if already running
+        # Step 3: Restart monitoring to include new keyword
         user_id = getattr(current_user, 'id', None)
         if user_id:
             status = scheduler_manager.get_status(user_id)
-            if not status.get('running'):
-                print(f"🚀 Auto-starting monitoring for user {user_id}...")
-                scheduler_manager.start(user_id)
-                print(f"   ✅ Monitoring started automatically")
-            else:
-                # Already running - trigger immediate search for new keyword
-                print(f"🔄 Monitoring already running - triggering immediate search for new keyword...")
-                scheduler_manager.trigger_now(user_id)
-                print(f"   ✅ Immediate search triggered")
+            if status.get('running'):
+                # Stop and restart to include new keyword immediately
+                print(f"🔄 Restarting monitoring to include new keyword...")
+                scheduler_manager.stop(user_id)
+            
+            print(f"🚀 Starting monitoring for user {user_id}...")
+            scheduler_manager.start(user_id)
+            print(f"   ✅ Monitoring started with all keywords")
         
         return jsonify({
             "success": True,

@@ -2425,6 +2425,66 @@ def newsdata_search():
     return jsonify(result), 200 if result.get('success') else 400
 
 
+@app.route('/api/newsdata/count', methods=['GET', 'POST'])
+@csrf.exempt
+def newsdata_count():
+    """
+    Get estimated article count for a query (credit-saving preview).
+    Uses minimal API call to get totalResults without fetching all articles.
+    """
+    if request.method == 'POST':
+        params = request.get_json() or {}
+    else:
+        params = request.args.to_dict()
+    
+    # Build query from params
+    raw_q = params.get('q', '').strip()
+    q_in_title = params.get('qInTitle', '').strip()
+    q_in_meta = params.get('qInMeta', '').strip()
+    
+    # Get filters
+    search_params = {
+        'q': raw_q if raw_q and not q_in_title and not q_in_meta else None,
+        'q_in_title': q_in_title or None,
+        'q_in_meta': q_in_meta or None,
+        'country': params.get('country', '').strip() or None,
+        'language': params.get('language', '').strip() or None,
+        'category': params.get('category', '').strip() or None,
+        'domain': params.get('domain', '').strip() or None,
+        'timeframe': params.get('timeframe', '').strip() or None,
+        'from_date': params.get('fromDate', '').strip() or None,
+        'to_date': params.get('toDate', '').strip() or None,
+    }
+    
+    # Remove None values
+    search_params = {k: v for k, v in search_params.items() if v is not None}
+    
+    result = newsdata_client.get_count(**search_params)
+    
+    # Determine query health
+    count = result.get('count', 0)
+    if count == 0:
+        health = 'empty'
+        health_ar = 'لا توجد نتائج'
+    elif count <= 50:
+        health = 'narrow'
+        health_ar = 'بحث محدد'
+    elif count <= 500:
+        health = 'moderate'
+        health_ar = 'بحث متوسط'
+    else:
+        health = 'broad'
+        health_ar = 'بحث واسع'
+    
+    return jsonify({
+        'success': result.get('success', False),
+        'count': count,
+        'health': health,
+        'health_ar': health_ar,
+        'message': result.get('message')
+    }), 200 if result.get('success') else 400
+
+
 @app.route('/api/newsdata/build-query', methods=['POST'])
 @csrf.exempt
 def build_query():

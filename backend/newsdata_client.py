@@ -486,6 +486,78 @@ class NewsDataClient:
         
         return result
     
+    def get_count(
+        self,
+        q: str = None,
+        q_in_title: str = None,
+        q_in_meta: str = None,
+        country: str = None,
+        language: str = None,
+        category: str = None,
+        domain: str = None,
+        timeframe: str = None,
+        from_date: str = None,
+        to_date: str = None,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Get article count without fetching full results (saves credits).
+        Uses the news count API endpoint.
+        """
+        params = {}
+        
+        # Query params (mutually exclusive)
+        if q:
+            params['q'] = q
+        elif q_in_title:
+            params['qInTitle'] = q_in_title
+        elif q_in_meta:
+            params['qInMeta'] = q_in_meta
+        
+        # Filters
+        if country:
+            params['country'] = ','.join(country.split(',')[:5])
+        if language:
+            params['language'] = language
+        if category:
+            params['category'] = category
+        if domain:
+            params['domain'] = domain
+        if timeframe:
+            params['timeframe'] = timeframe
+        if from_date:
+            params['from_date'] = from_date
+        if to_date:
+            params['to_date'] = to_date
+        
+        # Use news/count endpoint
+        try:
+            url = f"{self.BASE_URL}/news"
+            params['apikey'] = self.api_key
+            params['size'] = 1  # Minimal fetch to get totalResults
+            
+            response = requests.get(url, params=params, timeout=10)
+            data = response.json()
+            
+            if response.status_code == 200 and data.get('status') == 'success':
+                return {
+                    'success': True,
+                    'count': data.get('totalResults', 0),
+                    'message': None
+                }
+            else:
+                return {
+                    'success': False,
+                    'count': 0,
+                    'message': data.get('message', 'فشل في جلب العدد')
+                }
+        except Exception as e:
+            return {
+                'success': False,
+                'count': 0,
+                'message': str(e)[:200]
+            }
+    
     def search(self, endpoint: str = 'latest', **kwargs) -> Dict[str, Any]:
         """
         Generic search method that routes to the appropriate endpoint.
@@ -502,6 +574,8 @@ class NewsDataClient:
             return self.get_sources(**kwargs)
         elif endpoint == 'market':
             return self.search_market(**kwargs)
+        elif endpoint == 'count':
+            return self.get_count(**kwargs)
         else:
             return {
                 'success': False,

@@ -157,26 +157,45 @@ const ChipInput = ({ value, onChange, onAdd, placeholder, color, chips, onRemove
 /**
  * GuidedQueryBuilder - Progressive visual query builder
  * 
+ * Supports both controlled and uncontrolled modes:
+ * - Controlled: pass builder, setBuilder, basicText, setBasicText
+ * - Uncontrolled: pass onQueryChange, onBuilderChange callbacks
+ * 
  * Props:
+ * - builder: controlled builder state
+ * - setBuilder: controlled builder setter
+ * - basicText: controlled basic text
+ * - setBasicText: controlled basic text setter
  * - onQueryChange: (query: string, isValid: boolean) => void
  * - onBuilderChange: (builder: Object) => void
  * - maxLength: number
  */
 export default function GuidedQueryBuilder({ 
+  // Controlled mode props
+  builder: externalBuilder,
+  setBuilder: externalSetBuilder,
+  basicText: externalBasicText,
+  setBasicText: externalSetBasicText,
+  // Uncontrolled mode props
   onQueryChange, 
   onBuilderChange,
   maxLength = 512,
   initialBasicText = ''
 }) {
-  // Basic search text
-  const [basicText, setBasicText] = useState(initialBasicText)
-  
-  // Builder state
-  const [builder, setBuilder] = useState({
+  // Internal state (used when not controlled)
+  const [internalBasicText, setInternalBasicText] = useState(initialBasicText)
+  const [internalBuilder, setInternalBuilder] = useState({
     must: [],
     any: [],
     exclude: []
   })
+  
+  // Use external or internal state
+  const isControlled = externalBuilder !== undefined
+  const builder = isControlled ? externalBuilder : internalBuilder
+  const setBuilder = isControlled ? externalSetBuilder : setInternalBuilder
+  const basicText = externalBasicText !== undefined ? externalBasicText : internalBasicText
+  const setBasicText = externalSetBasicText !== undefined ? externalSetBasicText : setInternalBasicText
   
   // Input states
   const [mustInput, setMustInput] = useState('')
@@ -213,14 +232,18 @@ export default function GuidedQueryBuilder({
   const isOverLimit = queryLength > maxLength
   const isValid = validation.valid && !isOverLimit && queryLength > 0
   
-  // Notify parent of changes
+  // Notify parent of changes (only in uncontrolled mode)
   useEffect(() => {
-    onQueryChange?.(compiledQuery, isValid)
-  }, [compiledQuery, isValid, onQueryChange])
+    if (!isControlled) {
+      onQueryChange?.(compiledQuery, isValid)
+    }
+  }, [compiledQuery, isValid, onQueryChange, isControlled])
   
   useEffect(() => {
-    onBuilderChange?.(builder)
-  }, [builder, onBuilderChange])
+    if (!isControlled) {
+      onBuilderChange?.(builder)
+    }
+  }, [builder, onBuilderChange, isControlled])
   
   // Chip handlers
   const addChip = (type, value, inputSetter) => {

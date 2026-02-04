@@ -6,7 +6,7 @@ All tables in the DB must have a corresponding model here to prevent schema mism
 IMPORTANT: Do not modify table structures here without a migration plan.
 """
 import os
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Text, ForeignKey, UniqueConstraint
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Text, ForeignKey, UniqueConstraint, LargeBinary
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
@@ -134,8 +134,9 @@ class ExportRecord(Base):
     filters_json = Column(Text, nullable=True)
     article_count = Column(Integer, default=0)
     filename = Column(String(255), nullable=True)  # Original filename
-    stored_filename = Column(String(255), nullable=True)  # UUID filename on disk
+    stored_filename = Column(String(255), nullable=True)  # UUID filename on disk (legacy)
     file_size = Column(Integer, nullable=True)  # File size in bytes
+    file_data = Column(LargeBinary, nullable=True)  # PDF binary data stored in DB (for Render)
     source_type = Column(String(50), nullable=True)  # dashboard, top_headlines, etc.
     created_at = Column(DateTime, default=datetime.utcnow)
 

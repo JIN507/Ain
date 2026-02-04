@@ -7,7 +7,7 @@ export default function Sidebar({ currentPage, setCurrentPage, sidebarOpen, setS
     { id: 'topheadlines', label: 'أهم العناوين', icon: Activity },
     { id: 'myfiles', label: 'ملفاتي', icon: Newspaper },
     { id: 'countries', label: 'الدول', icon: Globe },
-    { id: 'keywords', label: 'الكلمات المفتاحية', icon: Key },
+    { id: 'keywords', label: 'مراقبة الأخبار', icon: Key },
   ]
 
   const adminItems = isAdmin

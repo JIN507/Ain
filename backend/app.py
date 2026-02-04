@@ -245,11 +245,12 @@ def list_exports():
         db.close()
 
 
+# Legacy filesystem storage (kept for backward compatibility)
 EXPORTS_FOLDER = os.path.join(os.path.dirname(__file__), 'exports')
 os.makedirs(EXPORTS_FOLDER, exist_ok=True)
 
 def get_user_exports_folder(user_id):
-    """Get or create user-specific exports folder"""
+    """Get or create user-specific exports folder (legacy)"""
     user_folder = os.path.join(EXPORTS_FOLDER, str(user_id))
     os.makedirs(user_folder, exist_ok=True)
     return user_folder
@@ -265,6 +266,8 @@ def create_export_record():
     - file: PDF file (optional)
     - filters: JSON string of filters
     - article_count: number of articles
+    
+    Files are stored in database (file_data column) for Render compatibility.
     """
     # Handle both JSON and multipart form data
     if request.content_type and 'multipart/form-data' in request.content_type:
@@ -292,17 +295,14 @@ def create_export_record():
             source_type=source_type,
         )
         
-        # Handle file upload
+        # Handle file upload - store in database for Render compatibility
         if file and file.filename:
-            ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else 'pdf'
-            stored_filename = f"{uuid.uuid4().hex}.{ext}"
-            user_folder = get_user_exports_folder(current_user.id)
-            file_path = os.path.join(user_folder, stored_filename)
-            file.save(file_path)
-            
+            file_data = file.read()
             rec.filename = file.filename
-            rec.stored_filename = stored_filename
-            rec.file_size = os.path.getsize(file_path)
+            rec.file_data = file_data
+            rec.file_size = len(file_data)
+            # stored_filename kept for legacy compatibility
+            rec.stored_filename = f"{uuid.uuid4().hex}.pdf"
         
         db.add(rec)
         db.commit()
@@ -326,6 +326,9 @@ def download_export(export_id):
     Query params:
     - view=1: View inline (for PDF preview)
     - (default): Download as attachment
+    
+    Files are retrieved from database (file_data column) for Render compatibility.
+    Falls back to filesystem for legacy files.
     """
     db = get_db()
     try:
@@ -333,10 +336,8 @@ def download_export(export_id):
         view_mode = request.args.get('view', '0') == '1'
         
         if is_admin:
-            # Admin can download any file
             rec = db.query(ExportRecord).filter(ExportRecord.id == export_id).first()
         else:
-            # Regular user can only download their own files
             rec = db.query(ExportRecord).filter(
                 ExportRecord.id == export_id,
                 ExportRecord.user_id == current_user.id
@@ -345,22 +346,31 @@ def download_export(export_id):
         if not rec:
             return jsonify({'error': 'السجل غير موجود'}), 404
         
-        if not rec.stored_filename:
-            return jsonify({'error': 'لا يوجد ملف مرفق'}), 404
+        # Try database storage first (new method for Render)
+        if rec.file_data:
+            from io import BytesIO
+            file_stream = BytesIO(rec.file_data)
+            return send_file(
+                file_stream,
+                mimetype='application/pdf',
+                as_attachment=not view_mode,
+                download_name=rec.filename or f"export_{export_id}.pdf"
+            )
         
-        # Use the file owner's folder, not current_user
-        user_folder = get_user_exports_folder(rec.user_id)
-        file_path = os.path.join(user_folder, rec.stored_filename)
+        # Fallback to filesystem (legacy files)
+        if rec.stored_filename:
+            user_folder = get_user_exports_folder(rec.user_id)
+            file_path = os.path.join(user_folder, rec.stored_filename)
+            
+            if os.path.exists(file_path):
+                return send_file(
+                    file_path,
+                    mimetype='application/pdf',
+                    as_attachment=not view_mode,
+                    download_name=rec.filename or f"export_{export_id}.pdf"
+                )
         
-        if not os.path.exists(file_path):
-            return jsonify({'error': 'الملف غير موجود'}), 404
-        
-        return send_file(
-            file_path,
-            mimetype='application/pdf',
-            as_attachment=not view_mode,
-            download_name=rec.filename or f"export_{export_id}.pdf"
-        )
+        return jsonify({'error': 'لا يوجد ملف مرفق'}), 404
     finally:
         db.close()
 
@@ -369,7 +379,10 @@ def download_export(export_id):
 @login_required
 @csrf.exempt
 def delete_export(export_id):
-    """Delete an export record and its file. Admins can delete any file."""
+    """Delete an export record and its file. Admins can delete any file.
+    
+    Deletes from database. Also cleans up legacy filesystem files if present.
+    """
     db = get_db()
     try:
         is_admin = current_user.role == 'ADMIN'
@@ -385,12 +398,15 @@ def delete_export(export_id):
         if not rec:
             return jsonify({'error': 'السجل غير موجود'}), 404
         
-        # Delete file if exists - use file owner's folder
-        if rec.stored_filename:
+        # Delete legacy filesystem file if exists
+        if rec.stored_filename and not rec.file_data:
             user_folder = get_user_exports_folder(rec.user_id)
             file_path = os.path.join(user_folder, rec.stored_filename)
             if os.path.exists(file_path):
-                os.remove(file_path)
+                try:
+                    os.remove(file_path)
+                except Exception:
+                    pass
         
         db.delete(rec)
         db.commit()

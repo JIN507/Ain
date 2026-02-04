@@ -85,9 +85,7 @@ def translate_keyword(keyword_ar):
                 key = 'zh' if lang_code == 'zh-cn' else lang_code
                 translations[key] = None
         
-        # Cache the result
-        _translation_cache[keyword_ar] = translations
-        
+        # PHASE 3: Cache removed - translations saved to DB instead
         return translations
         
     except Exception as e:

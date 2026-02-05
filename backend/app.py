@@ -3054,6 +3054,8 @@ def auto_initialize():
                 conn.execute(text("ALTER TABLE articles ALTER COLUMN url TYPE VARCHAR(2000)"))
                 conn.execute(text("ALTER TABLE articles ALTER COLUMN image_url TYPE VARCHAR(2000)"))
                 conn.execute(text("ALTER TABLE sources ALTER COLUMN url TYPE VARCHAR(2000)"))
+                # Exports file_data for Render compatibility
+                conn.execute(text("ALTER TABLE exports ADD COLUMN IF NOT EXISTS file_data BYTEA"))
                 conn.commit()
                 print("[INIT] ✅ PostgreSQL columns migrated")
             else:
@@ -3064,7 +3066,15 @@ def auto_initialize():
                     conn.execute(text("ALTER TABLE keywords ADD COLUMN translations_json TEXT"))
                     conn.execute(text("ALTER TABLE keywords ADD COLUMN translations_updated_at TIMESTAMP"))
                     conn.commit()
-                    print("[INIT] ✅ SQLite columns migrated")
+                    print("[INIT] ✅ SQLite keywords columns migrated")
+                
+                # Exports file_data for Render compatibility
+                result = conn.execute(text("PRAGMA table_info(exports)"))
+                export_columns = [row[1] for row in result]
+                if export_columns and 'file_data' not in export_columns:
+                    conn.execute(text("ALTER TABLE exports ADD COLUMN file_data BLOB"))
+                    conn.commit()
+                    print("[INIT] ✅ SQLite exports file_data column migrated")
     except Exception as e:
         print(f"[INIT] ⚠️ Column migration note: {str(e)[:100]}")
     

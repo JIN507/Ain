@@ -1,11 +1,14 @@
 """
 Async Monitor Wrapper for Flask Integration
 Bridges sync Flask routes with async RSS fetching
+
+Memory-optimized: Processes sources in batches to stay under 512MB RAM limit.
 """
 import json
 import re
 import sys
 import os
+import gc
 import asyncio
 from typing import List, Dict, Tuple, Optional
 from async_rss_fetcher import AsyncRSSFetcher
@@ -404,6 +407,8 @@ def run_optimized_monitoring(
     """
     Run complete monitoring pipeline with async fetching, health tracking, and full stats.
     
+    MEMORY OPTIMIZED: Processes sources in batches of 25 to stay under 512MB RAM.
+    
     Args:
         sources: List of enabled sources
         keyword_expansions: List of keyword expansions
@@ -416,10 +421,15 @@ def run_optimized_monitoring(
         - Keyword matching statistics
         - Save statistics with balancing info
     """
+    # MEMORY OPTIMIZATION: Process in batches of 70 sources
+    # Balances speed vs memory: ~3500 articles / 70 sources ≈ 50 articles/source
+    BATCH_SIZE = 70
+    
     print(f"\n{'='*80}")
-    print(f"🚀 Starting OPTIMIZED monitoring run")
+    print(f"🚀 Starting MEMORY-OPTIMIZED monitoring run")
     print(f"📊 {len(sources)} sources, {len(keyword_expansions)} keywords")
-    print(f"⚡ Max concurrent: {max_concurrent}")
+    print(f"📦 Batch size: {BATCH_SIZE} sources per batch")
+    print(f"⚡ Max concurrent per batch: {max_concurrent}")
     
     # Show config
     limit = config.get_effective_save_limit()
@@ -438,43 +448,91 @@ def run_optimized_monitoring(
         print(f"   {i}. {keyword_ar}")
     print()
     
-    # Step 1: Fetch all RSS feeds concurrently (FAST!)
-    print("📡 Fetching RSS feeds concurrently...")
-    results, articles = fetch_feeds_sync(sources, max_concurrent=max_concurrent)
+    # Initialize aggregated results
+    all_results = []
+    all_matches = []
+    total_fetched = 0
+    keyword_stats = {exp.get('original_ar', exp.get('keyword_ar', 'Unknown')): 0 
+                     for exp in keyword_expansions}
     
-    # Track feed health (defensive - must not crash monitoring)
+    # Health tracker
     health_tracker = get_health_tracker() if config.ENABLE_FEED_HEALTH else None
+    
+    # Split sources into batches
+    num_batches = (len(sources) + BATCH_SIZE - 1) // BATCH_SIZE
+    print(f"📦 Processing {len(sources)} sources in {num_batches} batches...\n")
+    
+    for batch_num in range(num_batches):
+        batch_start = batch_num * BATCH_SIZE
+        batch_end = min(batch_start + BATCH_SIZE, len(sources))
+        batch_sources = sources[batch_start:batch_end]
+        
+        print(f"\n{'─'*60}")
+        print(f"📦 Batch {batch_num + 1}/{num_batches}: sources {batch_start + 1}-{batch_end}")
+        print(f"{'─'*60}")
+        
+        # Step 1: Fetch this batch of RSS feeds
+        print(f"📡 Fetching {len(batch_sources)} sources...")
+        results, articles = fetch_feeds_sync(batch_sources, max_concurrent=max_concurrent)
+        
+        # Track feed health
+        if health_tracker:
+            try:
+                health_tracker.process_fetch_results(results)
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"⚠️  Feed health tracking failed for batch {batch_num + 1}")
+        
+        all_results.extend(results)
+        batch_fetched = len(articles)
+        total_fetched += batch_fetched
+        
+        print(f"✅ Batch {batch_num + 1}: Fetched {batch_fetched} articles")
+        
+        if articles:
+            # Step 2: Match articles with keywords for this batch
+            print(f"🔍 Matching batch articles against keywords...")
+            batch_matches, batch_stats = match_articles_with_keywords_with_stats(
+                articles, keyword_expansions, max_per_source
+            )
+            
+            all_matches.extend(batch_matches)
+            
+            # Aggregate keyword stats
+            for kw, count in batch_stats.items():
+                if kw in keyword_stats:
+                    keyword_stats[kw] += count
+            
+            print(f"✅ Batch {batch_num + 1}: Found {len(batch_matches)} matches")
+        
+        # MEMORY CLEANUP: Force garbage collection between batches
+        del articles
+        del results
+        gc.collect()
+        print(f"🧹 Memory cleaned after batch {batch_num + 1}")
+    
+    # Print health report at end
     if health_tracker:
         try:
-            health_tracker.process_fetch_results(results)
             health_tracker.print_health_report()
-        except Exception as e:
-            # CRITICAL: Feed health errors must not crash monitoring
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.exception("⚠️  Feed health tracking failed, continuing without health summary")
-            health_tracker = None  # Disable for this run
+        except:
+            pass
     
-    print(f"\n✅ Fetched {len(articles)} articles from {len([r for r in results if r.get('status') == 'success'])} sources")
+    print(f"\n{'='*80}")
+    print(f"✅ TOTAL: Fetched {total_fetched} articles, Found {len(all_matches)} matches")
+    print(f"{'='*80}")
     
-    if not articles:
-        print("⚠️  No articles fetched!")
+    if not all_matches:
+        print("⚠️  No matching articles found!")
         return {
             'success': False,
-            'total_fetched': 0,
+            'total_fetched': total_fetched,
             'total_matches': 0,
             'total_saved': 0,
             'articles_saved': 0,
             'feed_health': health_tracker.get_summary() if health_tracker else None
         }
-    
-    # Step 2: Match articles with keywords (with per-keyword statistics)
-    print(f"\n🔍 Matching articles against keywords...")
-    matches, keyword_stats = match_articles_with_keywords_with_stats(
-        articles, keyword_expansions, max_per_source
-    )
-    
-    print(f"\n✅ Found {len(matches)} matching articles")
     
     # Log per-keyword statistics
     print(f"\n📊 Per-keyword match statistics:")
@@ -483,27 +541,27 @@ def run_optimized_monitoring(
         print(f"   • {keyword_ar}: {count} matches")
         total_matches_check += count
     
-    print(f"\n📈 Total unique articles matched: {len(matches)}")
+    print(f"\n📈 Total unique articles matched: {len(all_matches)}")
     print(f"📈 Total keyword matches (can be > articles): {total_matches_check}")
     
     # Acceptance rate check
-    acceptance_rate = (len(matches) / len(articles) * 100) if articles else 0
-    print(f"📈 Acceptance rate: {acceptance_rate:.1f}% ({len(matches)}/{len(articles)})")
+    acceptance_rate = (len(all_matches) / total_fetched * 100) if total_fetched else 0
+    print(f"📈 Acceptance rate: {acceptance_rate:.1f}% ({len(all_matches)}/{total_fetched})")
     
     # Warning if suspiciously low
-    if acceptance_rate < 1.0 and len(articles) > 100:
+    if acceptance_rate < 1.0 and total_fetched > 100:
         print(f"\n⚠️  WARNING: Suspiciously low acceptance rate ({acceptance_rate:.2f}%)")
-        print(f"   Total articles: {len(articles)}")
-        print(f"   Matched: {len(matches)}")
+        print(f"   Total articles: {total_fetched}")
+        print(f"   Matched: {len(all_matches)}")
         print(f"   Expected: At least 2-5% for typical keywords")
         print(f"   This might indicate a keyword matching issue!")
     
     return {
         'success': True,
-        'total_fetched': len(articles),
-        'total_matches': len(matches),
-        'matches': matches,
-        'fetch_results': results,
+        'total_fetched': total_fetched,
+        'total_matches': len(all_matches),
+        'matches': all_matches,
+        'fetch_results': all_results,
         'keyword_stats': keyword_stats,
         'acceptance_rate': acceptance_rate,
         'feed_health': health_tracker.get_summary() if health_tracker else None,

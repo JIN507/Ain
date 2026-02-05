@@ -2,10 +2,14 @@
 Background Scheduler for Ain News Monitor
 Runs monitoring every 10 minutes when activated
 Per-user monitoring: each user has their own scheduler
+
+Multi-worker safe: Uses DB locks to prevent duplicate runs across Gunicorn workers.
+Memory-optimized: Forces garbage collection after each run to stay under 512MB.
 """
 import threading
 import time
-from datetime import datetime
+import gc
+from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 import json
 
@@ -139,6 +143,66 @@ class UserMonitoringScheduler:
             # Execute monitoring
             self._execute_monitoring()
     
+    def _acquire_db_lock(self, db) -> Optional[int]:
+        """
+        Try to acquire a DB-based lock for this user's monitoring run.
+        Returns job_id if lock acquired, None if another worker is already running.
+        
+        This prevents duplicate runs across multiple Gunicorn workers.
+        """
+        from models import MonitorJob
+        
+        # Check if there's already a RUNNING job for this user (from any worker)
+        active_job = db.query(MonitorJob).filter(
+            MonitorJob.user_id == self.user_id,
+            MonitorJob.status == 'RUNNING'
+        ).first()
+        
+        if active_job:
+            # Check if it's stale (running for more than 10 minutes = likely crashed worker)
+            if active_job.started_at:
+                age = datetime.utcnow() - active_job.started_at
+                if age > timedelta(minutes=10):
+                    # Mark stale job as failed and proceed
+                    active_job.status = 'FAILED'
+                    active_job.error_message = 'Stale job (worker timeout)'
+                    active_job.finished_at = datetime.utcnow()
+                    db.commit()
+                    print(f"[SCHEDULER] User {self.user_id}: Cleaned up stale job {active_job.id}")
+                else:
+                    # Another worker is actively running - skip this run
+                    print(f"[SCHEDULER] User {self.user_id}: Another worker running job {active_job.id} - skipping")
+                    return None
+        
+        # Create new job record to claim the lock
+        new_job = MonitorJob(
+            user_id=self.user_id,
+            status='RUNNING',
+            started_at=datetime.utcnow(),
+            progress=0,
+            progress_message='Starting monitoring...'
+        )
+        db.add(new_job)
+        db.commit()
+        
+        return new_job.id
+    
+    def _release_db_lock(self, db, job_id: int, success: bool, result: Dict[str, Any]):
+        """Release the DB lock and update job status"""
+        from models import MonitorJob
+        
+        job = db.query(MonitorJob).filter(MonitorJob.id == job_id).first()
+        if job:
+            job.status = 'SUCCEEDED' if success else 'FAILED'
+            job.finished_at = datetime.utcnow()
+            job.progress = 100
+            job.total_fetched = result.get('total_fetched', 0)
+            job.total_matched = result.get('total_matches', 0)
+            job.total_saved = result.get('total_saved', 0)
+            if not success:
+                job.error_message = result.get('error', 'Unknown error')
+            db.commit()
+    
     def _execute_monitoring(self):
         """Execute a single monitoring run for this specific user"""
         from models import get_db, Source, Keyword, Article
@@ -147,11 +211,23 @@ class UserMonitoringScheduler:
         
         # Mark as executing
         self._executing = True
+        job_id = None
         
         print(f"\n[SCHEDULER] User {self.user_id}: Starting monitoring at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         
         db = get_db()
         try:
+            # MULTI-WORKER SAFETY: Acquire DB lock before running
+            job_id = self._acquire_db_lock(db)
+            if job_id is None:
+                # Another worker is already running for this user - skip
+                with self._status_lock:
+                    self._last_run = datetime.now()
+                    self._last_result = {"skipped": True, "reason": "Another worker running"}
+                return
+            
+            print(f"[SCHEDULER] User {self.user_id}: Acquired DB lock (job {job_id})")
+            
             # Get ALL enabled sources (shared across users)
             sources = db.query(Source).filter(Source.enabled == True).all()
             
@@ -163,6 +239,7 @@ class UserMonitoringScheduler:
             
             if not sources or not keywords:
                 print(f"[SCHEDULER] User {self.user_id}: No enabled sources or keywords - skipping")
+                self._release_db_lock(db, job_id, True, {"skipped": True})
                 with self._status_lock:
                     self._last_run = datetime.now()
                     self._last_result = {"skipped": True, "reason": "No sources or keywords"}
@@ -182,6 +259,7 @@ class UserMonitoringScheduler:
             
             if not keyword_expansions:
                 print(f"[SCHEDULER] User {self.user_id}: No keyword expansions - skipping")
+                self._release_db_lock(db, job_id, True, {"skipped": True})
                 with self._status_lock:
                     self._last_run = datetime.now()
                     self._last_result = {"skipped": True, "reason": "No keyword expansions"}
@@ -207,16 +285,22 @@ class UserMonitoringScheduler:
                 )
                 saved_count = len(saved_ids)
             
+            result = {
+                "success": True,
+                "total_fetched": monitoring_result.get('total_fetched', 0),
+                "total_matches": len(monitoring_result.get('matches', [])),
+                "total_saved": saved_count,
+                "timestamp": datetime.now().isoformat()
+            }
+            
+            # Release DB lock with success
+            if job_id:
+                self._release_db_lock(db, job_id, True, result)
+            
             with self._status_lock:
                 self._last_run = datetime.now()
                 self._run_count += 1
-                self._last_result = {
-                    "success": True,
-                    "total_fetched": monitoring_result.get('total_fetched', 0),
-                    "total_matches": len(monitoring_result.get('matches', [])),
-                    "total_saved": saved_count,
-                    "timestamp": self._last_run.isoformat()
-                }
+                self._last_result = result
             
             print(f"[SCHEDULER] User {self.user_id}: Completed - fetched: {monitoring_result.get('total_fetched', 0)}, saved: {saved_count}")
             
@@ -225,18 +309,27 @@ class UserMonitoringScheduler:
             import traceback
             traceback.print_exc()
             
+            error_result = {
+                "success": False,
+                "error": str(e),
+                "timestamp": datetime.now().isoformat()
+            }
+            
+            # Release DB lock with failure
+            if job_id:
+                self._release_db_lock(db, job_id, False, error_result)
+            
             with self._status_lock:
                 self._error_count += 1
                 self._last_run = datetime.now()
-                self._last_result = {
-                    "success": False,
-                    "error": str(e),
-                    "timestamp": self._last_run.isoformat()
-                }
+                self._last_result = error_result
         finally:
             db.close()
             # Mark as not executing
             self._executing = False
+            # MEMORY CLEANUP: Force garbage collection after each run
+            gc.collect()
+            print(f"[SCHEDULER] User {self.user_id}: Memory cleaned (gc.collect)")
 
 
 class SchedulerManager:

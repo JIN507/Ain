@@ -18,6 +18,7 @@ import gc
 import json
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List, Set, Tuple
+from utils import strip_html_tags
 
 
 class GlobalMonitoringScheduler:
@@ -457,8 +458,8 @@ class GlobalMonitoringScheduler:
                 detected_lang
             )
             
-            title_ar = translation_result['title_ar']
-            summary_ar = translation_result['summary_ar']
+            title_ar = strip_html_tags(translation_result['title_ar'])
+            summary_ar = strip_html_tags(translation_result['summary_ar'])
             
             primary_keyword = matched_keywords[0]['keyword_ar']
             
@@ -468,7 +469,8 @@ class GlobalMonitoringScheduler:
             )
             
             for context in match_contexts:
-                snippet = context.get('full_snippet', '')
+                snippet = strip_html_tags(context.get('full_snippet', ''))
+                context['full_snippet'] = snippet
                 preserve_text = context.get('preserve_text', '')
                 keyword_arabic = context.get('keyword_ar', '')
                 
@@ -478,7 +480,7 @@ class GlobalMonitoringScheduler:
                             snippet, preserve_text, detected_lang, 'ar',
                             keyword_ar=keyword_arabic
                         )
-                        context['full_snippet_ar'] = translated_snippet
+                        context['full_snippet_ar'] = strip_html_tags(translated_snippet)
                         context['original_matched_text'] = preserve_text
                     except Exception:
                         context['full_snippet_ar'] = snippet
@@ -519,8 +521,8 @@ class GlobalMonitoringScheduler:
                     country=source['country_name'],
                     source_name=source['name'],
                     url=article['url'],
-                    title_original=article['title'],
-                    summary_original=article['summary'],
+                    title_original=strip_html_tags(article['title']),
+                    summary_original=strip_html_tags(article['summary']),
                     original_language=detected_lang,
                     image_url=article.get('image_url'),
                     title_ar=title_ar,

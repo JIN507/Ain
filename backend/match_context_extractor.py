@@ -9,6 +9,7 @@ Returns: N lines before match + matched text + N lines after match
 import re
 from typing import Optional, Dict, List
 from text_normalization import normalize_text
+from utils import strip_html_tags
 
 
 def translate_snippet_preserve_keyword(
@@ -218,10 +219,10 @@ def extract_all_match_contexts(
     summary = article.get('summary', '') or article.get('description', '')
     content = article.get('content', '')
     
-    # Build full text with all available content
-    full_text = f"{title}. {summary}"
+    # Build full text with all available content, strip any stray HTML
+    full_text = strip_html_tags(f"{title}. {summary}")
     if content:
-        full_text += f" {content}"
+        full_text += f" {strip_html_tags(content)}"
     
     # Debug: print what text we have
     print(f"      📝 Extracting context from text length: {len(full_text)} chars")

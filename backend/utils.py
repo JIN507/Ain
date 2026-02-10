@@ -5,6 +5,18 @@ import re
 from datetime import datetime
 from bs4 import BeautifulSoup
 
+def strip_html_tags(text):
+    """Simple regex-based HTML tag stripper - removes ALL HTML tags.
+    Use as a fast safety net after clean_html_content or on any text
+    that might still contain stray HTML."""
+    if not text:
+        return ""
+    text = re.sub(r'<[^>]+>', ' ', str(text))
+    text = re.sub(r'&nbsp;|&amp;|&lt;|&gt;|&quot;|&#\d+;', ' ', text)
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
+
+
 def clean_html_content(html_text):
     """
     Clean HTML content from RSS feeds - remove navigation, ads, social links, etc.

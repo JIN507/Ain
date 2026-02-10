@@ -10,6 +10,7 @@ import time
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime, timedelta
 import logging
+from utils import clean_html_content
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -226,8 +227,9 @@ class AsyncRSSFetcher:
                             # NOTE: No longer checking seen_hashes or skipping duplicates here
                             # Let all articles through to matching and DB insertion
                             
-                            # Get summary/description
-                            summary = entry.get('summary', '') or entry.get('description', '')
+                            # Get summary/description - strip HTML tags
+                            summary_raw = entry.get('summary', '') or entry.get('description', '')
+                            summary = clean_html_content(summary_raw) if summary_raw else ''
                             
                             # Get content (full article text if available)
                             # RSS feeds may have content:encoded or content field with full text
@@ -243,6 +245,9 @@ class AsyncRSSFetcher:
                                 content = entry.content_detail
                             if not content and hasattr(entry, 'content_encoded'):
                                 content = entry.content_encoded
+                            # Strip HTML from content
+                            if content:
+                                content = clean_html_content(content)
                             
                             # Get image
                             image_url = None

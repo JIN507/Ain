@@ -31,7 +31,7 @@ export default function Keywords({ onKeywordClick }) {
     if (!newKeyword.trim()) return
     
     // Check limit before sending (allow up to 5)
-    if (keywords.length >= MAX_KEYWORDS) {
+    if (keywords.length > MAX_KEYWORDS) {
       setError(`الحد الأقصى ${MAX_KEYWORDS} كلمات.`)
       setTimeout(() => setError(''), 5000)
       return
@@ -94,7 +94,8 @@ export default function Keywords({ onKeywordClick }) {
     }
   }
 
-  const isAtLimit = keywords.length >= MAX_KEYWORDS
+  const isOverLimit = keywords.length > MAX_KEYWORDS
+  const canAdd = keywords.length < MAX_KEYWORDS
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -105,10 +106,10 @@ export default function Keywords({ onKeywordClick }) {
           <p className="text-sm text-slate-500 mt-0.5">إدارة كلمات الرصد والمتابعة</p>
         </div>
         <div className={`px-3 py-1.5 rounded-full text-sm font-bold ${
-          isAtLimit 
+          isOverLimit 
             ? 'text-rose-600' 
             : 'text-teal-700'
-        }`} style={{ background: isAtLimit ? 'rgba(225,29,72,0.08)' : 'rgba(15,118,110,0.08)' }}>
+        }`} style={{ background: isOverLimit ? 'rgba(225,29,72,0.08)' : 'rgba(15,118,110,0.08)' }}>
           {keywords.length} / {MAX_KEYWORDS}
         </div>
       </div>
@@ -142,7 +143,7 @@ export default function Keywords({ onKeywordClick }) {
             className="input flex-1"
             disabled={loading}
           />
-          <button onClick={addKeyword} disabled={loading || isAtLimit} className="btn">
+          <button onClick={addKeyword} disabled={loading || !canAdd} className="btn">
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
             إضافة
           </button>

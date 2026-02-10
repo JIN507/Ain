@@ -781,21 +781,40 @@ def admin_delete_user(user_id):
         if not user:
             return jsonify({'error': 'User not found'}), 404
 
-        # Optional: prevent admin from deleting themselves
+        # Prevent admin from deleting themselves
         try:
             if current_user.is_authenticated and current_user.id == user.id:
                 return jsonify({'error': 'Cannot delete currently logged-in user'}), 400
         except Exception:
             pass
 
+        # Cascade-delete all related data (PostgreSQL enforces FK constraints)
+        from models import Article, Keyword, AuditLog, ExportRecord, UserFile, SearchHistory, MonitorJob
+        try:
+            from models import UserArticle, UserCountry, UserSource
+            db.query(UserArticle).filter(UserArticle.user_id == user_id).delete()
+            db.query(UserCountry).filter(UserCountry.user_id == user_id).delete()
+            db.query(UserSource).filter(UserSource.user_id == user_id).delete()
+        except Exception:
+            pass
+        db.query(Article).filter(Article.user_id == user_id).delete()
+        db.query(Keyword).filter(Keyword.user_id == user_id).delete()
+        db.query(ExportRecord).filter(ExportRecord.user_id == user_id).delete()
+        db.query(MonitorJob).filter(MonitorJob.user_id == user_id).delete()
+        db.query(SearchHistory).filter(SearchHistory.user_id == user_id).delete()
+        db.query(UserFile).filter(UserFile.user_id == user_id).delete()
+        db.query(AuditLog).filter(AuditLog.user_id == user_id).delete()
+        db.query(AuditLog).filter(AuditLog.admin_id == user_id).update({AuditLog.admin_id: None})
+
+        user_email = user.email
         db.delete(user)
         db.commit()
         try:
             log_action(
                 admin_id=getattr(current_user, 'id', None),
-                user_id=user.id,
+                user_id=None,
                 action="admin_delete_user",
-                meta={"email": user.email}
+                meta={"email": user_email}
             )
         except Exception:
             pass

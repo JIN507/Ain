@@ -28,7 +28,7 @@ from keyword_expansion import expand_keyword, get_all_expansions, load_expansion
 from async_monitor_wrapper import run_optimized_monitoring, save_matched_articles_sync
 # Utils
 from utils import clean_html_content
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import wraps
 import json
 import os
@@ -3352,6 +3352,20 @@ def auto_initialize():
     
     db = get_db()
     try:
+        # Ensure system user exists (user_id=0 for global scheduler jobs)
+        system_user = db.query(User).filter(User.id == 0).first()
+        if not system_user:
+            from sqlalchemy import text as sa_text
+            try:
+                db.execute(sa_text(
+                    "INSERT INTO users (id, email, name, password_hash, role, is_active) "
+                    "VALUES (0, 'system@internal', 'System', 'NOLOGIN', 'SYSTEM', false)"
+                ))
+                db.commit()
+                print("[INIT] ✅ System user created (id=0)")
+            except Exception:
+                db.rollback()  # Already exists or auto-increment conflict
+        
         # Check if admin exists
         admin = db.query(User).filter(User.email == "elite@local").first()
         if not admin:

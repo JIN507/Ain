@@ -3130,120 +3130,85 @@ def external_headlines():
 
 
 # =============================================================================
-# DATA LIFECYCLE MANAGEMENT - Auto-cleanup every 5 days
+# DATA LIFECYCLE MANAGEMENT - Auto-cleanup based on article age
 # =============================================================================
 
-DATA_RETENTION_DAYS = 5  # Delete all user data after 5 days
-
-def get_days_until_cleanup():
-    """Get the number of days until data cleanup"""
-    from models import SystemConfig
-    db = get_db()
-    try:
-        config = db.query(SystemConfig).filter(SystemConfig.key == 'last_cleanup_date').first()
-        if not config:
-            # First run - set cleanup date to now
-            config = SystemConfig(key='last_cleanup_date', value=datetime.utcnow().isoformat())
-            db.add(config)
-            db.commit()
-            return DATA_RETENTION_DAYS
-        
-        last_cleanup = datetime.fromisoformat(config.value)
-        days_passed = (datetime.utcnow() - last_cleanup).days
-        days_remaining = DATA_RETENTION_DAYS - days_passed
-        return max(0, days_remaining)
-    finally:
-        db.close()
+DATA_RETENTION_DAYS = 5  # Delete articles older than 5 days
 
 def check_and_run_cleanup():
-    """Check if cleanup is needed and run it if so"""
-    from models import SystemConfig
+    """Delete articles older than DATA_RETENTION_DAYS for every user.
+    Runs per-user based on each article's fetched_at date."""
+    from models import Article, MonitorJob
     db = get_db()
     try:
-        config = db.query(SystemConfig).filter(SystemConfig.key == 'last_cleanup_date').first()
-        if not config:
-            # First run - set cleanup date to now
-            config = SystemConfig(key='last_cleanup_date', value=datetime.utcnow().isoformat())
-            db.add(config)
-            db.commit()
-            print("[CLEANUP] ✅ Initialized cleanup tracker")
+        cutoff = datetime.utcnow() - timedelta(days=DATA_RETENTION_DAYS)
+        old_articles = db.query(Article).filter(Article.fetched_at < cutoff).all()
+        
+        if not old_articles:
+            print(f"[CLEANUP] ℹ️ No articles older than {DATA_RETENTION_DAYS} days")
             return False
         
-        last_cleanup = datetime.fromisoformat(config.value)
-        days_passed = (datetime.utcnow() - last_cleanup).days
+        count = len(old_articles)
+        for article in old_articles:
+            db.delete(article)
         
-        if days_passed >= DATA_RETENTION_DAYS:
-            print(f"[CLEANUP] 🗑️ {days_passed} days passed - running cleanup...")
-            run_data_cleanup(db)
-            # Reset cleanup date
-            config.value = datetime.utcnow().isoformat()
-            config.updated_at = datetime.utcnow()
-            db.commit()
-            print("[CLEANUP] ✅ Cleanup complete, timer reset")
-            return True
-        else:
-            print(f"[CLEANUP] ℹ️ {days_passed} days since last cleanup ({DATA_RETENTION_DAYS - days_passed} days remaining)")
-            return False
+        # Also clean up old finished monitor jobs
+        old_jobs = db.query(MonitorJob).filter(
+            MonitorJob.started_at < cutoff,
+            MonitorJob.status.in_(['SUCCEEDED', 'FAILED'])
+        ).all()
+        for job in old_jobs:
+            db.delete(job)
+        
+        db.commit()
+        print(f"[CLEANUP] 🗑️ Deleted {count} articles older than {DATA_RETENTION_DAYS} days, {len(old_jobs)} old jobs")
+        return True
     except Exception as e:
         print(f"[CLEANUP] ❌ Error: {e}")
+        db.rollback()
         return False
     finally:
         db.close()
 
-def run_data_cleanup(db):
-    """Delete all user data: articles, keywords, exports"""
-    from models import Article, Keyword, ExportRecord, MonitorJob
-    
-    # Count before deletion
-    article_count = db.query(Article).count()
-    keyword_count = db.query(Keyword).count()
-    export_count = db.query(ExportRecord).count()
-    job_count = db.query(MonitorJob).count()
-    
-    print(f"[CLEANUP] Deleting: {article_count} articles, {keyword_count} keywords, {export_count} exports, {job_count} jobs")
-    
-    # Delete all user data
-    db.query(Article).delete()
-    db.query(Keyword).delete()
-    db.query(ExportRecord).delete()
-    db.query(MonitorJob).delete()
-    db.commit()
-    
-    print(f"[CLEANUP] ✅ Deleted all user data")
-
 @app.route('/api/system/cleanup-status', methods=['GET'])
 @login_required
 def get_cleanup_status():
-    """Get data cleanup status - days remaining and warning flag.
-    Only shows warning if the user actually has articles to lose."""
-    from models import SystemConfig
+    """Get data cleanup status based on the user's oldest article age.
+    Warning shows when the user's oldest article is approaching deletion."""
+    from sqlalchemy import func as sa_func
     db = get_db()
     try:
-        # Check if user has any articles at all
-        user_article_count = db.query(Article).filter(Article.user_id == current_user.id).count()
+        # Find the user's oldest article fetched_at
+        oldest_fetched = db.query(sa_func.min(Article.fetched_at)).filter(
+            Article.user_id == current_user.id
+        ).scalar()
         
-        config = db.query(SystemConfig).filter(SystemConfig.key == 'last_cleanup_date').first()
-        if not config:
+        user_article_count = db.query(Article).filter(
+            Article.user_id == current_user.id
+        ).count()
+        
+        # No articles = no cleanup needed, no warning
+        if not oldest_fetched or user_article_count == 0:
             return jsonify({
                 'days_remaining': DATA_RETENTION_DAYS,
                 'show_warning': False,
                 'retention_days': DATA_RETENTION_DAYS,
-                'article_count': user_article_count
+                'article_count': 0
             })
         
-        last_cleanup = datetime.fromisoformat(config.value)
-        days_passed = (datetime.utcnow() - last_cleanup).days
-        days_remaining = max(0, DATA_RETENTION_DAYS - days_passed)
+        # Calculate how old the oldest article is
+        age_days = (datetime.utcnow() - oldest_fetched).days
+        days_remaining = max(0, DATA_RETENTION_DAYS - age_days)
         
-        # Only warn if user has articles AND cleanup is approaching (1 day left)
-        show_warning = user_article_count > 0 and days_remaining <= 1
+        # Show warning when oldest article has 1 day or less until deletion
+        show_warning = days_remaining <= 1
         
         return jsonify({
             'days_remaining': days_remaining,
             'show_warning': show_warning,
             'retention_days': DATA_RETENTION_DAYS,
-            'last_cleanup': config.value,
-            'article_count': user_article_count
+            'article_count': user_article_count,
+            'oldest_article_date': oldest_fetched.isoformat()
         })
     finally:
         db.close()

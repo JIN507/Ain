@@ -74,6 +74,13 @@ def fetch_feeds_sync(sources: List[Dict], max_concurrent=50) -> Tuple[List[Dict]
         results, articles = loop.run_until_complete(_fetch())
         return results, articles
     finally:
+        # Cancel all pending tasks to avoid 'Task was destroyed' warnings
+        pending = asyncio.all_tasks(loop)
+        for task in pending:
+            task.cancel()
+        if pending:
+            loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+        loop.run_until_complete(loop.shutdown_asyncgens())
         loop.close()
 
 

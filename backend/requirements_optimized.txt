@@ -25,7 +25,7 @@ sqlalchemy==2.0.23
 
 # Language Detection & Translation
 langdetect==1.0.9
-googletrans==4.0.0-rc1
+deep-translator==1.11.4
 # For production, consider:
 # google-cloud-translate==3.12.1  # Official Google Translate API
 # deepl==1.16.1  # DeepL API (faster, more accurate)

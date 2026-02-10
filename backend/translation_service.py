@@ -3,11 +3,8 @@ Translation Service using Google Translate (FREE - No API Key Required)
 Replaces OpenAI for translation functionality
 """
 import json
-from googletrans import Translator
+from deep_translator import GoogleTranslator
 from langdetect import detect, LangDetectException
-
-# Initialize Google Translator (free, no API key needed)
-translator = Translator()
 
 # PHASE 3: Removed in-memory caches to prevent RAM overflow
 # Translations are saved to database, no need for RAM cache
@@ -72,13 +69,13 @@ def translate_keyword(keyword_ar):
         for lang_code, lang_name in target_languages.items():
             try:
                 # Translate using Google Translate
-                result = translator.translate(keyword_ar, src='ar', dest=lang_code)
+                translated = GoogleTranslator(source='ar', target=lang_code).translate(keyword_ar)
                 
                 # Store with simplified key (zh instead of zh-cn)
                 key = 'zh' if lang_code == 'zh-cn' else lang_code
-                translations[key] = result.text
+                translations[key] = translated
                 
-                print(f"   ✅ {lang_name}: {result.text}")
+                print(f"   ✅ {lang_name}: {translated}")
                 
             except Exception as e:
                 print(f"   ⚠️ {lang_name} translation failed: {str(e)}")
@@ -118,14 +115,12 @@ def translate_to_arabic(title, summary=None):
     
     try:
         # Translate title
-        title_result = translator.translate(title, src='auto', dest='ar')
-        title_ar = title_result.text
+        title_ar = GoogleTranslator(source='auto', target='ar').translate(title)
         
         # Translate summary if provided
         summary_ar = title_ar  # Default to title if no summary
         if summary and summary.strip():
-            summary_result = translator.translate(summary, src='auto', dest='ar')
-            summary_ar = summary_result.text
+            summary_ar = GoogleTranslator(source='auto', target='ar').translate(summary)
         
         return {
             'title_ar': title_ar,

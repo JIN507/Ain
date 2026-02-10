@@ -7,7 +7,7 @@ instead of RAM cache. This fixes the "No keyword expansions" error after restart
 """
 import os
 from datetime import datetime, timedelta
-from googletrans import Translator
+from deep_translator import GoogleTranslator
 from arabic_utils import normalize_arabic
 from proper_noun_rules import get_proper_noun_forms, is_known_proper_noun
 import json
@@ -21,8 +21,6 @@ TRANSLATE_TARGETS = os.getenv(
 EXPANSION_TTL_DAYS = int(os.getenv('EXPANSION_TTL_DAYS', '7'))
 TRANSLATION_TIMEOUT_S = int(os.getenv('TRANSLATION_TIMEOUT_S', '8'))
 
-# Initialize Google Translator
-translator = Translator()
 
 
 def expand_keyword(keyword_ar, keyword_obj=None, db=None):
@@ -68,11 +66,11 @@ def expand_keyword(keyword_ar, keyword_obj=None, db=None):
                 translations[lang_code] = proper_noun_forms[lang_code]
                 print(f"      ✅ {lang_code.upper()}: {proper_noun_forms[lang_code]} (curated)")
             else:
-                result = translator.translate(keyword_ar, src='ar', dest=lang_code)
+                translated = GoogleTranslator(source='ar', target=lang_code).translate(keyword_ar)
                 
-                if result and result.text:
-                    translations[lang_code] = result.text
-                    print(f"      ✅ {lang_code.upper()}: {result.text}")
+                if translated:
+                    translations[lang_code] = translated
+                    print(f"      ✅ {lang_code.upper()}: {translated}")
                 else:
                     failed_langs.append(lang_code)
                     print(f"      ❌ {lang_code.upper()}: No result")

@@ -7,7 +7,7 @@ import hashlib
 import json
 import time
 from typing import Dict, List, Optional, Tuple
-from googletrans import Translator
+from deep_translator import GoogleTranslator
 import sqlite3
 import logging
 from concurrent.futures import ThreadPoolExecutor
@@ -105,7 +105,6 @@ class AsyncTranslationService:
         self.max_workers = max_workers
         self.enable_cache = enable_cache
         self.cache = TranslationCache() if enable_cache else None
-        self.translator = Translator()
         self.executor = ThreadPoolExecutor(max_workers=max_workers)
         
         # Metrics
@@ -130,8 +129,7 @@ class AsyncTranslationService:
             Translated text
         """
         try:
-            result = self.translator.translate(text, src=src_lang, dest=dest_lang)
-            return result.text
+            return GoogleTranslator(source=src_lang, target=dest_lang).translate(text)
         except Exception as e:
             logger.error(f"Translation error: {str(e)[:100]}")
             return text  # Return original on error

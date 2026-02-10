@@ -1892,17 +1892,16 @@ def get_articles_countries():
 def health_check_translation():
     """Test Google Translate service (no API key needed)"""
     try:
-        from googletrans import Translator
-        translator = Translator()
+        from deep_translator import GoogleTranslator
         
         # Quick test: translate "hello" to Arabic
-        result = translator.translate("hello", src='en', dest='ar')
+        result = GoogleTranslator(source='en', target='ar').translate("hello")
         
-        if result and result.text:
+        if result:
             return jsonify({
                 "ok": True,
                 "service": "Google Translate",
-                "test": f"hello → {result.text}",
+                "test": f"hello → {result}",
                 "status": "FREE - No API key required"
             })
         else:
@@ -2662,7 +2661,7 @@ def get_top_headlines():
     Get top headlines from all sources in a country
     Query params: country (required), per_source (default 5), translate (default true)
     """
-    from googletrans import Translator
+    from deep_translator import GoogleTranslator
     import feedparser
     from datetime import datetime as dt
     from time import mktime
@@ -2709,8 +2708,6 @@ def get_top_headlines():
             
             # Fetch headlines from each source
             results = []
-            translator = Translator() if translate else None
-            
             for source in sources:
                 source_result = {
                     'source_name': source.name,
@@ -2796,13 +2793,11 @@ def get_top_headlines():
                                 if lang != 'ar':
                                     # Translate title
                                     if title:
-                                        trans = translator.translate(title, src=lang, dest='ar')
-                                        title_ar = trans.text if trans else title
+                                        title_ar = GoogleTranslator(source=lang, target='ar').translate(title) or title
                                     
                                     # Translate summary (limit length)
                                     if summary:
-                                        trans = translator.translate(summary[:500], src=lang, dest='ar')
-                                        summary_ar = trans.text if trans else summary
+                                        summary_ar = GoogleTranslator(source=lang, target='ar').translate(summary[:500]) or summary
                             except Exception as trans_err:
                                 print(f"      Translation error: {trans_err}")
                                 # Keep original if translation fails
@@ -2891,7 +2886,7 @@ def external_headlines():
     }
     """
 
-    from googletrans import Translator
+    from deep_translator import GoogleTranslator
     import feedparser
     from datetime import datetime as dt
     from time import mktime
@@ -2960,7 +2955,6 @@ def external_headlines():
             }), 404
 
         results = []
-        translator = Translator() if translate else None
 
         for source in sources:
             source_result = {
@@ -3078,11 +3072,9 @@ def external_headlines():
 
                             if lang != 'ar':
                                 if title:
-                                    trans = translator.translate(title, src=lang, dest='ar')
-                                    title_ar = trans.text if trans else title
+                                    title_ar = GoogleTranslator(source=lang, target='ar').translate(title) or title
                                 if summary:
-                                    trans = translator.translate(summary[:500], src=lang, dest='ar')
-                                    summary_ar = trans.text if trans else summary
+                                    summary_ar = GoogleTranslator(source=lang, target='ar').translate(summary[:500]) or summary
                         except Exception:
                             # Keep original text if translation fails
                             pass

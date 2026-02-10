@@ -7,15 +7,12 @@ Translations are saved directly to Article model (title_ar, summary_ar).
 No need for RAM cache since articles are stored in database.
 """
 from datetime import datetime
-from googletrans import Translator
+from deep_translator import GoogleTranslator
 from arabic_utils import is_arabic_text
 import os
 
 # Configuration
 TRANSLATION_TIMEOUT_S = int(os.getenv('TRANSLATION_TIMEOUT_S', '8'))
-
-# Initialize translator
-translator = Translator()
 
 
 def translate_to_arabic(text, source_lang='auto'):
@@ -56,13 +53,14 @@ def translate_to_arabic(text, source_lang='auto'):
     
     # Translate directly (no cache)
     try:
-        result = translator.translate(text, src=source_lang, dest='ar')
+        src = source_lang if source_lang != 'auto' else 'auto'
+        translated_text = GoogleTranslator(source=src, target='ar').translate(text)
         
-        if result and result.text:
+        if translated_text:
             return {
                 'original': text,
-                'translated': result.text,
-                'source_lang': result.src if hasattr(result, 'src') else source_lang,
+                'translated': translated_text,
+                'source_lang': source_lang,
                 'translation_status': 'success',
                 'updated_at': datetime.utcnow().isoformat()
             }

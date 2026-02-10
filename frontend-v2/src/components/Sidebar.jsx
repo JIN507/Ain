@@ -98,10 +98,10 @@ export default function Sidebar({ currentPage, setCurrentPage, sidebarOpen, setS
           <div className="px-5 pb-6">
             <div className="rounded-xl p-3.5" style={{ background: 'rgba(255,255,255,0.04)' }}>
               <p className="text-[11px] text-slate-400 font-medium">قسم الحلول التقنية</p>
-              <p className="text-[11px] text-slate-500 mt-1">
+              <p className="text-[11px] text-green-500 mt-1">
                 {new Date().toLocaleDateString('ar-SA', { timeZone: 'Asia/Riyadh', year: 'numeric', month: 'long', day: 'numeric' })}
               </p>
-              <p className="text-[10px] text-teal-500/60 mt-1 font-semibold">v4.0</p>
+              <p className="text-[10px] text-green-500/90 mt-3 font-semibold">النسخة التجريبية</p>
             </div>
           </div>
         </div>

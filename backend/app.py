@@ -1278,7 +1278,7 @@ def get_keywords_expanded():
 @csrf.exempt
 def add_keyword():
     """Add new keyword with auto-translation to 7 languages + expansion"""
-    MAX_KEYWORDS_PER_USER = 5
+    MAX_KEYWORDS_PER_USER = 20
     user_id = getattr(current_user, 'id', None)  # Get user_id early for keyword sharing
     
     data = request.get_json() or {}

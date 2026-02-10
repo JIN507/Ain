@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { Plus, Loader2, Trash2, ExternalLink, AlertCircle } from 'lucide-react'
 import { apiFetch } from '../apiClient'
 
-const MAX_KEYWORDS = 5
+const MAX_KEYWORDS = 20
 
 export default function Keywords({ onKeywordClick }) {
   const [keywords, setKeywords] = useState([])
@@ -105,13 +105,7 @@ export default function Keywords({ onKeywordClick }) {
           <h1 className="text-2xl font-bold text-slate-900">الكلمات المفتاحية</h1>
           <p className="text-sm text-slate-500 mt-0.5">إدارة كلمات الرصد والمتابعة</p>
         </div>
-        <div className={`px-3 py-1.5 rounded-full text-sm font-bold ${
-          isOverLimit 
-            ? 'text-rose-600' 
-            : 'text-teal-700'
-        }`} style={{ background: isOverLimit ? 'rgba(225,29,72,0.08)' : 'rgba(15,118,110,0.08)' }}>
-          {keywords.length} / {MAX_KEYWORDS}
-        </div>
+
       </div>
 
       {/* Alerts */}

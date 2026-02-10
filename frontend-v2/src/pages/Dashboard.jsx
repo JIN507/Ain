@@ -785,7 +785,7 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
             <>
               <Radio className="w-4 h-4" />
               <span>
-                المراقبة التلقائية كل ساعة
+                المراقبة التلقائية كل 30 دقيقة
                 {monitorStatus.next_run && (
                   <> · القادم: {new Date(monitorStatus.next_run).toLocaleTimeString('ar-EG')}</>
                 )}

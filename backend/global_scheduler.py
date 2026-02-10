@@ -49,7 +49,7 @@ class GlobalMonitoringScheduler:
         if self._initialized:
             return
         self._initialized = True
-        self._interval = 3600  # 60 minutes default
+        self._interval = 1800  # 30 minutes
         self._running = False
         self._executing = False
         self._thread: Optional[threading.Thread] = None
@@ -136,14 +136,43 @@ class GlobalMonitoringScheduler:
         return {"success": True, "message": "Global scheduler stopped"}
     
     def trigger_now(self) -> Dict[str, Any]:
-        """Trigger an immediate monitoring run (e.g. after new keyword added)"""
+        """Trigger an immediate monitoring run (e.g. after new keyword added).
+        Also force-releases any stale DB locks so the run can actually execute."""
         with self._status_lock:
             if not self._running:
                 return {"success": False, "message": "Global scheduler not running"}
         
-        print(f"[GLOBAL-SCHED] Triggered immediate run")
+        # Force-release any stale locks so the triggered run can proceed
+        self._force_release_stale_locks()
+        
+        print(f"[GLOBAL-SCHED] Triggered immediate run (cleared stale locks)")
         self._trigger_event.set()
         return {"success": True, "message": "Immediate run triggered"}
+    
+    def _force_release_stale_locks(self):
+        """Force-release any RUNNING global jobs that may be stale."""
+        from models import get_db, MonitorJob
+        SYSTEM_USER_ID = 0
+        db = get_db()
+        try:
+            stale_jobs = db.query(MonitorJob).filter(
+                MonitorJob.user_id == SYSTEM_USER_ID,
+                MonitorJob.status == 'RUNNING'
+            ).all()
+            for job in stale_jobs:
+                age = (datetime.utcnow() - (job.started_at or datetime.utcnow())).total_seconds()
+                # Force-release if older than 2 minutes (triggered runs should be fast to start)
+                if age > 120:
+                    job.status = 'FAILED'
+                    job.error_message = f'Force-released stale lock (age: {int(age)}s)'
+                    job.finished_at = datetime.utcnow()
+                    print(f"[GLOBAL-SCHED] Force-released stale job {job.id} (age: {int(age)}s)")
+            db.commit()
+        except Exception as e:
+            print(f"[GLOBAL-SCHED] Error releasing stale locks: {e}")
+            db.rollback()
+        finally:
+            db.close()
     
     # ── Main Loop ─────────────────────────────────────────────────────
     
@@ -187,7 +216,7 @@ class GlobalMonitoringScheduler:
         
         if active_job:
             age = datetime.utcnow() - (active_job.started_at or datetime.utcnow())
-            if age > timedelta(minutes=15):
+            if age > timedelta(minutes=5):
                 active_job.status = 'FAILED'
                 active_job.error_message = 'Stale global job (worker timeout)'
                 active_job.finished_at = datetime.utcnow()

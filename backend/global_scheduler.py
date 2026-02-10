@@ -487,26 +487,20 @@ class GlobalMonitoringScheduler:
                 else:
                     context['full_snippet_ar'] = snippet
             
-            keywords_info = json.dumps({
-                'primary': primary_keyword,
-                'all_matched': [m['keyword_ar'] for m in matched_keywords],
-                'match_details': matched_keywords,
-                'match_contexts': match_contexts
-            }, ensure_ascii=False)
-            
             # Parse published date
             published_datetime = self._parse_published_date(article.get('published_at'))
             
-            # ── Save to EACH user who has this keyword (cheap) ────────
-            target_user_ids = keyword_user_map.get(primary_keyword, set())
-            
-            # Also check other matched keywords for additional users
+            # ── Save to EACH user who owns a matched keyword ─────────
+            # Build per-user keyword lists: only give each user THEIR keywords
+            user_matched_keywords: Dict[int, list] = {}
             for mk in matched_keywords:
                 kw_ar = mk.get('keyword_ar', '')
-                if kw_ar in keyword_user_map:
-                    target_user_ids = target_user_ids | keyword_user_map[kw_ar]
+                for uid in keyword_user_map.get(kw_ar, set()):
+                    if uid not in user_matched_keywords:
+                        user_matched_keywords[uid] = []
+                    user_matched_keywords[uid].append(mk)
             
-            for user_id in target_user_ids:
+            for user_id, user_kws in user_matched_keywords.items():
                 # Per-user duplicate check (composite unique: url + user_id)
                 exists = db.query(Article).filter(
                     Article.url == article['url'],
@@ -516,6 +510,18 @@ class GlobalMonitoringScheduler:
                 if exists:
                     duplicates += 1
                     continue
+                
+                # Use this user's first matched keyword as primary
+                user_primary = user_kws[0]['keyword_ar']
+                
+                # Build per-user keywords_info (only their keywords)
+                user_contexts = [c for c in match_contexts if c.get('keyword_ar', '') in [k['keyword_ar'] for k in user_kws]]
+                user_keywords_info = json.dumps({
+                    'primary': user_primary,
+                    'all_matched': [k['keyword_ar'] for k in user_kws],
+                    'match_details': user_kws,
+                    'match_contexts': user_contexts if user_contexts else match_contexts[:1]
+                }, ensure_ascii=False)
                 
                 new_article = Article(
                     country=source['country_name'],
@@ -528,9 +534,9 @@ class GlobalMonitoringScheduler:
                     title_ar=title_ar,
                     summary_ar=summary_ar,
                     arabic_text=f"{title_ar} {summary_ar}",
-                    keyword=primary_keyword,
-                    keyword_original=primary_keyword,
-                    keywords_translations=keywords_info,
+                    keyword=user_primary,
+                    keyword_original=user_primary,
+                    keywords_translations=user_keywords_info,
                     sentiment_label="محايد",
                     sentiment_score=None,
                     published_at=published_datetime,

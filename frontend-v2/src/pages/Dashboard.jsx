@@ -795,8 +795,8 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
         </div>
       )}
 
-      {/* Data Cleanup Warning */}
-      {cleanupStatus?.show_warning && (
+      {/* Data Cleanup Warning - only when user has articles */}
+      {cleanupStatus?.show_warning && articles.length > 0 && (
         <div className="flex items-center gap-3 px-4 py-3.5 rounded-xl"
           style={{ background: 'rgba(225,29,72,0.06)' }}>
           <AlertTriangle className="w-5 h-5 text-rose-600 flex-shrink-0" />

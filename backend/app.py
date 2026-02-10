@@ -3212,28 +3212,38 @@ def run_data_cleanup(db):
     print(f"[CLEANUP] ✅ Deleted all user data")
 
 @app.route('/api/system/cleanup-status', methods=['GET'])
+@login_required
 def get_cleanup_status():
-    """Get data cleanup status - days remaining and warning flag"""
+    """Get data cleanup status - days remaining and warning flag.
+    Only shows warning if the user actually has articles to lose."""
     from models import SystemConfig
     db = get_db()
     try:
+        # Check if user has any articles at all
+        user_article_count = db.query(Article).filter(Article.user_id == current_user.id).count()
+        
         config = db.query(SystemConfig).filter(SystemConfig.key == 'last_cleanup_date').first()
         if not config:
             return jsonify({
                 'days_remaining': DATA_RETENTION_DAYS,
                 'show_warning': False,
-                'retention_days': DATA_RETENTION_DAYS
+                'retention_days': DATA_RETENTION_DAYS,
+                'article_count': user_article_count
             })
         
         last_cleanup = datetime.fromisoformat(config.value)
         days_passed = (datetime.utcnow() - last_cleanup).days
         days_remaining = max(0, DATA_RETENTION_DAYS - days_passed)
         
+        # Only warn if user has articles AND cleanup is approaching (1 day left)
+        show_warning = user_article_count > 0 and days_remaining <= 1
+        
         return jsonify({
             'days_remaining': days_remaining,
-            'show_warning': days_remaining <= 1,  # Show warning on day 4 (1 day remaining)
+            'show_warning': show_warning,
             'retention_days': DATA_RETENTION_DAYS,
-            'last_cleanup': config.value
+            'last_cleanup': config.value,
+            'article_count': user_article_count
         })
     finally:
         db.close()

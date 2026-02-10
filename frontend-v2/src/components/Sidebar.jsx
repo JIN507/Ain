@@ -4,11 +4,11 @@ import { Home, Globe, Key, Newspaper, Search, Activity, Shield, Eye } from 'luci
 export default function Sidebar({ currentPage, setCurrentPage, sidebarOpen, setSidebarOpen, isAdmin }) {
   const navItems = [
     { id: 'dashboard', label: 'النتائج', icon: Home },
+    { id: 'keywords', label: 'الكلمات والمراقبة', icon: Key },
     { id: 'directsearch', label: 'إبحث الآن', icon: Search },
     { id: 'topheadlines', label: 'أهم العناوين', icon: Activity },
     { id: 'myfiles', label: 'ملفاتي', icon: Newspaper },
     { id: 'countries', label: 'الدول', icon: Globe },
-    { id: 'keywords', label: 'مراقبة الأخبار', icon: Key },
   ]
 
   const adminItems = isAdmin

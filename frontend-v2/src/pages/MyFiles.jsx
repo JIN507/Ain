@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
+import { motion } from 'framer-motion'
 import { apiFetch } from '../apiClient'
-import { Download, FileText, Trash2, RefreshCw, Eye } from 'lucide-react'
+import { Download, FileText, Trash2, RefreshCw, Eye, Loader2 } from 'lucide-react'
 
 export default function MyFiles() {
   const [exportsList, setExportsList] = useState([])
@@ -97,142 +98,108 @@ export default function MyFiles() {
     if (filters.sentiment) parts.push(`المزاج: ${filters.sentiment}`)
     if (filters.sortBy) parts.push(`الترتيب: ${filters.sortBy === 'newest' ? 'الأحدث' : 'الأقدم'}`)
     if (parts.length === 0) return 'كل الأخبار'
-    return parts.join(' • ')
+    return parts.join(' \u00B7 ')
   }
 
-  const getSourceTypeInfo = (sourceType) => {
+  const getSourceColor = (sourceType) => {
     switch (sourceType) {
-      case 'direct_search':
-        return {
-          label: 'البحث المباشر',
-          icon: '🔍',
-          bgColor: 'bg-blue-100',
-          textColor: 'text-blue-700',
-          borderColor: 'border-blue-300',
-          iconBg: 'bg-blue-500'
-        }
-      case 'top_headlines':
-        return {
-          label: 'أهم العناوين',
-          icon: '📰',
-          bgColor: 'bg-purple-100',
-          textColor: 'text-purple-700',
-          borderColor: 'border-purple-300',
-          iconBg: 'bg-purple-500'
-        }
-      case 'dashboard':
-      default:
-        return {
-          label: 'لوحة المتابعة',
-          icon: '📊',
-          bgColor: 'bg-emerald-100',
-          textColor: 'text-emerald-700',
-          borderColor: 'border-emerald-300',
-          iconBg: 'bg-emerald-500'
-        }
+      case 'direct_search': return { bg: 'rgba(59,130,246,0.08)', color: '#2563eb', label: 'البحث المباشر' }
+      case 'top_headlines':  return { bg: 'rgba(139,92,246,0.08)', color: '#7c3aed', label: 'أهم العناوين' }
+      default:               return { bg: 'rgba(15,118,110,0.08)', color: '#0f766e', label: 'لوحة المتابعة' }
     }
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-4">
+    <div className="max-w-4xl mx-auto space-y-6">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900">ملفاتي</h1>
-          <p className="text-gray-600 mt-1">سجل الملفات التي قمت بتصديرها من لوحة المتابعة</p>
+          <h1 className="text-2xl font-bold text-slate-900">ملفاتي</h1>
+          <p className="text-sm text-slate-500 mt-0.5">الملفات المصدّرة من النظام</p>
         </div>
-        <button
-          onClick={loadExports}
-          disabled={loading}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-semibold text-sm disabled:opacity-60"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+        <button onClick={loadExports} disabled={loading} className="btn-outline !py-2">
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           تحديث
         </button>
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+          className="rounded-xl px-4 py-3 text-sm"
+          style={{ background: 'rgba(225,29,72,0.06)', color: '#e11d48' }}>
           {error}
-        </div>
+        </motion.div>
       )}
 
-      <div className="card p-4">
-        {loading ? (
-          <div className="text-sm text-gray-500 text-center py-8">جاري التحميل...</div>
-        ) : exportsList.length === 0 ? (
-          <div className="text-sm text-gray-500 text-center py-8">
-            <FileText className="w-12 h-12 mx-auto text-gray-300 mb-3" />
-            <p>لم تقم بتصدير أي ملفات حتى الآن</p>
-            <p className="text-xs mt-1">عند تصدير تقرير PDF من لوحة المتابعة، سيظهر هنا</p>
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+        </div>
+      ) : exportsList.length === 0 ? (
+        <div className="card p-16 text-center">
+          <div className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.04)' }}>
+            <FileText className="w-7 h-7 text-slate-300" />
           </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {exportsList.map((rec) => {
-              const sourceInfo = getSourceTypeInfo(rec.source_type)
-              return (
-              <div
+          <p className="text-slate-500 text-sm">لم تقم بتصدير أي ملفات حتى الآن</p>
+          <p className="text-xs text-slate-400 mt-1">عند تصدير تقرير PDF، سيظهر هنا</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {exportsList.map((rec, idx) => {
+            const src = getSourceColor(rec.source_type)
+            return (
+              <motion.div
                 key={rec.id}
-                className={`border rounded-xl p-4 hover:shadow-md transition bg-white ${sourceInfo.borderColor}`}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.04 }}
+                className="card p-4 flex items-center gap-4"
               >
-                {/* Source Type Badge */}
-                <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold mb-3 ${sourceInfo.bgColor} ${sourceInfo.textColor}`}>
-                  <span>{sourceInfo.icon}</span>
-                  <span>{sourceInfo.label}</span>
+                {/* Icon */}
+                <div className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center"
+                  style={{ background: src.bg }}>
+                  <FileText className="w-5 h-5" style={{ color: src.color }} />
                 </div>
-                
-                <div className="flex items-start gap-3">
-                  <div className={`flex-shrink-0 w-10 h-10 rounded-lg ${sourceInfo.iconBg} flex items-center justify-center`}>
-                    <FileText className="w-5 h-5 text-white" />
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <h3 className="text-sm font-semibold text-slate-900">تقرير {rec.article_count} خبر</h3>
+                    <span className="badge" style={{ background: src.bg, color: src.color }}>{src.label}</span>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-semibold text-gray-900">
-                      تقرير {rec.article_count} خبر
-                    </h3>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {formatDateTime(rec.created_at)}
-                    </p>
-                    <p className="text-xs text-gray-600 mt-1 truncate" title={summarizeFilters(rec.filters)}>
-                      {summarizeFilters(rec.filters)}
-                    </p>
-                    {rec.user_name && (
-                      <p className="text-xs text-indigo-600 mt-1 font-medium">
-                        👤 {rec.user_name}
-                      </p>
-                    )}
+                  <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                    <span>{formatDateTime(rec.created_at)}</span>
+                    <span>\u00B7</span>
+                    <span className="truncate">{summarizeFilters(rec.filters)}</span>
                   </div>
                 </div>
-                <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
+
+                {/* Actions */}
+                <div className="flex items-center gap-1.5 flex-shrink-0">
                   {rec.has_file && (
                     <>
-                      <button
-                        onClick={() => handleView(rec.id)}
-                        className="flex-1 inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold hover:bg-emerald-100"
-                      >
-                        <Eye className="w-3 h-3" />
-                        عرض
+                      <button onClick={() => handleView(rec.id)}
+                        className="btn-ghost !px-2.5 !py-1.5" style={{ color: '#0f766e' }}>
+                        <Eye className="w-3.5 h-3.5" />
                       </button>
-                      <button
-                        onClick={() => handleDownload(rec.id, rec.filename)}
-                        className="flex-1 inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 text-xs font-semibold hover:bg-blue-100"
-                      >
-                        <Download className="w-3 h-3" />
-                        تحميل
+                      <button onClick={() => handleDownload(rec.id, rec.filename)}
+                        className="btn-ghost !px-2.5 !py-1.5" style={{ color: '#2563eb' }}>
+                        <Download className="w-3.5 h-3.5" />
                       </button>
                     </>
                   )}
-                  <button
-                    onClick={() => handleDelete(rec.id)}
-                    className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-red-50 text-red-700 border border-red-200 text-xs font-semibold hover:bg-red-100"
-                  >
-                    <Trash2 className="w-3 h-3" />
+                  <button onClick={() => handleDelete(rec.id)}
+                    className="btn-ghost !px-2.5 !py-1.5"
+                    style={{ color: '#94a3b8' }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = '#e11d48'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = '#94a3b8'}>
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
-              </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
+              </motion.div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

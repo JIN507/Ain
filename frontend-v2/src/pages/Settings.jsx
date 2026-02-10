@@ -78,9 +78,24 @@ export default function Settings() {
       const data = await res.json()
       setExportResult(data)
       
-      // Download the file
+      // Download the file via apiFetch (ensures auth cookies are sent)
       if (data.download_url) {
-        window.location.href = data.download_url
+        try {
+          const dlRes = await apiFetch(data.download_url)
+          if (dlRes.ok) {
+            const blob = await dlRes.blob()
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = data.filename || 'export.xlsx'
+            document.body.appendChild(a)
+            a.click()
+            a.remove()
+            URL.revokeObjectURL(url)
+          }
+        } catch (dlErr) {
+          console.error('Download failed:', dlErr)
+        }
       }
 
       // Refresh page after 2 seconds
@@ -112,214 +127,128 @@ export default function Settings() {
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl md:text-4xl font-bold text-gray-900">تشغيل وإيقاف النظام</h1>
-        <p className="text-gray-600 mt-1">المراقبة المستمرة للأخبار كل 10 دقائق</p>
-      </div>
-
-      {/* Info Alert */}
-      <div className="card p-4 bg-blue-50 border-blue-200">
-        <div className="flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-          <div className="text-sm text-blue-800">
-            <p className="font-semibold mb-1">نظام المراقبة المستمرة:</p>
-            <ul className="list-disc list-inside space-y-1 mr-3">
-              <li>عند التشغيل، يتم البحث تلقائياً كل <strong>10 دقائق</strong></li>
-              <li>يعمل النظام في الخلفية حتى عند إغلاق المتصفح</li>
-              <li>يمكن لعدة مستخدمين الوصول للنتائج في نفس الوقت</li>
-              <li>يتم حفظ جميع النتائج في قاعدة البيانات</li>
-              <li>يمكنك إيقاف النظام في أي وقت</li>
-            </ul>
-          </div>
-        </div>
+        <h1 className="text-2xl font-bold text-slate-900">إعدادات النظام</h1>
+        <p className="text-sm text-slate-500 mt-0.5">التحكم في نظام المراقبة التلقائية</p>
       </div>
 
       {/* Main Control Card */}
-      <div className="card p-8">
+      <div className="card p-6">
         {loading ? (
-          <div className="text-center py-8">
-            <Loader2 className="w-8 h-8 animate-spin mx-auto text-emerald-600" />
-            <p className="text-gray-600 mt-2">جاري تحميل حالة النظام...</p>
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin text-teal-600" />
           </div>
         ) : (
-          <div className="space-y-6">
-            {/* Status Indicator */}
-            <div className="flex items-center justify-center gap-4">
-              <div className={`w-4 h-4 rounded-full ${status?.running ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
-              <span className={`text-2xl font-bold ${status?.running ? 'text-green-600' : 'text-gray-600'}`}>
-                {status?.running ? 'النظام يعمل' : 'النظام متوقف'}
-              </span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className={`w-3 h-3 rounded-full ${status?.running ? 'bg-teal-500 pulse-glow' : 'bg-slate-300'}`} />
+              <div>
+                <span className={`text-lg font-bold ${status?.running ? 'text-slate-900' : 'text-slate-500'}`}>
+                  {status?.running ? 'النظام يعمل' : 'النظام متوقف'}
+                </span>
+                {status?.running && (
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    <Clock className="w-3 h-3 inline ml-1" />
+                    فحص كل {status.interval_minutes} دقيقة
+                  </p>
+                )}
+              </div>
             </div>
-
-            {/* Action Buttons */}
-            <div className="flex justify-center gap-4">
+            <div className="flex items-center gap-2">
               {!status?.running ? (
-                <button
-                  onClick={startMonitoring}
-                  disabled={actionLoading}
-                  className="btn text-lg px-8 py-4 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {actionLoading ? (
-                    <>
-                      <Loader2 className="w-6 h-6 animate-spin" />
-                      جاري التشغيل...
-                    </>
-                  ) : (
-                    <>
-                      <Play className="w-6 h-6" />
-                      تشغيل نظام عين
-                    </>
-                  )}
+                <button onClick={startMonitoring} disabled={actionLoading} className="btn">
+                  {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                  تشغيل
                 </button>
               ) : (
-                <button
-                  onClick={stopMonitoring}
-                  disabled={actionLoading}
-                  className="btn text-lg px-8 py-4 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {actionLoading ? (
-                    <>
-                      <Loader2 className="w-6 h-6 animate-spin" />
-                      جاري الإيقاف...
-                    </>
-                  ) : (
-                    <>
-                      <Square className="w-6 h-6" />
-                      إيقاف النظام
-                    </>
-                  )}
+                <button onClick={stopMonitoring} disabled={actionLoading} className="btn-danger">
+                  {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Square className="w-4 h-4" />}
+                  إيقاف
                 </button>
               )}
-              
-              <button
-                onClick={fetchStatus}
-                className="btn text-lg px-4 py-4 bg-gray-200 hover:bg-gray-300 text-gray-700"
-                title="تحديث الحالة"
-              >
-                <RefreshCw className="w-6 h-6" />
+              <button onClick={fetchStatus} className="btn-ghost" title="تحديث">
+                <RefreshCw className="w-4 h-4" />
               </button>
             </div>
-
-            {/* Running Status Details */}
-            {status?.running && (
-              <div className="mt-6 p-4 bg-green-50 rounded-lg border border-green-200">
-                <div className="flex items-center justify-center gap-2 text-green-700">
-                  <Clock className="w-5 h-5" />
-                  <span>يتم الفحص كل <strong>{status.interval_minutes}</strong> دقيقة</span>
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>
 
       {/* System Statistics */}
-      <div className="card p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-bold text-gray-900">إحصائيات النظام</h3>
-          {status?.running && (
-            <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-semibold">
-              يعمل الآن
-            </span>
-          )}
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <div className="text-sm text-blue-600">عدد الفحوصات</div>
-            <div className="text-3xl font-bold text-blue-700">{status?.run_count || 0}</div>
+      <div className="card p-5">
+        <h3 className="text-sm font-semibold text-slate-900 mb-4">إحصائيات النظام</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="rounded-xl p-3" style={{ background: 'rgba(2,132,199,0.06)' }}>
+            <div className="text-[11px] text-slate-400 font-medium">الفحوصات</div>
+            <div className="text-xl font-bold text-slate-900 mt-1">{status?.run_count || 0}</div>
           </div>
-          <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-200">
-            <div className="text-sm text-emerald-600">آخر فحص</div>
-            <div className="text-lg font-bold text-emerald-700">{formatDate(status?.last_run)}</div>
+          <div className="rounded-xl p-3" style={{ background: 'rgba(15,118,110,0.06)' }}>
+            <div className="text-[11px] text-slate-400 font-medium">آخر فحص</div>
+            <div className="text-xs font-semibold text-slate-700 mt-1">{formatDate(status?.last_run)}</div>
           </div>
-          <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
-            <div className="text-sm text-purple-600">الفحص القادم</div>
-            <div className="text-lg font-bold text-purple-700">{formatDate(status?.next_run)}</div>
+          <div className="rounded-xl p-3" style={{ background: 'rgba(139,92,246,0.06)' }}>
+            <div className="text-[11px] text-slate-400 font-medium">القادم</div>
+            <div className="text-xs font-semibold text-slate-700 mt-1">{formatDate(status?.next_run)}</div>
           </div>
-          <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
-            <div className="text-sm text-orange-600">الأخطاء</div>
-            <div className="text-3xl font-bold text-orange-700">{status?.error_count || 0}</div>
+          <div className="rounded-xl p-3" style={{ background: 'rgba(234,88,12,0.06)' }}>
+            <div className="text-[11px] text-slate-400 font-medium">الأخطاء</div>
+            <div className="text-xl font-bold text-slate-900 mt-1">{status?.error_count || 0}</div>
           </div>
         </div>
 
         {/* Last Result */}
         {status?.last_result && (
-          <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-            <h4 className="font-semibold text-gray-700 mb-2">نتيجة آخر فحص:</h4>
+          <div className="mt-3 rounded-xl p-3" style={{ background: 'rgba(0,0,0,0.02)' }}>
+            <h4 className="text-xs font-semibold text-slate-500 mb-2">آخر فحص:</h4>
             {status.last_result.success ? (
-              <div className="grid grid-cols-3 gap-4 text-center">
+              <div className="grid grid-cols-3 gap-3 text-center">
                 <div>
-                  <div className="text-2xl font-bold text-blue-600">{status.last_result.total_fetched || 0}</div>
-                  <div className="text-sm text-gray-600">تم جلبها</div>
+                  <div className="text-lg font-bold text-slate-900">{status.last_result.total_fetched || 0}</div>
+                  <div className="text-[11px] text-slate-400">جُلبت</div>
                 </div>
                 <div>
-                  <div className="text-2xl font-bold text-emerald-600">{status.last_result.total_matches || 0}</div>
-                  <div className="text-sm text-gray-600">مطابقة</div>
+                  <div className="text-lg font-bold text-slate-900">{status.last_result.total_matches || 0}</div>
+                  <div className="text-[11px] text-slate-400">مطابقة</div>
                 </div>
                 <div>
-                  <div className="text-2xl font-bold text-green-600">{status.last_result.total_saved || 0}</div>
-                  <div className="text-sm text-gray-600">تم حفظها</div>
+                  <div className="text-lg font-bold text-slate-900">{status.last_result.total_saved || 0}</div>
+                  <div className="text-[11px] text-slate-400">حُفظت</div>
                 </div>
               </div>
             ) : status.last_result.skipped ? (
-              <p className="text-yellow-700">⚠️ تم تخطي الفحص: {status.last_result.reason}</p>
+              <p className="text-xs text-amber-600">تم تخطي الفحص: {status.last_result.reason}</p>
             ) : (
-              <p className="text-red-700">❌ خطأ: {status.last_result.error}</p>
+              <p className="text-xs text-rose-600">خطأ: {status.last_result.error}</p>
             )}
           </div>
         )}
       </div>
 
       {/* Export & Reset */}
-      <div className="card p-6 border-2 border-orange-200">
-        <div className="flex items-start gap-3 mb-4">
-          <AlertCircle className="w-6 h-6 text-orange-600 mt-0.5 flex-shrink-0" />
-          <div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">حفظ البيانات وإعادة تهيئة</h3>
-            <p className="text-sm text-gray-600 mb-3">
-              تصدير جميع الأخبار إلى ملف Excel ثم حذف جميع البيانات من النظام
-            </p>
-            <ul className="text-sm text-gray-600 space-y-1 mr-5 list-disc">
-              <li>سيتم تصدير جميع الأخبار إلى ملف Excel</li>
-              <li>سيتم التحقق من سلامة التصدير قبل الحذف</li>
-              <li>سيتم حذف جميع الأخبار والكلمات المفتاحية</li>
-              <li>سيتم تنزيل ملف Excel تلقائياً</li>
-            </ul>
+      <div className="card p-5" style={{ borderColor: 'rgba(234,88,12,0.15)' }}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(234,88,12,0.08)' }}>
+              <Download className="w-4 h-4" style={{ color: '#ea580c' }} />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900">حفظ البيانات وإعادة تهيئة</h3>
+              <p className="text-xs text-slate-400">تصدير Excel ثم حذف جميع البيانات</p>
+            </div>
           </div>
+          <button onClick={exportAndReset} disabled={exporting}
+            className="btn-outline !text-xs !px-4 !py-2"
+            style={{ color: '#ea580c', borderColor: 'rgba(234,88,12,0.25)' }}>
+            {exporting ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> جاري...</> : 'حفظ وتهيئة'}
+          </button>
         </div>
-
-        <button
-          onClick={exportAndReset}
-          disabled={exporting}
-          className="btn bg-orange-600 hover:bg-orange-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {exporting ? (
-            <>
-              <Loader2 className="w-5 h-5 animate-spin" />
-              جاري التصدير وإعادة التهيئة...
-            </>
-          ) : (
-            <>
-              <Download className="w-5 h-5" />
-              حفظ البيانات وإعادة تهيئة
-            </>
-          )}
-        </button>
-
-        {/* Export Result */}
         {exportResult && !exportResult.error && (
-          <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
-            <p className="text-green-800 font-semibold">✅ تم التصدير وإعادة التهيئة بنجاح!</p>
-            <p className="text-sm text-green-700 mt-1">
-              تم تصدير {exportResult.article_count} مقالة إلى {exportResult.filename}
-            </p>
-            <p className="text-sm text-green-700">جاري تحديث الصفحة...</p>
+          <div className="mt-3 rounded-xl px-4 py-3 text-sm" style={{ background: 'rgba(20,184,166,0.06)', color: '#0f766e' }}>
+            تم تصدير {exportResult.article_count} مقالة بنجاح
           </div>
         )}
-
-        {/* Export Error */}
         {exportResult && exportResult.error && (
-          <div className="mt-4 p-4 bg-red-50 rounded-lg border border-red-200">
-            <p className="text-red-800">❌ {exportResult.error}</p>
+          <div className="mt-3 rounded-xl px-4 py-3 text-sm" style={{ background: 'rgba(225,29,72,0.06)', color: '#e11d48' }}>
+            {exportResult.error}
           </div>
         )}
       </div>

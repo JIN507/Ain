@@ -77,13 +77,16 @@ class Keyword(Base):
 
 class Article(Base):
     __tablename__ = 'articles'
+    __table_args__ = (
+        UniqueConstraint('url', 'user_id', name='uq_article_url_user'),
+    )
     
     id = Column(Integer, primary_key=True)
     
     # Source info
     country = Column(String(100), nullable=False)
     source_name = Column(String(200), nullable=False)
-    url = Column(String(2000), nullable=False, unique=True)
+    url = Column(String(2000), nullable=False)
     
     # Original content
     title_original = Column(Text, nullable=False)
@@ -325,8 +328,30 @@ _connect_args = {}
 if DATABASE_URL.startswith('sqlite'):
     _connect_args = {"check_same_thread": False}
 
-engine = create_engine(DATABASE_URL, connect_args=_connect_args, pool_pre_ping=True)
+# Connection pool configuration
+# PostgreSQL (Render): pool_size=10, max_overflow=15 → max 25 connections per worker
+# SQLite: no pooling needed (StaticPool is default for check_same_thread=False)
+_pool_kwargs = {"pool_pre_ping": True}
+if 'postgresql' in DATABASE_URL:
+    _pool_kwargs.update({
+        "pool_size": 10,        # Persistent connections per worker
+        "max_overflow": 15,     # Extra connections under load
+        "pool_recycle": 300,    # Recycle connections every 5 min (prevents stale)
+        "pool_timeout": 30,     # Wait max 30s for a connection
+    })
+
+engine = create_engine(DATABASE_URL, connect_args=_connect_args, **_pool_kwargs)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+class SystemConfig(Base):
+    """System configuration storage for cleanup dates and other settings"""
+    __tablename__ = 'system_config'
+    
+    id = Column(Integer, primary_key=True)
+    key = Column(String(100), unique=True, nullable=False)
+    value = Column(Text, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow)
 
 
 def init_db():

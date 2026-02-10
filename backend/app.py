@@ -1,25 +1,29 @@
 """
 Flask API for Ain News Monitor
 """
+import sys
+# Force unbuffered output for Windows CMD
+sys.stdout.reconfigure(line_buffering=True)
+sys.stderr.reconfigure(line_buffering=True)
+
 from flask import Flask, request, jsonify, send_from_directory, send_file
 from flask_cors import CORS
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_wtf.csrf import CSRFProtect, generate_csrf
 from models import init_db, get_db, Country, Source, Keyword, Article, User, AuditLog, ExportRecord, UserFile, SearchHistory
 import uuid
-from rss_service import fetch_all_feeds, fetch_feed
+from rss_service import fetch_feed
 from translation_service import (
     translate_keyword, 
     detect_language, 
-    translate_to_arabic, 
-    analyze_sentiment
+    translate_to_arabic
 )
 # New multilingual services
 from keyword_expansion import expand_keyword, get_all_expansions, load_expansions_from_keywords
-from multilingual_matcher import match_article_against_keywords, detect_article_language
-from translation_cache import translate_article_to_arabic
-from arabic_utils import normalize_arabic
-from multilingual_monitor import fetch_and_match_multilingual, save_matched_articles
+# multilingual_matcher imported where needed
+# translation_cache imported where needed
+# arabic_utils imported where needed
+# multilingual_monitor - legacy, replaced by async_monitor_wrapper
 # New optimized async services
 from async_monitor_wrapper import run_optimized_monitoring, save_matched_articles_sync
 # Utils
@@ -346,15 +350,20 @@ def download_export(export_id):
         if not rec:
             return jsonify({'error': 'السجل غير موجود'}), 404
         
+        # Detect mimetype from filename
+        import mimetypes as _mt
+        fname = rec.filename or f"export_{export_id}.pdf"
+        guessed_mime = _mt.guess_type(fname)[0] or 'application/pdf'
+        
         # Try database storage first (new method for Render)
         if rec.file_data:
             from io import BytesIO
             file_stream = BytesIO(rec.file_data)
             return send_file(
                 file_stream,
-                mimetype='application/pdf',
+                mimetype=guessed_mime,
                 as_attachment=not view_mode,
-                download_name=rec.filename or f"export_{export_id}.pdf"
+                download_name=fname
             )
         
         # Fallback to filesystem (legacy files)
@@ -365,9 +374,9 @@ def download_export(export_id):
             if os.path.exists(file_path):
                 return send_file(
                     file_path,
-                    mimetype='application/pdf',
+                    mimetype=guessed_mime,
                     as_attachment=not view_mode,
-                    download_name=rec.filename or f"export_{export_id}.pdf"
+                    download_name=fname
                 )
         
         return jsonify({'error': 'لا يوجد ملف مرفق'}), 404
@@ -835,6 +844,11 @@ def index():
     """Serve built frontend from the static folder (backend/static)."""
     return send_from_directory('static', 'index.html')
 
+@app.route('/health')
+def health_check():
+    """Health check endpoint for Render"""
+    return jsonify({'status': 'healthy', 'timestamp': datetime.utcnow().isoformat()}), 200
+
 @app.route('/api/auth/check', methods=['POST'])
 def check_auth():
     """Legacy auth check by email whitelist (kept for backward compatibility)."""
@@ -979,6 +993,8 @@ def get_countries():
         db.close()
 
 @app.route('/api/countries/<int:country_id>/toggle', methods=['POST'])
+@csrf.exempt
+@admin_required
 def toggle_country(country_id):
     """Toggle country enabled status"""
     db = get_db()
@@ -1019,6 +1035,7 @@ def get_sources():
         db.close()
 
 @app.route('/api/sources', methods=['POST'])
+@admin_required
 @csrf.exempt
 def add_source():
     """Add new RSS source"""
@@ -1046,6 +1063,7 @@ def add_source():
         db.close()
 
 @app.route('/api/sources/<int:source_id>', methods=['PUT'])
+@admin_required
 @csrf.exempt
 def update_source(source_id):
     """Update source"""
@@ -1073,6 +1091,7 @@ def update_source(source_id):
         db.close()
 
 @app.route('/api/sources/<int:source_id>', methods=['DELETE'])
+@admin_required
 @csrf.exempt
 def delete_source(source_id):
     """Delete source"""
@@ -1091,6 +1110,8 @@ def delete_source(source_id):
         db.close()
 
 @app.route('/api/sources/<int:source_id>/toggle', methods=['POST'])
+@csrf.exempt
+@admin_required
 def toggle_source(source_id):
     """Toggle source enabled status"""
     db = get_db()
@@ -1140,6 +1161,80 @@ def get_keywords():
     finally:
         db.close()
 
+def copy_articles_from_shared_keyword(db, keyword_ar: str, target_user_id: int) -> int:
+    """
+    Copy articles from other users who have the same keyword.
+    This allows sharing results between users with matching keywords.
+    Returns the number of articles copied.
+    """
+    # Find other users who have this exact keyword
+    other_keywords = db.query(Keyword).filter(
+        Keyword.text_ar == keyword_ar,
+        Keyword.user_id != target_user_id
+    ).all()
+    
+    if not other_keywords:
+        return 0
+    
+    # Get user IDs who have this keyword
+    source_user_ids = [k.user_id for k in other_keywords]
+    
+    # Find articles from those users with this keyword
+    source_articles = db.query(Article).filter(
+        Article.user_id.in_(source_user_ids),
+        Article.keyword == keyword_ar
+    ).all()
+    
+    if not source_articles:
+        return 0
+    
+    # Copy articles to target user (avoid duplicates by URL)
+    existing_urls = set(
+        a.url for a in db.query(Article).filter(
+            Article.user_id == target_user_id
+        ).all()
+    )
+    
+    copied = 0
+    for article in source_articles:
+        if article.url in existing_urls:
+            continue
+        
+        # Create a copy for the target user
+        new_article = Article(
+            country=article.country,
+            source_name=article.source_name,
+            url=article.url,
+            title_original=article.title_original,
+            summary_original=article.summary_original,
+            original_language=article.original_language,
+            image_url=article.image_url,
+            title_ar=article.title_ar,
+            summary_ar=article.summary_ar,
+            arabic_text=article.arabic_text,
+            keyword=article.keyword,
+            keyword_original=article.keyword_original,
+            keywords_translations=article.keywords_translations,
+            sentiment_label=article.sentiment_label,
+            sentiment_score=article.sentiment_score,
+            published_at=article.published_at,
+            fetched_at=article.fetched_at,
+            user_id=target_user_id  # Assign to new user
+        )
+        db.add(new_article)
+        existing_urls.add(article.url)
+        copied += 1
+    
+    if copied > 0:
+        try:
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            print(f"[COPY] ⚠️ Error copying shared articles: {str(e)[:100]}")
+            copied = 0
+    
+    return copied
+
 @app.route('/api/keywords/expanded', methods=['GET'])
 @login_required
 def get_keywords_expanded():
@@ -1164,6 +1259,9 @@ def get_keywords_expanded():
 @csrf.exempt
 def add_keyword():
     """Add new keyword with auto-translation to 7 languages + expansion"""
+    MAX_KEYWORDS_PER_USER = 5
+    user_id = getattr(current_user, 'id', None)  # Get user_id early for keyword sharing
+    
     data = request.get_json() or {}
     db = get_db()
     try:
@@ -1172,6 +1270,12 @@ def add_keyword():
         if not keyword_ar:
             print(f"❌ Keyword add failed: empty keyword text")
             return jsonify({"error": "النص العربي للكلمة مطلوب"}), 400
+        
+        # Check keyword limit (5 per user)
+        current_count = scoped(db.query(Keyword), Keyword, force_user_filter=True).count()
+        if current_count >= MAX_KEYWORDS_PER_USER:
+            print(f"❌ Keyword add failed: user {current_user.id} reached limit ({current_count}/{MAX_KEYWORDS_PER_USER})")
+            return jsonify({"error": f"لقد وصلت للحد الأقصى ({MAX_KEYWORDS_PER_USER} كلمات). احذف كلمة لإضافة أخرى."}), 400
         
         # Check if keyword already exists FOR THIS USER only (force_user_filter=True)
         existing = scoped(db.query(Keyword), Keyword, force_user_filter=True).filter(Keyword.text_ar == keyword_ar).first()
@@ -1214,6 +1318,11 @@ def add_keyword():
         
         print(f"   ✅ Keyword saved to database (ID: {keyword.id})")
         
+        # Step 1.5: Check if other users have this keyword and copy their articles
+        copied_count = copy_articles_from_shared_keyword(db, keyword_ar, user_id)
+        if copied_count > 0:
+            print(f"   📋 Copied {copied_count} articles from other users with same keyword")
+        
         # Step 2: Expand keyword to 32 languages and SAVE TO DATABASE
         print(f"🔄 Step 2: Expanding keyword to 32 languages for global search...")
         expansion = expand_keyword(keyword_ar, keyword_obj=keyword, db=db)
@@ -1226,18 +1335,16 @@ def add_keyword():
         else:
             print(f"   ❌ Expansion failed")
         
-        # Step 3: Restart monitoring to include new keyword
-        user_id = getattr(current_user, 'id', None)
+        # Step 3: Ensure global scheduler is running and trigger immediate run
         if user_id:
-            status = scheduler_manager.get_status(user_id)
-            if status.get('running'):
-                # Stop and restart to include new keyword immediately
-                print(f"🔄 Restarting monitoring to include new keyword...")
-                scheduler_manager.stop(user_id)
-            
-            print(f"🚀 Starting monitoring for user {user_id}...")
-            scheduler_manager.start(user_id)
-            print(f"   ✅ Monitoring started with all keywords")
+            status = global_scheduler.get_status()
+            if not status.get('running'):
+                print(f"🚀 Starting global scheduler (first keyword added)...")
+                global_scheduler.start()
+            else:
+                print(f"🔄 Triggering immediate monitoring run for new keyword...")
+                global_scheduler.trigger_now()
+            print(f"   ✅ Global monitoring active")
         
         return jsonify({
             "success": True,
@@ -1255,7 +1362,7 @@ def delete_keyword(keyword_id):
     """Delete keyword - stops monitoring if no keywords remain"""
     db = get_db()
     try:
-        query = scoped(db.query(Keyword), Keyword)
+        query = scoped(db.query(Keyword), Keyword, force_user_filter=True)
         keyword = query.filter(Keyword.id == keyword_id).first()
         
         if not keyword:
@@ -1266,26 +1373,25 @@ def delete_keyword(keyword_id):
         
         # Check if there are any remaining enabled keywords for this user
         user_id = getattr(current_user, 'id', None)
-        remaining_keywords = scoped(db.query(Keyword), Keyword).filter(Keyword.enabled == True).count()
+        remaining_keywords = scoped(db.query(Keyword), Keyword, force_user_filter=True).filter(Keyword.enabled == True).count()
         
-        # If no keywords remain, stop monitoring
+        # Note: Global scheduler keeps running for other users
+        # It will skip users with no keywords automatically
         if remaining_keywords == 0 and user_id:
-            status = scheduler_manager.get_status(user_id)
-            if status.get('running'):
-                print(f"🛑 No keywords remaining - stopping monitoring for user {user_id}")
-                scheduler_manager.stop(user_id)
+            print(f"ℹ️ User {user_id} has no keywords remaining - will be skipped in next global run")
         
         return jsonify({"success": True, "remaining_keywords": remaining_keywords})
     finally:
         db.close()
 
 @app.route('/api/keywords/<int:keyword_id>/toggle', methods=['POST'])
+@csrf.exempt
 @login_required
 def toggle_keyword(keyword_id):
     """Toggle keyword enabled status"""
     db = get_db()
     try:
-        query = scoped(db.query(Keyword), Keyword)
+        query = scoped(db.query(Keyword), Keyword, force_user_filter=True)
         keyword = query.filter(Keyword.id == keyword_id).first()
         
         if not keyword:
@@ -1408,33 +1514,31 @@ def get_monitor_jobs_history():
     return jsonify({"jobs": jobs})
 
 
-# ==================== Monitoring Scheduler (Per-User) ====================
+# ==================== Monitoring Scheduler (Global) ====================
 
-from scheduler import scheduler_manager
+from global_scheduler import global_scheduler
 
 @app.route('/api/monitor/status', methods=['GET'])
 @login_required
 def get_monitor_status():
-    """Get the current status of the monitoring scheduler for this user"""
+    """Get monitoring status for current user (backed by global scheduler)"""
     user_id = current_user.id
-    return jsonify(scheduler_manager.get_status(user_id))
+    return jsonify(global_scheduler.get_user_status(user_id))
 
 @app.route('/api/monitor/start', methods=['POST'])
 @csrf.exempt
 @login_required
 def start_monitoring_scheduler():
-    """Start the continuous monitoring scheduler for this user (runs every 10 minutes)"""
-    user_id = current_user.id
-    result = scheduler_manager.start(user_id)
+    """Start the global monitoring scheduler (admin action, benefits all users)"""
+    result = global_scheduler.start()
     return jsonify(result)
 
 @app.route('/api/monitor/stop', methods=['POST'])
 @csrf.exempt
 @login_required
 def stop_monitoring_scheduler():
-    """Stop the continuous monitoring scheduler for this user"""
-    user_id = current_user.id
-    result = scheduler_manager.stop(user_id)
+    """Stop the global monitoring scheduler (admin action)"""
+    result = global_scheduler.stop()
     return jsonify(result)
 
 # ==================== Monitoring (Manual) ====================
@@ -1710,18 +1814,23 @@ def get_sources_countries():
     try:
         from sqlalchemy import func
         
-        # Get all enabled countries from Country table
+        # Single query with GROUP BY - fixes N+1 query issue
+        source_counts = db.query(
+            Source.country_name,
+            func.count(Source.id).label('count')
+        ).filter(
+            Source.enabled == True
+        ).group_by(Source.country_name).all()
+        
+        # Convert to dict for fast lookup
+        count_map = {row[0]: row[1] for row in source_counts}
+        
+        # Get enabled countries and join with source counts
         countries = db.query(Country).filter(Country.enabled == True).all()
         
         result = []
         for country in countries:
-            # Count sources for this country
-            source_count = db.query(Source).filter(
-                Source.country_name == country.name_ar,
-                Source.enabled == True
-            ).count()
-            
-            # Only include countries that have sources
+            source_count = count_map.get(country.name_ar, 0)
             if source_count > 0:
                 result.append({
                     'name': country.name_ar,
@@ -1734,8 +1843,10 @@ def get_sources_countries():
         # Log for debugging
         if result:
             print(f"📰 Found {len(result)} countries with sources:")
-            for c in result:
+            for c in result[:5]:  # Only log top 5 to reduce noise
                 print(f"   • {c['name']}: {c['count']} sources")
+            if len(result) > 5:
+                print(f"   ... and {len(result) - 5} more countries")
         
         return jsonify({'countries': result})
     finally:
@@ -1892,8 +2003,9 @@ def export_and_reset():
     from datetime import datetime as dt
     import os
     
+    from io import BytesIO
+    
     db = get_db()
-    export_path = None
     user_id = current_user.id
     
     try:
@@ -1907,13 +2019,9 @@ def export_and_reset():
         
         print(f"   ✅ Found {article_count} articles")
         
-        # Step 2: Create Excel file
+        # Step 2: Create Excel file in memory (no filesystem — Render compatible)
         timestamp = dt.now().strftime('%Y-%m-%d_%H-%M-%S')
         filename = f"export_{timestamp}.xlsx"
-        export_path = os.path.join(os.getcwd(), 'exports', filename)
-        
-        # Create exports directory if it doesn't exist
-        os.makedirs(os.path.dirname(export_path), exist_ok=True)
         
         print(f"📝 Creating Excel file: {filename}")
         wb = openpyxl.Workbook()
@@ -1964,20 +2072,27 @@ def export_and_reset():
             adjusted_width = min(max_length + 2, 50)
             ws.column_dimensions[column_letter].width = adjusted_width
         
-        # Save workbook
-        wb.save(export_path)
-        print(f"   ✅ Excel file saved: {export_path}")
+        # Save workbook to memory buffer
+        buf = BytesIO()
+        wb.save(buf)
+        file_data = buf.getvalue()
+        buf.close()
+        print(f"   ✅ Excel file created in memory: {len(file_data)} bytes")
         
-        # Step 3: Verify export
-        wb_verify = openpyxl.load_workbook(export_path)
-        ws_verify = wb_verify.active
-        exported_rows = ws_verify.max_row - 1  # Minus header row
-        wb_verify.close()
-        
-        if exported_rows != article_count:
-            raise Exception(f"Export verification failed: expected {article_count} rows, got {exported_rows}")
-        
-        print(f"   ✅ Export verified: {exported_rows} rows")
+        # Step 3: Store in database as ExportRecord (uses existing download route)
+        rec = ExportRecord(
+            user_id=user_id,
+            filters_json=json.dumps({"type": "export_and_reset"}, ensure_ascii=False),
+            article_count=article_count,
+            filename=filename,
+            file_data=file_data,
+            file_size=len(file_data),
+            source_type='export_reset',
+        )
+        db.add(rec)
+        db.flush()  # Get rec.id before commit
+        export_id = rec.id
+        print(f"   ✅ Export record created: id={export_id}")
         
         # Step 4: Delete ONLY current user's data (atomic transaction)
         print(f"🗑️ Starting atomic delete transaction for user {user_id}...")
@@ -1993,26 +2108,17 @@ def export_and_reset():
         from translation_service import clear_all_caches
         clear_all_caches()
         
-        # Step 6: Return success with download link
+        # Step 6: Return success with correct download URL
         return jsonify({
             "success": True,
             "filename": filename,
             "article_count": article_count,
-            "download_url": f"/api/exports/download/{filename}"
+            "download_url": f"/api/exports/{export_id}/download"
         })
         
     except Exception as e:
         print(f"❌ Export & Reset failed: {str(e)}")
         db.rollback()
-        
-        # Clean up partial export file
-        if export_path and os.path.exists(export_path):
-            try:
-                os.remove(export_path)
-                print("   🧹 Cleaned up partial export file")
-            except:
-                pass
-        
         return jsonify({"error": f"Export failed: {str(e)}"}), 500
         
     finally:
@@ -2195,10 +2301,7 @@ def calculate_relevance_score(article_data, keywords):
     return min(score, 1.0)
 
 
-from flask import request, jsonify
-import os
 import requests
-from datetime import datetime as dt
 
 @app.route('/api/direct-search', methods=['GET'])
 def direct_search():
@@ -3026,6 +3129,117 @@ def external_headlines():
         db.close()
 
 
+# =============================================================================
+# DATA LIFECYCLE MANAGEMENT - Auto-cleanup every 5 days
+# =============================================================================
+
+DATA_RETENTION_DAYS = 5  # Delete all user data after 5 days
+
+def get_days_until_cleanup():
+    """Get the number of days until data cleanup"""
+    from models import SystemConfig
+    db = get_db()
+    try:
+        config = db.query(SystemConfig).filter(SystemConfig.key == 'last_cleanup_date').first()
+        if not config:
+            # First run - set cleanup date to now
+            config = SystemConfig(key='last_cleanup_date', value=datetime.utcnow().isoformat())
+            db.add(config)
+            db.commit()
+            return DATA_RETENTION_DAYS
+        
+        last_cleanup = datetime.fromisoformat(config.value)
+        days_passed = (datetime.utcnow() - last_cleanup).days
+        days_remaining = DATA_RETENTION_DAYS - days_passed
+        return max(0, days_remaining)
+    finally:
+        db.close()
+
+def check_and_run_cleanup():
+    """Check if cleanup is needed and run it if so"""
+    from models import SystemConfig
+    db = get_db()
+    try:
+        config = db.query(SystemConfig).filter(SystemConfig.key == 'last_cleanup_date').first()
+        if not config:
+            # First run - set cleanup date to now
+            config = SystemConfig(key='last_cleanup_date', value=datetime.utcnow().isoformat())
+            db.add(config)
+            db.commit()
+            print("[CLEANUP] ✅ Initialized cleanup tracker")
+            return False
+        
+        last_cleanup = datetime.fromisoformat(config.value)
+        days_passed = (datetime.utcnow() - last_cleanup).days
+        
+        if days_passed >= DATA_RETENTION_DAYS:
+            print(f"[CLEANUP] 🗑️ {days_passed} days passed - running cleanup...")
+            run_data_cleanup(db)
+            # Reset cleanup date
+            config.value = datetime.utcnow().isoformat()
+            config.updated_at = datetime.utcnow()
+            db.commit()
+            print("[CLEANUP] ✅ Cleanup complete, timer reset")
+            return True
+        else:
+            print(f"[CLEANUP] ℹ️ {days_passed} days since last cleanup ({DATA_RETENTION_DAYS - days_passed} days remaining)")
+            return False
+    except Exception as e:
+        print(f"[CLEANUP] ❌ Error: {e}")
+        return False
+    finally:
+        db.close()
+
+def run_data_cleanup(db):
+    """Delete all user data: articles, keywords, exports"""
+    from models import Article, Keyword, ExportRecord, MonitorJob
+    
+    # Count before deletion
+    article_count = db.query(Article).count()
+    keyword_count = db.query(Keyword).count()
+    export_count = db.query(ExportRecord).count()
+    job_count = db.query(MonitorJob).count()
+    
+    print(f"[CLEANUP] Deleting: {article_count} articles, {keyword_count} keywords, {export_count} exports, {job_count} jobs")
+    
+    # Delete all user data
+    db.query(Article).delete()
+    db.query(Keyword).delete()
+    db.query(ExportRecord).delete()
+    db.query(MonitorJob).delete()
+    db.commit()
+    
+    print(f"[CLEANUP] ✅ Deleted all user data")
+
+@app.route('/api/system/cleanup-status', methods=['GET'])
+def get_cleanup_status():
+    """Get data cleanup status - days remaining and warning flag"""
+    from models import SystemConfig
+    db = get_db()
+    try:
+        config = db.query(SystemConfig).filter(SystemConfig.key == 'last_cleanup_date').first()
+        if not config:
+            return jsonify({
+                'days_remaining': DATA_RETENTION_DAYS,
+                'show_warning': False,
+                'retention_days': DATA_RETENTION_DAYS
+            })
+        
+        last_cleanup = datetime.fromisoformat(config.value)
+        days_passed = (datetime.utcnow() - last_cleanup).days
+        days_remaining = max(0, DATA_RETENTION_DAYS - days_passed)
+        
+        return jsonify({
+            'days_remaining': days_remaining,
+            'show_warning': days_remaining <= 1,  # Show warning on day 4 (1 day remaining)
+            'retention_days': DATA_RETENTION_DAYS,
+            'last_cleanup': config.value
+        })
+    finally:
+        db.close()
+
+# =============================================================================
+
 def auto_initialize():
     """Auto-initialize database with admin user, countries, and sources on startup.
     
@@ -3056,6 +3270,26 @@ def auto_initialize():
                 conn.execute(text("ALTER TABLE sources ALTER COLUMN url TYPE VARCHAR(2000)"))
                 # Exports file_data for Render compatibility
                 conn.execute(text("ALTER TABLE exports ADD COLUMN IF NOT EXISTS file_data BYTEA"))
+                # Migrate articles unique constraint: url-only → (url, user_id)
+                result = conn.execute(text("""
+                    SELECT 1 FROM pg_constraint 
+                    WHERE conname = 'uq_article_url_user' AND conrelid = 'articles'::regclass
+                """))
+                if not result.fetchone():
+                    # Drop old unique on url alone (may have different names)
+                    conn.execute(text("""
+                        DO $$ BEGIN
+                            EXECUTE (SELECT string_agg('ALTER TABLE articles DROP CONSTRAINT ' || conname, '; ')
+                                     FROM pg_constraint
+                                     WHERE conrelid = 'articles'::regclass
+                                       AND contype = 'u'
+                                       AND array_length(conkey, 1) = 1);
+                        EXCEPTION WHEN OTHERS THEN NULL;
+                        END $$;
+                    """))
+                    conn.execute(text("DROP INDEX IF EXISTS ix_articles_url"))
+                    conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_article_url_user ON articles(url, user_id)"))
+                    print("[INIT] ✅ PostgreSQL articles unique constraint migrated to (url, user_id)")
                 conn.commit()
                 print("[INIT] ✅ PostgreSQL columns migrated")
             else:
@@ -3075,6 +3309,69 @@ def auto_initialize():
                     conn.execute(text("ALTER TABLE exports ADD COLUMN file_data BLOB"))
                     conn.commit()
                     print("[INIT] ✅ SQLite exports file_data column migrated")
+                
+                # Migrate articles unique constraint: url-only → (url, user_id)
+                # SQLite can't ALTER constraints, so we must recreate the table
+                result = conn.execute(text("PRAGMA index_list(articles)"))
+                indexes = [(row[1], row[2]) for row in result]
+                has_new_composite = False
+                needs_migration = False
+                for idx_name, idx_unique in indexes:
+                    if idx_unique:
+                        idx_info = conn.execute(text(f"PRAGMA index_info('{idx_name}')"))
+                        idx_cols = [r[2] for r in idx_info]
+                        if idx_cols == ['url']:
+                            needs_migration = True
+                        if set(idx_cols) == {'url', 'user_id'}:
+                            has_new_composite = True
+                
+                if needs_migration and not has_new_composite:
+                    print("[INIT] Migrating articles table: url unique → (url, user_id) composite...")
+                    # Get actual columns from existing table
+                    col_result = conn.execute(text("PRAGMA table_info(articles)"))
+                    old_cols = [row[1] for row in col_result]
+                    col_list = ', '.join(old_cols)
+                    
+                    conn.execute(text("ALTER TABLE articles RENAME TO _articles_old_migration"))
+                    # Recreate with same columns but composite unique instead of url-only unique
+                    col_defs = []
+                    for c in old_cols:
+                        if c == 'id':
+                            col_defs.append('id INTEGER PRIMARY KEY')
+                        elif c == 'country':
+                            col_defs.append('country VARCHAR(100) NOT NULL')
+                        elif c == 'source_name':
+                            col_defs.append('source_name VARCHAR(200) NOT NULL')
+                        elif c == 'url':
+                            col_defs.append('url VARCHAR(2000) NOT NULL')
+                        elif c == 'title_original':
+                            col_defs.append('title_original TEXT NOT NULL')
+                        elif c == 'user_id':
+                            col_defs.append('user_id INTEGER REFERENCES users(id)')
+                        elif c in ('published_at', 'fetched_at', 'created_at'):
+                            col_defs.append(f'{c} DATETIME')
+                        elif c in ('sentiment', 'sentiment_label', 'language', 'original_language'):
+                            col_defs.append(f'{c} VARCHAR(50)')
+                        elif c in ('keyword', 'keyword_original'):
+                            col_defs.append(f'{c} VARCHAR(200)')
+                        elif c == 'sentiment_score':
+                            col_defs.append(f'{c} VARCHAR(20)')
+                        elif c == 'source_id':
+                            col_defs.append(f'{c} INTEGER')
+                        else:
+                            col_defs.append(f'{c} TEXT')
+                    col_defs.append('UNIQUE(url, user_id)')
+                    create_sql = f"CREATE TABLE articles ({', '.join(col_defs)})"
+                    conn.execute(text(create_sql))
+                    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_articles_user_id ON articles(user_id)"))
+                    conn.execute(text(f"INSERT INTO articles ({col_list}) SELECT {col_list} FROM _articles_old_migration"))
+                    conn.execute(text("DROP TABLE _articles_old_migration"))
+                    conn.commit()
+                    print("[INIT] ✅ SQLite articles unique constraint migrated to (url, user_id)")
+                elif not has_new_composite:
+                    conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_article_url_user ON articles(url, user_id)"))
+                    conn.commit()
+                    print("[INIT] ✅ SQLite articles composite index created")
     except Exception as e:
         print(f"[INIT] ⚠️ Column migration note: {str(e)[:100]}")
     
@@ -3126,6 +3423,24 @@ def auto_initialize():
         traceback.print_exc()
     finally:
         db.close()
+    
+    # Check and run data cleanup if needed (5-day cycle)
+    check_and_run_cleanup()
+    
+    # Auto-start global scheduler if any user has keywords
+    from global_scheduler import global_scheduler
+    db2 = get_db()
+    try:
+        keyword_count = db2.query(Keyword).filter(Keyword.enabled == True).count()
+        if keyword_count > 0:
+            print(f"[INIT] 🚀 Auto-starting global scheduler ({keyword_count} active keywords)")
+            global_scheduler.start()
+        else:
+            print(f"[INIT] ℹ️ No active keywords - global scheduler will start when keywords are added")
+    except Exception as e:
+        print(f"[INIT] ⚠️ Could not auto-start scheduler: {e}")
+    finally:
+        db2.close()
 
 
 # Run auto-initialization when module loads (for Gunicorn)

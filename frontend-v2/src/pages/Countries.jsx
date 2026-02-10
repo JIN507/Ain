@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Globe, Plus, Edit2, Trash2, CheckCircle, XCircle, Loader2, AlertTriangle, Search, ChevronDown, ChevronUp } from 'lucide-react'
 import { apiFetch } from '../apiClient'
 
-export default function Countries() {
+export default function Countries({ isAdmin = false }) {
   const [countries, setCountries] = useState([])
   const [sources, setSources] = useState([])
   const [editingSource, setEditingSource] = useState(null)
@@ -213,60 +213,64 @@ export default function Countries() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900">الدول</h1>
-          <p className="text-gray-600 mt-1">إدارة مصادر الأخبار حسب الدولة</p>
+          <h1 className="text-2xl font-bold text-slate-900">الدول</h1>
+          <p className="text-sm text-slate-500 mt-0.5">إدارة مصادر الأخبار حسب الدولة</p>
         </div>
+{isAdmin && (
         <button className="btn" onClick={() => setAddingSource(true)}>
-          <Plus className="w-5 h-5" />
-          إضافة مصدر مخصص
+          <Plus className="w-4 h-4" />
+          إضافة مصدر
         </button>
+        )}
       </div>
 
       {/* Search Bar */}
       <div className="card p-4">
         <div className="relative">
-          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="ابحث عن مصدر معين (الاسم، الرابط، أو الدولة)..."
-            className="w-full pr-12 pl-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+            placeholder="ابحث عن مصدر..."
+            className="input !pr-10"
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
             >
               ✕
             </button>
           )}
         </div>
         {searchQuery && (
-          <div className="mt-2 text-sm text-gray-600">
-            🔍 تم العثور على {filteredSources.length} مصدر من أصل {sources.length}
+          <div className="mt-2 text-[11px] text-slate-400">
+            {filteredSources.length} مصدر من {sources.length}
           </div>
         )}
       </div>
 
       {/* Countries Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {countries.map((country) => {
           const countrySources = sources.filter(s => s.country_name === country.name_ar)
           
           return (
             <div
               key={country.id}
-              className={`card p-6 transition-all duration-300 ${
-                country.enabled ? 'border-emerald-400' : 'border-gray-300'
-              }`}
+              className="card p-5 transition-all duration-300"
             >
               {/* Header */}
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <Globe className="w-6 h-6 text-emerald-600" />
-                  <h3 className="text-xl font-bold text-gray-900">{country.name_ar}</h3>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+                    style={{ background: country.enabled ? 'rgba(15,118,110,0.08)' : 'rgba(0,0,0,0.04)' }}>
+                    <Globe className="w-4 h-4" style={{ color: country.enabled ? '#0f766e' : '#94a3b8' }} />
+                  </div>
+                  <h3 className="text-base font-bold text-slate-900">{country.name_ar}</h3>
                 </div>
+{isAdmin ? (
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"
@@ -276,11 +280,16 @@ export default function Countries() {
                   />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-emerald-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
                 </label>
+                ) : (
+                  <span className={`text-xs font-medium px-2 py-1 rounded-lg ${country.enabled ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                    {country.enabled ? 'مفعّل' : 'معطّل'}
+                  </span>
+                )}
               </div>
 
               {/* Source Count */}
               <div className="mb-3">
-                <span className="text-sm text-gray-600">
+                <span className="text-xs text-slate-400">
                   {countrySources.length} مصدر
                 </span>
               </div>
@@ -288,11 +297,11 @@ export default function Countries() {
               {/* Sources Preview */}
               <div className="space-y-2">
                 {(expandedCountries[country.id] ? countrySources : countrySources.slice(0, 3)).map((source) => (
-                  <div key={source.id} className="flex items-center gap-2 text-sm text-gray-700">
-                    <span className={source.enabled ? "text-emerald-600" : "text-gray-400"}>📡</span>
+                  <div key={source.id} className="flex items-center gap-2 text-xs text-slate-600">
+                    <span className={`w-1 h-1 rounded-full flex-shrink-0 ${source.enabled ? 'bg-teal-500' : 'bg-slate-300'}`}></span>
                     <span className="truncate flex-1">{source.name}</span>
                     {!source.enabled && (
-                      <span className="text-xs text-gray-400">(معطل)</span>
+                      <span className="text-[10px] text-slate-400">(معطل)</span>
                     )}
                   </div>
                 ))}
@@ -302,29 +311,15 @@ export default function Countries() {
               {countrySources.length > 3 && (
                 <button
                   onClick={() => toggleCountryExpanded(country.id)}
-                  className="w-full mt-3 px-3 py-2 text-sm font-semibold text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-lg transition-all flex items-center justify-center gap-2"
+                  className="w-full mt-2 py-1.5 text-[11px] font-medium rounded-lg transition-all flex items-center justify-center gap-1"
+                  style={{ color: '#0f766e' }}
                 >
                   {expandedCountries[country.id] ? (
-                    <>
-                      <ChevronUp className="w-4 h-4" />
-                      اخفِ المصادر
-                    </>
+                    <>اخفِ <ChevronUp className="w-3 h-3" /></>
                   ) : (
-                    <>
-                      <ChevronDown className="w-4 h-4" />
-                      اظهر المزيد ({countrySources.length - 3} مصدر إضافي)
-                    </>
+                    <>المزيد ({countrySources.length - 3}) <ChevronDown className="w-3 h-3" /></>
                   )}
                 </button>
-              )}
-
-              {/* Status Badge */}
-              {country.enabled && (
-                <div className="mt-3">
-                  <span className="badge bg-green-100 text-green-800 border border-green-200">
-                    مفعل
-                  </span>
-                </div>
               )}
             </div>
           )
@@ -382,48 +377,56 @@ export default function Countries() {
 
                 {/* Action Buttons */}
                 <div className="flex items-center gap-2">
-                  {/* Toggle Switch */}
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={source.enabled}
-                      onChange={() => toggleSource(source.id)}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-emerald-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-                  </label>
+                  {isAdmin ? (
+                    <>
+                      {/* Toggle Switch */}
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={source.enabled}
+                          onChange={() => toggleSource(source.id)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-emerald-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                      </label>
 
-                  {/* Test Button */}
-                  <button
-                    onClick={() => testSource(source.id, source.url)}
-                    disabled={testingSource === source.id}
-                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50"
-                    title="اختبار المصدر"
-                  >
-                    {testingSource === source.id ? (
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                    ) : (
-                      <CheckCircle className="w-5 h-5" />
-                    )}
-                  </button>
+                      {/* Test Button */}
+                      <button
+                        onClick={() => testSource(source.id, source.url)}
+                        disabled={testingSource === source.id}
+                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50"
+                        title="اختبار المصدر"
+                      >
+                        {testingSource === source.id ? (
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : (
+                          <CheckCircle className="w-5 h-5" />
+                        )}
+                      </button>
 
-                  {/* Edit Button */}
-                  <button
-                    onClick={() => setEditingSource(source)}
-                    className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                    title="تعديل المصدر"
-                  >
-                    <Edit2 className="w-5 h-5" />
-                  </button>
+                      {/* Edit Button */}
+                      <button
+                        onClick={() => setEditingSource(source)}
+                        className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                        title="تعديل المصدر"
+                      >
+                        <Edit2 className="w-5 h-5" />
+                      </button>
 
-                  {/* Delete Button */}
-                  <button
-                    onClick={() => deleteSource(source.id)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    title="حذف المصدر"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
+                      {/* Delete Button */}
+                      <button
+                        onClick={() => deleteSource(source.id)}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="حذف المصدر"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    </>
+                  ) : (
+                    <span className={`text-xs font-medium px-2 py-1 rounded-lg ${source.enabled ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                      {source.enabled ? 'مفعّل' : 'معطّل'}
+                    </span>
+                  )}
                 </div>
               </div>
             ))}
@@ -432,7 +435,7 @@ export default function Countries() {
       )}
 
       {/* Edit Source Modal */}
-      {editingSource && (
+      {isAdmin && editingSource && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setEditingSource(null)}>
           <div className="card max-w-2xl w-full p-6" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-2xl font-bold text-gray-900 mb-4">تعديل المصدر</h3>
@@ -511,7 +514,7 @@ export default function Countries() {
       )}
 
       {/* Add Source Modal */}
-      {addingSource && (
+      {isAdmin && addingSource && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setAddingSource(false)}>
           <div className="card max-w-2xl w-full p-6" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-2xl font-bold text-gray-900 mb-4">إضافة مصدر جديد</h3>

@@ -328,76 +328,31 @@ export default function TopHeadlines() {
 </html>
       `
 
-      // Create hidden iframe for PDF generation (maintains full document context)
-      const pdfIframe = document.createElement('iframe')
-      pdfIframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:210mm;height:297mm;border:none;'
-      document.body.appendChild(pdfIframe)
-      
-      const iframeDoc = pdfIframe.contentDocument || pdfIframe.contentWindow?.document
-      if (iframeDoc) {
-        iframeDoc.open()
-        iframeDoc.write(printContent)
-        iframeDoc.close()
-      }
-      
-      // Open print preview window
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+      const filename = `تقرير_أهم_العناوين_${selectedCountry}_${timestamp}.html`
+
+      // Instant preview for user
       const printWindow = window.open('', '_blank')
       if (printWindow) {
         printWindow.document.write(printContent)
         printWindow.document.close()
-        setTimeout(() => {
-          try { printWindow.print() } catch (e) { console.error('Print error:', e) }
-        }, 500)
       }
-      
-      // Generate PDF from iframe
+
+      // Store the SAME HTML content on the server
+      const htmlBlob = new Blob([printContent], { type: 'text/html;charset=utf-8' })
+      const formData = new FormData()
+      formData.append('file', htmlBlob, filename)
+      formData.append('filters', JSON.stringify({ country: selectedCountry, type: 'top_headlines' }))
+      formData.append('article_count', totalArticles.toString())
+      formData.append('source_type', 'top_headlines')
+
       try {
-        const html2pdf = (await import('html2pdf.js')).default
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-        const filename = `تقرير_أهم_العناوين_${selectedCountry}_${timestamp}.pdf`
-        
-        // Wait for content to render
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        
-        if (iframeDoc && iframeDoc.body) {
-          const pdfBlob = await html2pdf()
-            .set({
-              margin: [10, 10, 10, 10],
-              filename: filename,
-              image: { type: 'jpeg', quality: 0.98 },
-              html2canvas: { 
-                scale: 2, 
-                useCORS: true,
-                logging: false,
-                allowTaint: true,
-                backgroundColor: '#ffffff',
-                windowWidth: pdfIframe.contentWindow?.innerWidth || 794
-              },
-              jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-              pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-            })
-            .from(iframeDoc.body)
-            .outputPdf('blob')
-          
-          // Upload PDF to server
-          const formData = new FormData()
-          formData.append('file', pdfBlob, filename)
-          formData.append('filters', JSON.stringify({ country: selectedCountry, type: 'top_headlines' }))
-          formData.append('article_count', totalArticles.toString())
-          formData.append('source_type', 'top_headlines')
-          
-          await apiFetch('/api/exports', {
-            method: 'POST',
-            body: formData,
-          })
-        }
+        await apiFetch('/api/exports', {
+          method: 'POST',
+          body: formData,
+        })
       } catch (e) {
         console.error('Failed to save export:', e)
-      } finally {
-        // Cleanup
-        if (pdfIframe.parentNode) {
-          pdfIframe.parentNode.removeChild(pdfIframe)
-        }
       }
     } catch (error) {
       console.error('Error exporting headlines PDF:', error)
@@ -410,82 +365,52 @@ export default function TopHeadlines() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="card p-6">
-        <div className="flex items-center justify-between gap-3 mb-2">
-          <div className="flex items-center gap-3">
-            <Newspaper className="w-8 h-8 text-emerald-600" />
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                أهم العناوين
-              </h1>
-              <p className="text-gray-600">
-                آخر الأخبار من المصادر المفضلة لديك في كل دولة
-              </p>
-            </div>
-          </div>
-          {headlines.length > 0 && (
-            <button
-              onClick={exportToPDF}
-              disabled={exporting}
-              className="btn disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {exporting ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  جاري التصدير...
-                </>
-              ) : (
-                <>
-                  <Download className="w-5 h-5" />
-                  تصدير PDF
-                </>
-              )}
-            </button>
-          )}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">أهم العناوين</h1>
+          <p className="text-sm text-slate-500 mt-0.5">آخر الأخبار من المصادر في كل دولة</p>
         </div>
+        {headlines.length > 0 && (
+          <button onClick={exportToPDF} disabled={exporting} className="btn">
+            {exporting ? <><Loader2 className="w-4 h-4 animate-spin" /> جاري...</> : <><Download className="w-4 h-4" /> تصدير PDF</>}
+          </button>
+        )}
       </div>
       
       {/* Country Selector */}
-      <div className="card p-6">
-        <label className="block text-sm font-medium text-gray-700 mb-3">
-          اختر الدولة {countries.length > 0 && `(${countries.length} دولة متاحة)`}
+      <div className="card p-5">
+        <label className="block text-xs font-medium text-slate-500 mb-2">
+          اختر الدولة {countries.length > 0 && `(${countries.length} دولة)`}
         </label>
-        
-        {countries.length === 0 && !error && (
-          <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
-            ⚠️ جاري تحميل الدول...
-          </div>
-        )}
         
         <div className="flex gap-3 items-center">
           <div className="flex-1 relative">
             <select
               value={selectedCountry}
               onChange={(e) => setSelectedCountry(e.target.value)}
-              className="input w-full appearance-none"
+              className="input w-full"
               disabled={countries.length === 0}
             >
-              <option value="">-- اختر دولة --</option>
+              <option value="">اختر دولة</option>
               {countries.map((country) => (
                 <option key={country.name} value={country.name}>
                   {country.name} ({country.count} مصدر)
                 </option>
               ))}
             </select>
-            <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
           </div>
           
           <button
             onClick={fetchHeadlines}
             disabled={loading || !selectedCountry}
-            className="btn disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn"
           >
-            {loading ? 'جاري التحميل...' : 'تحديث'}
+            {loading ? 'جاري...' : 'تحديث'}
           </button>
         </div>
         
         {lastFetch && (
-          <div className="mt-3 text-xs text-gray-500">
+          <div className="mt-2 text-[11px] text-slate-400">
             آخر تحديث: {formatLastFetch()}
           </div>
         )}

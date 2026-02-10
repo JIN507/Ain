@@ -289,12 +289,13 @@ def save_matched_articles_sync(
         
         print(f"      🔄 Translation: {translation_status}")
         
-        # STRICT duplicate check: ONLY URL-based (no fuzzy matching!)
-        # Rule: If URL exists in database → skip (true duplicate)
-        #       If URL is new → save (unique article, even if title similar)
-        url_duplicate = db.query(Article).filter(
-            Article.url == article['url']
-        ).first()
+        # STRICT duplicate check: URL + user_id (composite unique constraint)
+        # Rule: If URL exists for this user → skip (true duplicate)
+        #       If URL is new for this user → save
+        dup_filter = [Article.url == article['url']]
+        if user_id is not None:
+            dup_filter.append(Article.user_id == user_id)
+        url_duplicate = db.query(Article).filter(*dup_filter).first()
         
         if url_duplicate:
             # True duplicate - same URL already in database
@@ -363,6 +364,7 @@ def save_matched_articles_sync(
             title_ar=title_ar,
             summary_ar=summary_ar,
             arabic_text=f"{title_ar} {summary_ar}",
+            keyword=primary_keyword,  # Arabic keyword for filtering
             keyword_original=primary_keyword,
             keywords_translations=keywords_info,
             sentiment_label="محايد",

@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { FileText, Download, Loader2, AlertCircle, RotateCcw } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { FileText, Download, Loader2, AlertCircle, RotateCcw, Radio, AlertTriangle } from 'lucide-react'
 import StatsOverview from '../components/StatsOverview'
 import FilterBar from '../components/FilterBar'
 import ArticleCard from '../components/ArticleCard'
@@ -13,12 +13,16 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
   const [resetResult, setResetResult] = useState(null)
   const [articles, setArticles] = useState([])
   const [stats, setStats] = useState({ total: 0, positive: 0, negative: 0, neutral: 0 })
+  const [monitorStatus, setMonitorStatus] = useState(null)
+  const [cleanupStatus, setCleanupStatus] = useState(null)
+  const prevArticleCount = useRef(0)
   // Initialize filters with keyword if provided from navigation
   const [filters, setFilters] = useState(() => 
     initialKeywordFilter ? { keyword: initialKeywordFilter } : {}
   )
   const [countries, setCountries] = useState([])
   const [keywords, setKeywords] = useState([])
+  const [keywordsLoaded, setKeywordsLoaded] = useState(false)
 
   // Clear the navigation state after initial render (to allow re-navigation)
   useEffect(() => {
@@ -33,7 +37,48 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
     loadArticles()
     loadStats()
     loadKeywords()
+    loadCleanupStatus()
   }, [filters])
+
+  // Load cleanup status to show warning
+  const loadCleanupStatus = async () => {
+    try {
+      const res = await apiFetch('/api/system/cleanup-status')
+      const data = await res.json()
+      setCleanupStatus(data)
+    } catch (error) {
+      console.error('Error loading cleanup status:', error)
+    }
+  }
+
+  // Load monitor status only when keywords exist, clear when none
+  useEffect(() => {
+    if (keywordsLoaded) {
+      if (keywords.length > 0) {
+        loadMonitorStatus()
+      } else {
+        // No keywords = clear monitor status completely
+        setMonitorStatus(null)
+      }
+    }
+  }, [keywordsLoaded, keywords.length])
+
+  // Poll monitor status every 30 seconds (only if keywords exist)
+  useEffect(() => {
+    // Wait until keywords are loaded, then check if any exist
+    if (!keywordsLoaded) return
+    if (keywords.length === 0) return // Don't poll if no keywords
+    
+    const interval = setInterval(() => {
+      loadMonitorStatus()
+      // If monitoring is executing, also refresh articles/stats
+      if (monitorStatus?.executing) {
+        loadArticles()
+        loadStats()
+      }
+    }, 30000)
+    return () => clearInterval(interval)
+  }, [keywordsLoaded, keywords.length, monitorStatus?.executing])
 
   // Load countries dynamically whenever articles change
   useEffect(() => {
@@ -61,6 +106,18 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
       setStats(data)
     } catch (error) {
       console.error('Error loading stats:', error)
+    }
+  }
+
+  const loadMonitorStatus = async () => {
+    try {
+      const res = await apiFetch('/api/monitor/status')
+      if (res.ok) {
+        const data = await res.json()
+        setMonitorStatus(data)
+      }
+    } catch (error) {
+      console.error('Error loading monitor status:', error)
     }
   }
 
@@ -100,8 +157,10 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
       const res = await apiFetch('/api/keywords')
       const data = await res.json()
       setKeywords(data)
+      setKeywordsLoaded(true)
     } catch (error) {
       console.error('Error loading keywords:', error)
+      setKeywordsLoaded(true)
     }
   }
 
@@ -128,8 +187,24 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
       const data = await res.json()
       setResetResult(data)
       
+      // Download the file via apiFetch (ensures auth cookies are sent)
       if (data.download_url) {
-        window.location.href = data.download_url
+        try {
+          const dlRes = await apiFetch(data.download_url)
+          if (dlRes.ok) {
+            const blob = await dlRes.blob()
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = data.filename || 'export.xlsx'
+            document.body.appendChild(a)
+            a.click()
+            a.remove()
+            URL.revokeObjectURL(url)
+          }
+        } catch (dlErr) {
+          console.error('Download failed:', dlErr)
+        }
       }
 
       setTimeout(() => {
@@ -649,76 +724,31 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
 </html>
       `
       
-      // Create hidden iframe for PDF generation (maintains full document context)
-      const pdfIframe = document.createElement('iframe')
-      pdfIframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:210mm;height:297mm;border:none;'
-      document.body.appendChild(pdfIframe)
-      
-      const iframeDoc = pdfIframe.contentDocument || pdfIframe.contentWindow?.document
-      if (iframeDoc) {
-        iframeDoc.open()
-        iframeDoc.write(printContent)
-        iframeDoc.close()
-      }
-      
-      // Open print preview window for user to review
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+      const filename = `تقرير_أخبار_عين_${timestamp}.html`
+
+      // Instant preview for user (no freezing, renders perfectly)
       const printWindow = window.open('', '_blank')
       if (printWindow) {
         printWindow.document.write(printContent)
         printWindow.document.close()
-        setTimeout(() => {
-          try { printWindow.print() } catch (e) { console.error('Print error:', e) }
-        }, 500)
       }
-      
-      // Generate PDF from iframe
+
+      // Store the SAME HTML content on the server
+      const htmlBlob = new Blob([printContent], { type: 'text/html;charset=utf-8' })
+      const formData = new FormData()
+      formData.append('file', htmlBlob, filename)
+      formData.append('filters', JSON.stringify(filters))
+      formData.append('article_count', articles.length.toString())
+      formData.append('source_type', 'dashboard')
+
       try {
-        const html2pdf = (await import('html2pdf.js')).default
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-        const filename = `تقرير_أخبار_عين_${timestamp}.pdf`
-        
-        // Wait for content to render
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        
-        if (iframeDoc && iframeDoc.body) {
-          const pdfBlob = await html2pdf()
-            .set({
-              margin: [10, 10, 10, 10],
-              filename: filename,
-              image: { type: 'jpeg', quality: 0.98 },
-              html2canvas: { 
-                scale: 2, 
-                useCORS: true,
-                logging: false,
-                allowTaint: true,
-                backgroundColor: '#ffffff',
-                windowWidth: pdfIframe.contentWindow?.innerWidth || 794
-              },
-              jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-              pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-            })
-            .from(iframeDoc.body)
-            .outputPdf('blob')
-          
-          // Upload PDF to server with user context
-          const formData = new FormData()
-          formData.append('file', pdfBlob, filename)
-          formData.append('filters', JSON.stringify(filters))
-          formData.append('article_count', articles.length.toString())
-          formData.append('source_type', 'dashboard')
-          
-          await apiFetch('/api/exports', {
-            method: 'POST',
-            body: formData,
-          })
-        }
+        await apiFetch('/api/exports', {
+          method: 'POST',
+          body: formData,
+        })
       } catch (e) {
         console.error('Failed to save export:', e)
-      } finally {
-        // Cleanup
-        if (pdfIframe.parentNode) {
-          pdfIframe.parentNode.removeChild(pdfIframe)
-        }
       }
 
     } catch (error) {
@@ -730,35 +760,82 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
+      {/* Monitoring Status Indicator */}
+      {keywords.length === 0 ? (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm"
+          style={{ background: 'rgba(234,88,12,0.06)', color: '#c2410c' }}>
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          <span className="font-medium">أضف كلمة مفتاحية واحدة على الأقل لبدء المراقبة</span>
+        </div>
+      ) : monitorStatus && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm"
+          style={{
+            background: monitorStatus.executing ? 'rgba(20,184,166,0.06)' : 'rgba(0,0,0,0.02)',
+            color: monitorStatus.executing ? '#0f766e' : '#64748b',
+          }}>
+          {monitorStatus.executing ? (
+            <>
+              <div className="relative">
+                <Radio className="w-4 h-4" />
+                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-teal-500 rounded-full animate-ping" />
+              </div>
+              <span className="font-medium">جاري جلب الأخبار...</span>
+            </>
+          ) : (
+            <>
+              <Radio className="w-4 h-4" />
+              <span>
+                المراقبة التلقائية كل ساعة
+                {monitorStatus.next_run && (
+                  <> · القادم: {new Date(monitorStatus.next_run).toLocaleTimeString('ar-EG')}</>
+                )}
+              </span>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Data Cleanup Warning */}
+      {cleanupStatus?.show_warning && (
+        <div className="flex items-center gap-3 px-4 py-3.5 rounded-xl"
+          style={{ background: 'rgba(225,29,72,0.06)' }}>
+          <AlertTriangle className="w-5 h-5 text-rose-600 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-rose-700">سيتم حذف جميع البيانات غداً</p>
+            <p className="text-xs text-rose-500 mt-0.5">
+              يتم حذف البيانات كل {cleanupStatus.retention_days} أيام. صدّر البيانات المهمة الآن.
+            </p>
+          </div>
+          <span className="text-lg font-bold text-rose-600 px-3 py-1 rounded-lg"
+            style={{ background: 'rgba(225,29,72,0.08)' }}>
+            {cleanupStatus.days_remaining} يوم
+          </span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900">الخلاصة</h1>
-          <p className="text-gray-600 mt-1">جميع الأخبار المراقبة</p>
+          <h1 className="text-2xl font-bold text-slate-900">الخلاصة</h1>
+          <p className="text-sm text-slate-500 mt-0.5">جميع الأخبار المرصودة</p>
         </div>
         {articles.length > 0 && (
           <button 
             onClick={exportToPDF}
             disabled={exporting}
-            className="btn disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn"
           >
             {exporting ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                جاري التصدير...
-              </>
+              <><Loader2 className="w-4 h-4 animate-spin" /> جاري التصدير...</>
             ) : (
-              <>
-                <Download className="w-5 h-5" />
-                تصدير PDF
-              </>
+              <><Download className="w-4 h-4" /> تصدير PDF</>
             )}
           </button>
         )}
       </div>
 
       {/* Stats */}
-      <StatsOverview stats={stats} />
+      <StatsOverview stats={stats} keywordCount={keywords.length} />
 
       {/* Filters */}
       <FilterBar 
@@ -773,13 +850,15 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
       {loading ? (
         <Loader text="جاري تحميل الأخبار..." />
       ) : articles.length === 0 ? (
-        <div className="card p-12 text-center">
-          <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-xl font-bold text-gray-900 mb-2">لا توجد أخبار</h3>
-          <p className="text-gray-600">اذهب إلى الإعدادات لتشغيل المراقبة</p>
+        <div className="card p-16 text-center">
+          <div className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.04)' }}>
+            <FileText className="w-7 h-7 text-slate-300" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-900 mb-1">لا توجد أخبار</h3>
+          <p className="text-sm text-slate-400">أضف كلمات مفتاحية لبدء الرصد التلقائي</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[...articles]
             .sort((a, b) => {
               const sortBy = filters.sortBy || 'newest'
@@ -798,47 +877,39 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
 
       {/* Reset Section */}
       {articles.length > 0 && (
-        <div className="card p-6 border-2 border-orange-200">
-          <div className="flex items-start gap-3 mb-4">
-            <AlertCircle className="w-6 h-6 text-orange-600 mt-0.5 flex-shrink-0" />
-            <div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">إعادة تهيئة النظام</h3>
-              <p className="text-sm text-gray-600">
-                تصدير جميع الأخبار إلى ملف Excel ثم حذف جميع البيانات والكلمات المفتاحية
-              </p>
+        <div className="card p-5" style={{ borderColor: 'rgba(234,88,12,0.15)' }}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(234,88,12,0.08)' }}>
+                <RotateCcw className="w-4 h-4" style={{ color: '#ea580c' }} />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900">إعادة تهيئة النظام</h3>
+                <p className="text-xs text-slate-400">تصدير Excel ثم حذف جميع البيانات</p>
+              </div>
             </div>
+            <button
+              onClick={exportAndReset}
+              disabled={resetting}
+              className="btn-outline !text-xs !px-4 !py-2"
+              style={{ color: '#ea580c', borderColor: 'rgba(234,88,12,0.25)' }}
+            >
+              {resetting ? (
+                <><Loader2 className="w-3.5 h-3.5 animate-spin" /> جاري...</>
+              ) : (
+                'حفظ وإعادة تهيئة'
+              )}
+            </button>
           </div>
 
-          <button
-            onClick={exportAndReset}
-            disabled={resetting}
-            className="btn bg-orange-600 hover:bg-orange-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {resetting ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                جاري التصدير وإعادة التهيئة...
-              </>
-            ) : (
-              <>
-                <RotateCcw className="w-5 h-5" />
-                حفظ البيانات وإعادة تهيئة
-              </>
-            )}
-          </button>
-
           {resetResult && !resetResult.error && (
-            <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
-              <p className="text-green-800 font-semibold">✅ تم التصدير وإعادة التهيئة بنجاح!</p>
-              <p className="text-sm text-green-700 mt-1">
-                تم تصدير {resetResult.article_count} مقالة إلى {resetResult.filename}
-              </p>
+            <div className="mt-3 rounded-xl px-4 py-3 text-sm" style={{ background: 'rgba(20,184,166,0.06)', color: '#0f766e' }}>
+              تم تصدير {resetResult.article_count} مقالة بنجاح
             </div>
           )}
-
           {resetResult && resetResult.error && (
-            <div className="mt-4 p-4 bg-red-50 rounded-lg border border-red-200">
-              <p className="text-red-800">❌ {resetResult.error}</p>
+            <div className="mt-3 rounded-xl px-4 py-3 text-sm" style={{ background: 'rgba(225,29,72,0.06)', color: '#e11d48' }}>
+              {resetResult.error}
             </div>
           )}
         </div>

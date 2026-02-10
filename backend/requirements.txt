@@ -25,5 +25,8 @@ email-validator==2.1.0.post1
 Flask-Login==0.6.3
 Flask-WTF==1.2.1
 
+# Production server
+gunicorn==21.2.0
+
 # All dependencies pinned for reproducibility
 # Note: OpenAI removed - using Google Translate instead

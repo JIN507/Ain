@@ -116,123 +116,84 @@ export default function Admin() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900">لوحة الإدارة</h1>
-          <p className="text-gray-600 mt-1">إدارة المستخدمين وصلاحيات الوصول</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-slate-900">لوحة الإدارة</h1>
+        <p className="text-sm text-slate-500 mt-0.5">إدارة المستخدمين وصلاحيات الوصول</p>
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
+        <div className="rounded-xl px-4 py-3 text-sm" style={{ background: 'rgba(225,29,72,0.06)', color: '#e11d48' }}>
           {error}
         </div>
       )}
 
       {/* Create user */}
-      <div className="card p-4 space-y-4">
-        <h2 className="text-lg font-semibold text-gray-900">إضافة مستخدم جديد</h2>
+      <div className="card p-5 space-y-4">
+        <h2 className="text-sm font-semibold text-slate-900">إضافة مستخدم جديد</h2>
         <form onSubmit={handleCreateUser} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">الاسم</label>
-            <input
-              type="text"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            />
+            <label className="block text-[11px] font-medium text-slate-500 mb-1">الاسم</label>
+            <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">اسم المستخدم</label>
-            <input
-              type="text"
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            />
+            <label className="block text-[11px] font-medium text-slate-500 mb-1">اسم المستخدم</label>
+            <input type="text" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="input" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">الدور</label>
-            <select
-              value={form.role}
-              onChange={(e) => setForm({ ...form, role: e.target.value })}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
-            >
+            <label className="block text-[11px] font-medium text-slate-500 mb-1">الدور</label>
+            <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="input">
               <option value="USER">مستخدم</option>
               <option value="ADMIN">مسؤول</option>
             </select>
           </div>
           <div className="flex flex-col gap-2 md:flex-row md:items-end">
             <div className="flex-1">
-              <label className="block text-xs font-medium text-gray-700 mb-1">كلمة المرور المبدئية</label>
-              <input
-                type="password"
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                placeholder="اتركها فارغة لاستخدام 0000"
-              />
+              <label className="block text-[11px] font-medium text-slate-500 mb-1">كلمة المرور</label>
+              <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })}
+                className="input" placeholder="اتركها فارغة لـ 0000" />
             </div>
-            <button
-              type="submit"
-              disabled={creating}
-              className="md:w-32 h-10 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold mt-2 md:mt-0 disabled:opacity-60"
-            >
-              {creating ? 'جاري الإضافة...' : 'إضافة'}
+            <button type="submit" disabled={creating} className="btn !py-2.5 mt-2 md:mt-0">
+              {creating ? 'جاري...' : 'إضافة'}
             </button>
           </div>
         </form>
       </div>
 
       {/* Users table */}
-      <div className="card p-4 overflow-x-auto">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">جميع المستخدمين</h2>
+      <div className="card p-5 overflow-x-auto">
+        <h2 className="text-sm font-semibold text-slate-900 mb-4">المستخدمون</h2>
         {loading ? (
-          <div className="text-sm text-gray-500">جاري التحميل...</div>
+          <div className="text-xs text-slate-400 py-4">جاري التحميل...</div>
         ) : users.length === 0 ? (
-          <div className="text-sm text-gray-500">لا يوجد مستخدمون حتى الآن</div>
+          <div className="text-xs text-slate-400 py-4">لا يوجد مستخدمون</div>
         ) : (
-          <table className="min-w-full text-sm">
+          <table className="min-w-full text-xs">
             <thead>
-              <tr className="border-b border-gray-200 bg-gray-50">
-                <th className="py-2 px-3 text-right font-semibold text-gray-700">الاسم</th>
-                <th className="py-2 px-3 text-right font-semibold text-gray-700">اسم المستخدم</th>
-                <th className="py-2 px-3 text-right font-semibold text-gray-700">الدور</th>
-                <th className="py-2 px-3 text-right font-semibold text-gray-700">الحالة</th>
-                <th className="py-2 px-3 text-right font-semibold text-gray-700">إجراءات</th>
+              <tr style={{ borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+                <th className="py-2.5 px-3 text-right font-semibold text-slate-500">الاسم</th>
+                <th className="py-2.5 px-3 text-right font-semibold text-slate-500">المستخدم</th>
+                <th className="py-2.5 px-3 text-right font-semibold text-slate-500">الدور</th>
+                <th className="py-2.5 px-3 text-right font-semibold text-slate-500">الحالة</th>
+                <th className="py-2.5 px-3 text-right font-semibold text-slate-500">إجراءات</th>
               </tr>
             </thead>
             <tbody>
               {users.map((u) => (
-                <tr key={u.id} className="border-b border-gray-100 hover:bg-gray-50">
+                <tr key={u.id} style={{ borderBottom: '1px solid rgba(0,0,0,0.03)' }} className="hover:bg-slate-50/50">
                   <td className="py-2 px-3">
-                    <input
-                      type="text"
-                      defaultValue={u.name || ''}
-                      className="w-full bg-transparent border border-transparent hover:border-gray-200 rounded px-2 py-1 text-xs"
-                      onBlur={(e) =>
-                        e.target.value !== (u.name || '') &&
-                        handleChangeUser(u.id, { name: e.target.value })
-                      }
-                    />
+                    <input type="text" defaultValue={u.name || ''}
+                      className="w-full bg-transparent border border-transparent hover:border-slate-200 rounded-lg px-2 py-1 text-xs transition"
+                      onBlur={(e) => e.target.value !== (u.name || '') && handleChangeUser(u.id, { name: e.target.value })} />
                   </td>
                   <td className="py-2 px-3">
-                    <input
-                      type="email"
-                      defaultValue={u.email}
-                      className="w-full bg-transparent border border-transparent hover:border-gray-200 rounded px-2 py-1 text-xs"
-                      onBlur={(e) =>
-                        e.target.value !== u.email &&
-                        handleChangeUser(u.id, { email: e.target.value })
-                      }
-                    />
+                    <input type="email" defaultValue={u.email}
+                      className="w-full bg-transparent border border-transparent hover:border-slate-200 rounded-lg px-2 py-1 text-xs transition"
+                      onBlur={(e) => e.target.value !== u.email && handleChangeUser(u.id, { email: e.target.value })} />
                   </td>
                   <td className="py-2 px-3">
-                    <select
-                      defaultValue={u.role}
-                      className="bg-white border border-gray-200 rounded px-2 py-1 text-xs"
-                      onChange={(e) => handleChangeUser(u.id, { role: e.target.value })}
-                    >
+                    <select defaultValue={u.role}
+                      className="bg-transparent border border-transparent hover:border-slate-200 rounded-lg px-2 py-1 text-xs transition"
+                      onChange={(e) => handleChangeUser(u.id, { role: e.target.value })}>
                       <option value="USER">مستخدم</option>
                       <option value="ADMIN">مسؤول</option>
                     </select>
@@ -240,30 +201,27 @@ export default function Admin() {
                   <td className="py-2 px-3">
                     <button
                       onClick={() => handleChangeUser(u.id, { is_active: !u.is_active })}
-                      className={`px-3 py-1 rounded-full text-xs font-semibold border ${
-                        u.is_active
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          : 'bg-gray-50 text-gray-500 border-gray-200'
-                      }`}
-                    >
+                      className="badge cursor-pointer"
+                      style={u.is_active
+                        ? { background: 'rgba(20,184,166,0.1)', color: '#0f766e' }
+                        : { background: 'rgba(0,0,0,0.04)', color: '#94a3b8' }}>
                       {u.is_active ? 'مفعل' : 'معلّق'}
                     </button>
                   </td>
-                  <td className="py-2 px-3 space-x-1 space-x-reverse">
-                    <button
-                      onClick={() =>
-                        setPasswordModal({ open: true, userId: u.id, userName: u.name || u.email, newPassword: '' })
-                      }
-                      className="inline-flex items-center px-2 py-1 rounded-md bg-blue-50 text-blue-700 border border-blue-200 text-xs mr-1"
-                    >
-                      تغيير كلمة المرور
-                    </button>
-                    <button
-                      onClick={() => handleDeleteUser(u.id)}
-                      className="inline-flex items-center px-2 py-1 rounded-md bg-red-50 text-red-700 border border-red-200 text-xs"
-                    >
-                      حذف
-                    </button>
+                  <td className="py-2 px-3">
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setPasswordModal({ open: true, userId: u.id, userName: u.name || u.email, newPassword: '' })}
+                        className="btn-ghost !px-2 !py-1 !text-[11px]" style={{ color: '#2563eb' }}>
+                        كلمة المرور
+                      </button>
+                      <button onClick={() => handleDeleteUser(u.id)}
+                        className="btn-ghost !px-2 !py-1 !text-[11px]" style={{ color: '#94a3b8' }}
+                        onMouseEnter={(e) => e.currentTarget.style.color = '#e11d48'}
+                        onMouseLeave={(e) => e.currentTarget.style.color = '#94a3b8'}>
+                        حذف
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -274,38 +232,22 @@ export default function Admin() {
 
       {/* Password Change Modal */}
       {passwordModal.open && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              تغيير كلمة المرور للمستخدم: {passwordModal.userName}
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="card p-6 w-full max-w-sm mx-4">
+            <h3 className="text-sm font-semibold text-slate-900 mb-4">
+              تغيير كلمة المرور: {passwordModal.userName}
             </h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  كلمة المرور الجديدة
-                </label>
-                <input
-                  type="password"
-                  value={passwordModal.newPassword}
+                <label className="block text-[11px] font-medium text-slate-500 mb-1">كلمة المرور الجديدة</label>
+                <input type="password" value={passwordModal.newPassword}
                   onChange={(e) => setPasswordModal({ ...passwordModal, newPassword: e.target.value })}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  placeholder="أدخل كلمة المرور الجديدة"
-                  autoFocus
-                />
+                  className="input" placeholder="أدخل كلمة المرور الجديدة" autoFocus />
               </div>
-              <div className="flex gap-3 justify-end">
-                <button
-                  onClick={() => setPasswordModal({ open: false, userId: null, userName: '', newPassword: '' })}
-                  className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 text-sm hover:bg-gray-50"
-                >
-                  إلغاء
-                </button>
-                <button
-                  onClick={handlePasswordChange}
-                  className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold"
-                >
-                  حفظ
-                </button>
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => setPasswordModal({ open: false, userId: null, userName: '', newPassword: '' })}
+                  className="btn-ghost">إلغاء</button>
+                <button onClick={handlePasswordChange} className="btn">حفظ</button>
               </div>
             </div>
           </div>

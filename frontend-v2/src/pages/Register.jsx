@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Newspaper, CheckCircle } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { Eye, CheckCircle, Loader2 } from 'lucide-react'
 
 export default function Register({ onRegister, onSwitchToLogin }) {
   const [name, setName] = useState('')
@@ -14,26 +15,11 @@ export default function Register({ onRegister, onSwitchToLogin }) {
     e.preventDefault()
     setError('')
 
-    if (!name.trim()) {
-      setError('يرجى إدخال الاسم')
-      return
-    }
-    if (!email.trim()) {
-      setError('يرجى إدخال اسم المستخدم')
-      return
-    }
-    if (!password) {
-      setError('يرجى إدخال كلمة المرور')
-      return
-    }
-    if (password !== confirmPassword) {
-      setError('كلمة المرور غير متطابقة')
-      return
-    }
-    if (password.length < 4) {
-      setError('كلمة المرور يجب أن تكون 4 أحرف على الأقل')
-      return
-    }
+    if (!name.trim()) { setError('يرجى إدخال الاسم'); return }
+    if (!email.trim()) { setError('يرجى إدخال اسم المستخدم'); return }
+    if (!password) { setError('يرجى إدخال كلمة المرور'); return }
+    if (password !== confirmPassword) { setError('كلمة المرور غير متطابقة'); return }
+    if (password.length < 4) { setError('كلمة المرور يجب أن تكون 4 أحرف على الأقل'); return }
 
     setLoading(true)
     try {
@@ -46,117 +32,101 @@ export default function Register({ onRegister, onSwitchToLogin }) {
     }
   }
 
-  // Show success message after registration
+  const inputClass = "w-full rounded-xl px-4 py-3 text-sm transition-all duration-200 bg-white focus:outline-none focus:ring-0"
+  const inputStyle = { border: '1.5px solid rgba(0,0,0,0.08)' }
+
   if (success) {
     return (
-      <div dir="rtl" lang="ar" className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-green-50 font-cairo p-4">
-        <div className="w-full max-w-md">
-          <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200 p-8 text-center">
-            <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4">
-              <CheckCircle className="w-10 h-10 text-emerald-600" />
+      <div dir="rtl" lang="ar" className="min-h-screen flex items-center justify-center font-cairo p-4" style={{ background: '#f8fafc' }}>
+        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-sm">
+          <div className="card p-8 text-center">
+            <div className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center"
+              style={{ background: 'rgba(20,184,166,0.1)' }}>
+              <CheckCircle className="w-7 h-7 text-teal-600" />
             </div>
-            <h2 className="text-2xl font-bold text-emerald-900 mb-3">تم إنشاء الحساب بنجاح</h2>
-            <p className="text-gray-600 mb-6">
-              حسابك قيد المراجعة من قبل الإدارة. سيتم إعلامك عند تفعيل حسابك.
-            </p>
-            <button
-              onClick={onSwitchToLogin}
-              className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold transition"
-            >
-              العودة لتسجيل الدخول
-            </button>
+            <h2 className="text-xl font-bold text-slate-900 mb-2">تم إنشاء الحساب بنجاح</h2>
+            <p className="text-sm text-slate-500 mb-6">حسابك قيد المراجعة. سيتم إعلامك عند التفعيل.</p>
+            <button onClick={onSwitchToLogin} className="btn w-full !py-3">العودة لتسجيل الدخول</button>
           </div>
-        </div>
+        </motion.div>
       </div>
     )
   }
 
   return (
-    <div dir="rtl" lang="ar" className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-green-50 font-cairo p-4">
-      <div className="w-full max-w-md">
-        <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200 p-8">
+    <div dir="rtl" lang="ar" className="min-h-screen flex items-center justify-center font-cairo p-4" style={{ background: '#f8fafc' }}>
+      <motion.div
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
+        className="w-full max-w-sm"
+      >
+        <div className="card p-8">
           {/* Logo */}
           <div className="flex flex-col items-center mb-8">
-            <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center shadow-lg mb-4">
-              <Newspaper className="w-8 h-8 text-white" />
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
+              style={{
+                background: 'linear-gradient(135deg, #0f766e 0%, #14b8a6 100%)',
+                boxShadow: '0 6px 20px rgba(20,184,166,0.3)',
+              }}>
+              <Eye className="w-7 h-7 text-white" />
             </div>
-            <h1 className="text-3xl font-bold text-emerald-900">عين</h1>
-            <p className="text-emerald-600 mt-1">إنشاء حساب جديد</p>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">عين</h1>
+            <p className="text-xs text-slate-400 mt-1 font-medium">إنشاء حساب جديد</p>
           </div>
 
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3 mb-6">
+            <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+              className="text-xs text-rose-600 rounded-xl px-3 py-2.5 mb-4"
+              style={{ background: 'rgba(225,29,72,0.06)' }}>
               {error}
-            </div>
+            </motion.div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">الاسم</label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                placeholder="أدخل اسمك الكامل"
-              />
+              <label className="block text-xs font-medium text-slate-500 mb-1.5">الاسم</label>
+              <input type="text" value={name} onChange={(e) => setName(e.target.value)}
+                className={inputClass} placeholder="الاسم الكامل" style={inputStyle}
+                onFocus={(e) => e.target.style.borderColor = '#14b8a6'}
+                onBlur={(e) => e.target.style.borderColor = 'rgba(0,0,0,0.08)'} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">اسم المستخدم</label>
-              <input
-                type="text"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                placeholder="أدخل اسم المستخدم"
-              />
+              <label className="block text-xs font-medium text-slate-500 mb-1.5">اسم المستخدم</label>
+              <input type="text" value={email} onChange={(e) => setEmail(e.target.value)}
+                className={inputClass} placeholder="اسم المستخدم" style={inputStyle}
+                onFocus={(e) => e.target.style.borderColor = '#14b8a6'}
+                onBlur={(e) => e.target.style.borderColor = 'rgba(0,0,0,0.08)'} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">كلمة المرور</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                placeholder="أدخل كلمة المرور"
-              />
+              <label className="block text-xs font-medium text-slate-500 mb-1.5">كلمة المرور</label>
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+                className={inputClass} placeholder="أدخل كلمة المرور" style={inputStyle}
+                onFocus={(e) => e.target.style.borderColor = '#14b8a6'}
+                onBlur={(e) => e.target.style.borderColor = 'rgba(0,0,0,0.08)'} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">تأكيد كلمة المرور</label>
-              <input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                placeholder="أعد إدخال كلمة المرور"
-              />
+              <label className="block text-xs font-medium text-slate-500 mb-1.5">تأكيد كلمة المرور</label>
+              <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
+                className={inputClass} placeholder="أعد إدخال كلمة المرور" style={inputStyle}
+                onFocus={(e) => e.target.style.borderColor = '#14b8a6'}
+                onBlur={(e) => e.target.style.borderColor = 'rgba(0,0,0,0.08)'} />
             </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold transition disabled:opacity-60"
-            >
-              {loading ? 'جاري الإنشاء...' : 'إنشاء حساب'}
+            <button type="submit" disabled={loading} className="btn w-full !py-3 !text-sm !rounded-xl">
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'إنشاء حساب'}
             </button>
           </form>
 
-          <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600">
-              لديك حساب بالفعل؟{' '}
-              <button
-                onClick={onSwitchToLogin}
-                className="text-emerald-600 hover:text-emerald-700 font-semibold"
-              >
+          <div className="mt-5 text-center">
+            <p className="text-xs text-slate-400">
+              لديك حساب؟{' '}
+              <button onClick={onSwitchToLogin} className="font-semibold" style={{ color: '#0f766e' }}>
                 تسجيل الدخول
               </button>
             </p>
           </div>
         </div>
-
-        <p className="text-center text-xs text-gray-500 mt-6">
-          طور بواسطة قسم الحلول التقنية - 2025
-        </p>
-      </div>
+      </motion.div>
     </div>
   )
 }

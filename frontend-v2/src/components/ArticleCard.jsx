@@ -37,8 +37,8 @@ export default function ArticleCard({ article }) {
         return (
           <span 
             key={index} 
-            className="bg-yellow-200 font-bold px-1 rounded"
-            style={{ backgroundColor: '#fef08a' }}
+            className="font-bold px-1 rounded"
+            style={{ backgroundColor: 'rgba(20,184,166,0.12)', color: '#0f766e' }}
           >
             {keyword}
           </span>
@@ -50,19 +50,18 @@ export default function ArticleCard({ article }) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-      whileHover={{ scale: 1.02 }}
-      className="card hover:shadow-xl transition-all duration-300 h-full flex flex-col overflow-hidden"
+      transition={{ duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
+      className="card h-full flex flex-col overflow-hidden group"
     >
       {/* Article Image */}
       {article.image_url && (
-        <div className="w-full h-48 overflow-hidden bg-gray-100">
+        <div className="w-full h-44 overflow-hidden bg-slate-50">
           <img 
             src={article.image_url} 
             alt={article.title_ar}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             onError={(e) => { e.target.style.display = 'none' }}
           />
         </div>
@@ -70,26 +69,22 @@ export default function ArticleCard({ article }) {
       
       <div className="p-5 flex flex-col h-full">
         {/* Header Badges */}
-        <div className="flex flex-wrap gap-2 mb-3">
-          <span className="badge bg-emerald-100 text-emerald-800 border border-emerald-200">
-            🌍 {article.country}
+        <div className="flex flex-wrap items-center gap-1.5 mb-3">
+          <span className="badge" style={{ background: 'rgba(15,118,110,0.08)', color: '#0f766e' }}>
+            {article.country}
           </span>
-          <span className="badge bg-white text-emerald-700 border border-emerald-200">
-            📰 {article.source_name}
+          <span className="badge" style={{ background: 'rgba(0,0,0,0.04)', color: '#64748b' }}>
+            {article.source_name}
           </span>
+          {article.keyword_original && (
+            <span className="badge" style={{ background: 'rgba(79,70,229,0.08)', color: '#4f46e5' }}>
+              {article.keyword_original}
+            </span>
+          )}
         </div>
 
-        {/* Keyword */}
-        {article.keyword_original && (
-          <div className="mb-3">
-            <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 px-3 py-1 rounded-full text-sm font-semibold">
-              🔑 {article.keyword_original}
-            </span>
-          </div>
-        )}
-
         {/* Title */}
-        <h3 className="text-xl font-bold text-gray-900 mb-3 leading-relaxed">
+        <h3 className="text-base font-bold text-slate-900 mb-3 leading-relaxed line-clamp-2">
           {article.title_ar}
         </h3>
 
@@ -97,19 +92,19 @@ export default function ArticleCard({ article }) {
         <div className="mb-4 flex-grow">
           {/* Show match context indicator if available */}
           {hasMatchContext && (
-            <div className="mb-2 text-xs text-emerald-600 font-semibold flex items-center gap-1">
-              <span>🎯</span>
-              <span>سياق المطابقة:</span>
+            <div className="mb-2 text-[11px] font-semibold flex items-center gap-1" style={{ color: '#0f766e' }}>
+              <span className="w-1 h-1 rounded-full bg-teal-500"></span>
+              سياق المطابقة
             </div>
           )}
           
           <div 
-            className={`text-gray-700 leading-relaxed overflow-hidden transition-all duration-300 ease-in-out ${
-              isExpanded ? 'max-h-[1000px]' : 'max-h-[120px]'
+            className={`text-sm text-slate-600 leading-relaxed overflow-hidden transition-all duration-300 ease-in-out ${
+              isExpanded ? 'max-h-[1000px]' : 'max-h-[100px]'
             }`}
             style={{
               display: '-webkit-box',
-              WebkitLineClamp: isExpanded ? 'unset' : 5,
+              WebkitLineClamp: isExpanded ? 'unset' : 4,
               WebkitBoxOrient: 'vertical',
               overflow: isExpanded ? 'visible' : 'hidden'
             }}
@@ -119,58 +114,49 @@ export default function ArticleCard({ article }) {
           
           {/* Show gradient fade when collapsed and text is long */}
           {!isExpanded && shouldShowExpandButton && (
-            <div className="h-8 bg-gradient-to-t from-white to-transparent -mt-8 relative" />
+            <div className="h-6 -mt-6 relative" style={{ background: 'linear-gradient(to top, rgba(255,255,255,0.95), transparent)' }} />
           )}
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-3 border-t border-emerald-100 mt-auto">
+        <div className="flex items-center justify-between pt-3 mt-auto" style={{ borderTop: '1px solid rgba(0,0,0,0.05)' }}>
           <div className="flex items-center gap-2">
             <span className={`badge ${config.class} flex items-center gap-1`}>
               <SentimentIcon className="w-3 h-3" />
               {article.sentiment}
             </span>
+            <span className="text-[11px] text-slate-400">
+              {article.published_at ? new Date(article.published_at).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: 'numeric' }) : ''}
+            </span>
           </div>
 
-          <div className="flex flex-col items-end gap-2">
-            {/* Buttons row */}
-            <div className="flex items-center gap-2">
-              {/* Expand/Collapse button - only show if text is long */}
-              {shouldShowExpandButton && (
-                <button
-                  onClick={() => setIsExpanded(!isExpanded)}
-                  className="text-emerald-600 hover:text-emerald-800 font-semibold text-sm flex items-center gap-1 transition"
-                >
-                  {isExpanded ? (
-                    <>
-                      اخفِ النص
-                      <ChevronUp className="w-4 h-4" />
-                    </>
-                  ) : (
-                    <>
-                      اظهر المزيد
-                      <ChevronDown className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
-              )}
-              
-              {/* Original article link */}
-              <a
-                href={article.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-emerald-600 hover:text-emerald-800 font-semibold text-sm flex items-center gap-1 transition"
+          <div className="flex items-center gap-1.5">
+            {/* Expand/Collapse button - only show if text is long */}
+            {shouldShowExpandButton && (
+              <button
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="btn-ghost !px-2 !py-1 !text-xs !gap-0.5"
+                style={{ color: '#0f766e' }}
               >
-                المقال الأصلي
-                <ExternalLink className="w-4 h-4" />
-              </a>
-            </div>
+                {isExpanded ? (
+                  <>اخفِ <ChevronUp className="w-3.5 h-3.5" /></>
+                ) : (
+                  <>المزيد <ChevronDown className="w-3.5 h-3.5" /></>
+                )}
+              </button>
+            )}
             
-            {/* Date */}
-            <span className="text-xs text-gray-500">
-              {article.published_at ? new Date(article.published_at).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: 'numeric' }) : 'غير محدد'}
-            </span>
+            {/* Original article link */}
+            <a
+              href={article.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-ghost !px-2 !py-1 !text-xs !gap-1"
+              style={{ color: '#0f766e' }}
+            >
+              المصدر
+              <ExternalLink className="w-3 h-3" />
+            </a>
           </div>
         </div>
       </div>

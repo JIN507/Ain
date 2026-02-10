@@ -1,4 +1,5 @@
-import { Home, Globe, Key, Newspaper, Search, Activity, Shield } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { Home, Globe, Key, Newspaper, Search, Activity, Shield, Eye } from 'lucide-react'
 
 export default function Sidebar({ currentPage, setCurrentPage, sidebarOpen, setSidebarOpen, isAdmin }) {
   const navItems = [
@@ -20,8 +21,11 @@ export default function Sidebar({ currentPage, setCurrentPage, sidebarOpen, setS
     <>
       {/* Overlay for mobile */}
       {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 md:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -29,27 +33,37 @@ export default function Sidebar({ currentPage, setCurrentPage, sidebarOpen, setS
       {/* Sidebar */}
       <aside
         className={`
-          fixed md:sticky top-0 right-0 h-screen w-72 bg-white/90 backdrop-blur-sm
-          border-l border-emerald-200 shadow-xl z-50 transition-transform duration-300
+          fixed md:sticky top-0 right-0 h-screen w-64 z-50
+          transition-transform duration-300 ease-out
           ${sidebarOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0'}
         `}
+        style={{
+          background: 'linear-gradient(180deg, #0f172a 0%, #1e293b 100%)',
+        }}
       >
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className="p-6 border-b border-emerald-200">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center shadow-lg">
-                <Newspaper className="w-6 h-6 text-white" />
+          <div className="px-6 pt-8 pb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center"
+                style={{
+                  background: 'linear-gradient(135deg, #0f766e 0%, #14b8a6 100%)',
+                  boxShadow: '0 4px 14px rgba(20,184,166,0.3)',
+                }}>
+                <Eye className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-emerald-900">عين</h1>
-                <p className="text-sm text-emerald-600">لرؤية شاملة</p>
+                <h1 className="text-xl font-bold text-white tracking-tight">عين</h1>
+                <p className="text-[11px] text-teal-400/70 font-medium">نظام رصد الأخبار</p>
               </div>
             </div>
           </div>
 
+          {/* Divider */}
+          <div className="mx-5 h-px bg-white/[0.06]" />
+
           {/* Navigation */}
-          <nav className="flex-1 p-4 space-y-1">
+          <nav className="flex-1 px-3 py-4 space-y-0.5">
             {[...navItems, ...adminItems].map((item) => {
               const Icon = item.icon
               const isActive = currentPage === item.id
@@ -61,21 +75,33 @@ export default function Sidebar({ currentPage, setCurrentPage, sidebarOpen, setS
                     setCurrentPage(item.id)
                     setSidebarOpen(false)
                   }}
-                  className={`sidebar-link w-full text-right flex items-center gap-3 ${isActive ? 'active' : ''}`}
+                  className={`sidebar-link w-full text-right relative ${isActive ? 'active' : ''}`}
                 >
-                  <Icon className="w-5 h-5" />
-                  <span className="font-semibold">{item.label}</span>
+                  {isActive && (
+                    <motion.div
+                      layoutId="sidebar-indicator"
+                      className="absolute inset-0 rounded-xl"
+                      style={{ background: 'rgba(20,184,166,0.12)' }}
+                      transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                    />
+                  )}
+                  <span className="relative z-10 flex items-center gap-3">
+                    <Icon className="w-[18px] h-[18px]" />
+                    <span>{item.label}</span>
+                  </span>
                 </button>
               )
             })}
           </nav>
 
           {/* Footer */}
-          <div className="p-4 border-t border-emerald-200">
-            <div className="bg-emerald-50 rounded-lg p-3 mb-3">
-              <p className="text-xs text-emerald-700 font-semibold">طور بواسطة قسم الحلول التقنية</p>
-              <p className="text-sm text-emerald-900">{new Date().toLocaleDateString('ar-SA', { timeZone: 'Asia/Riyadh', year: 'numeric', month: 'long', day: 'numeric' , hour: '2-digit', minute: '2-digit' })}</p>
-              <p className="text-sm text-red-900">Version 3.0</p>
+          <div className="px-5 pb-6">
+            <div className="rounded-xl p-3.5" style={{ background: 'rgba(255,255,255,0.04)' }}>
+              <p className="text-[11px] text-slate-400 font-medium">قسم الحلول التقنية</p>
+              <p className="text-[11px] text-slate-500 mt-1">
+                {new Date().toLocaleDateString('ar-SA', { timeZone: 'Asia/Riyadh', year: 'numeric', month: 'long', day: 'numeric' })}
+              </p>
+              <p className="text-[10px] text-teal-500/60 mt-1 font-semibold">v4.0</p>
             </div>
           </div>
         </div>

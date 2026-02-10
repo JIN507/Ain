@@ -2,17 +2,17 @@ import { Search, RefreshCw } from 'lucide-react'
 
 export default function FilterBar({ filters, setFilters, onReset, countries, keywords }) {
   return (
-    <div className="card p-5">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+    <div className="card p-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
         {/* Search */}
-        <div className="relative">
-          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+        <div className="relative lg:col-span-1">
+          <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
           <input
             type="text"
             placeholder="ابحث في الأخبار..."
             value={filters.search || ''}
             onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-            className="input pr-10"
+            className="input !pr-10"
           />
         </div>
 
@@ -50,13 +50,13 @@ export default function FilterBar({ filters, setFilters, onReset, countries, key
           onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
           className="input"
         >
-          <option value="newest"> الأحدث في النظام</option>
-          <option value="oldest"> الأقدم في النظام</option>
+          <option value="newest">الأحدث</option>
+          <option value="oldest">الأقدم</option>
         </select>
 
         {/* Reset */}
-        <button onClick={onReset} className="btn-outline">
-          <RefreshCw className="w-4 h-4" />
+        <button onClick={onReset} className="btn-outline !py-2.5">
+          <RefreshCw className="w-3.5 h-3.5" />
           إعادة تعيين
         </button>
       </div>

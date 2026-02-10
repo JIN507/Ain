@@ -3,13 +3,21 @@ import { motion } from 'framer-motion'
 import { FileText, Globe, Clock, MapPin } from 'lucide-react'
 import { apiFetch } from '../apiClient'
 
-export default function StatsOverview({ stats }) {
+export default function StatsOverview({ stats, keywordCount = 0 }) {
   const [countdown, setCountdown] = useState('--:--')
   const [nextRunTime, setNextRunTime] = useState(null)
   const [isMonitoringRunning, setIsMonitoringRunning] = useState(false)
 
-  // Fetch scheduler status and calculate countdown
+  // Fetch scheduler status and calculate countdown (only if keywords exist)
   useEffect(() => {
+    // No keywords = no monitoring, stop everything
+    if (keywordCount === 0) {
+      setIsMonitoringRunning(false)
+      setNextRunTime(null)
+      setCountdown('متوقف')
+      return
+    }
+
     const fetchSchedulerStatus = async () => {
       try {
         const res = await apiFetch('/api/monitor/status')
@@ -34,7 +42,7 @@ export default function StatsOverview({ stats }) {
     // Refresh scheduler status every 30 seconds to catch new monitoring starts
     const statusInterval = setInterval(fetchSchedulerStatus, 30000)
     return () => clearInterval(statusInterval)
-  }, [])
+  }, [keywordCount])
 
   // Update countdown every second
   useEffect(() => {
@@ -73,49 +81,58 @@ export default function StatsOverview({ stats }) {
       label: 'إجمالي المقالات',
       value: stats.total,
       icon: FileText,
-      gradient: 'from-emerald-500 to-emerald-700'
+      color: '#0f766e',
+      bg: 'rgba(15,118,110,0.08)',
     },
     {
       label: 'الدول',
       value: stats.uniqueCountries || stats.countries || 0,
       icon: MapPin,
-      gradient: 'from-green-500 to-green-700'
+      color: '#4f46e5',
+      bg: 'rgba(79,70,229,0.08)',
     },
     {
-      label: 'البحث',
+      label: 'البحث التالي',
       value: countdown,
       icon: Clock,
-      gradient: 'from-orange-500 to-red-500'
+      color: '#ea580c',
+      bg: 'rgba(234,88,12,0.08)',
+      isTimer: true,
     },
     {
       label: 'الدول المراقبة',
       value: stats.countries || 0,
       icon: Globe,
-      gradient: 'from-blue-500 to-indigo-600'
+      color: '#0284c7',
+      bg: 'rgba(2,132,199,0.08)',
     }
   ]
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       {statCards.map((stat, idx) => {
         const Icon = stat.icon
         return (
           <motion.div
             key={idx}
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: idx * 0.1 }}
-            className="card p-5"
+            transition={{ delay: idx * 0.08, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+            className="card p-5 group"
           >
-            <div className="flex items-center gap-4">
-              <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${stat.gradient} flex items-center justify-center shadow-lg flex-shrink-0`}>
-                <Icon className="w-7 h-7 text-white" />
+            <div className="flex items-start justify-between mb-3">
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110"
+                style={{ background: stat.bg }}
+              >
+                <Icon className="w-5 h-5" style={{ color: stat.color }} />
               </div>
-              <div>
-                <div className="text-3xl font-bold text-gray-900">{stat.value}</div>
-                <div className="text-sm text-gray-600">{stat.label}</div>
-              </div>
+              {stat.isTimer && isMonitoringRunning && (
+                <span className="inline-flex h-2 w-2 rounded-full bg-teal-500 pulse-glow mt-1" />
+              )}
             </div>
+            <div className="text-2xl font-bold text-slate-900 animate-count-up">{stat.value}</div>
+            <div className="text-xs text-slate-500 mt-0.5 font-medium">{stat.label}</div>
           </motion.div>
         )
       })}

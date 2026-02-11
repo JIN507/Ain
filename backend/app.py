@@ -265,8 +265,6 @@ def get_user_exports_folder(user_id):
 @csrf.exempt
 def generate_pdf():
     """Generate a real PDF from article data using reportlab (pure Python)."""
-    from pdf_generator import generate_report_pdf
-
     data = request.get_json() or {}
     articles = data.get('articles', [])
     title = data.get('title', 'تقرير أخبار عين')
@@ -276,6 +274,7 @@ def generate_pdf():
         return jsonify({'error': 'No articles provided'}), 400
 
     try:
+        from pdf_generator import generate_report_pdf
         pdf_bytes = generate_report_pdf(articles, title=title, stats=stats)
         return Response(
             pdf_bytes,

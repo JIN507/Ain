@@ -116,6 +116,7 @@ export default function TopHeadlines() {
       })
     } catch (error) {
       console.error('Error exporting headlines PDF:', error)
+      alert('خطأ في تصدير PDF: ' + error.message)
     } finally {
       setExporting(false)
     }

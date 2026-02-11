@@ -245,6 +245,7 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
       })
     } catch (error) {
       console.error('Error exporting PDF:', error)
+      alert('خطأ في تصدير PDF: ' + error.message)
     } finally {
       setExporting(false)
     }

@@ -382,7 +382,7 @@ export default function DirectSearch() {
       await uploadExport(apiFetch, pdfBlob, filename, {
         articleCount: results.length, filters: { type: 'direct_search', query: compiledQuery }, sourceType: 'direct_search',
       })
-    } catch (err) { console.error('Export error:', err) }
+    } catch (err) { console.error('Export error:', err); alert('خطأ في تصدير PDF: ' + err.message) }
     finally { setExporting(false) }
   }
 

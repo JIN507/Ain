@@ -1,6 +1,6 @@
 """
 AI Service for Ain News Monitor
-Uses Google Gemini 2.0 Flash for:
+Uses OpenAI GPT-4o-mini for:
   - Daily Brief (ملخص ذكي): Summarize all day's articles into one concise paragraph
   - Deep Sentiment (لماذا؟): Explain why an article is positive/negative
 """
@@ -8,52 +8,56 @@ import os
 import json
 import requests
 
-GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
+OPENAI_API_KEY = ''
 
-# Load from .env file if not in environment (local dev)
-if not GEMINI_API_KEY:
-    _env_path = os.path.join(os.path.dirname(__file__), '.env')
-    if os.path.exists(_env_path):
-        with open(_env_path) as f:
-            for line in f:
-                if line.strip().startswith('GEMINI_API_KEY='):
-                    GEMINI_API_KEY = line.strip().split('=', 1)[1].strip()
-                    break
-GEMINI_MODEL = 'gemini-1.5-flash'
-GEMINI_URL = f'https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent'
+# Load from .env file first (local dev), then fall back to environment
+_env_path = os.path.join(os.path.dirname(__file__), '.env')
+if os.path.exists(_env_path):
+    with open(_env_path, encoding='utf-8') as f:
+        for line in f:
+            if line.strip().startswith('OPENAI_API_KEY='):
+                OPENAI_API_KEY = line.strip().split('=', 1)[1].strip()
+                break
+
+if not OPENAI_API_KEY:
+    OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
+
+OPENAI_MODEL = 'gpt-4o-mini'
+OPENAI_URL = 'https://api.openai.com/v1/chat/completions'
 
 
-def _call_gemini(prompt, max_tokens=1024):
-    """Call Gemini API and return the text response."""
-    if not GEMINI_API_KEY:
-        raise ValueError('GEMINI_API_KEY not configured')
+def _call_llm(prompt, max_tokens=1024):
+    """Call OpenAI API and return the text response."""
+    if not OPENAI_API_KEY:
+        raise ValueError('OPENAI_API_KEY not configured')
 
     payload = {
-        'contents': [{'parts': [{'text': prompt}]}],
-        'generationConfig': {
-            'maxOutputTokens': max_tokens,
-            'temperature': 0.4,
-        },
+        'model': OPENAI_MODEL,
+        'messages': [{'role': 'user', 'content': prompt}],
+        'max_tokens': max_tokens,
+        'temperature': 0.4,
     }
 
     resp = requests.post(
-        GEMINI_URL,
-        params={'key': GEMINI_API_KEY},
-        headers={'Content-Type': 'application/json'},
+        OPENAI_URL,
+        headers={
+            'Content-Type': 'application/json',
+            'Authorization': f'Bearer {OPENAI_API_KEY}',
+        },
         json=payload,
         timeout=30,
     )
 
     if resp.status_code != 200:
         error_msg = resp.text[:500]
-        print(f'[AI] ❌ Gemini API error {resp.status_code}: {error_msg}')
-        raise Exception(f'Gemini API error: {resp.status_code}')
+        print(f'[AI] ❌ OpenAI API error {resp.status_code}: {error_msg}')
+        raise Exception(f'OpenAI API error: {resp.status_code}')
 
     data = resp.json()
     try:
-        return data['candidates'][0]['content']['parts'][0]['text']
+        return data['choices'][0]['message']['content']
     except (KeyError, IndexError):
-        raise Exception('Unexpected Gemini response format')
+        raise Exception('Unexpected OpenAI response format')
 
 
 def generate_daily_brief(articles):
@@ -101,26 +105,26 @@ def generate_daily_brief(articles):
 
 الملخص الذكي:"""
 
-    return _call_gemini(prompt, max_tokens=800)
+    return _call_llm(prompt, max_tokens=800)
 
 
-def explain_sentiment(title, summary, sentiment, source_name='', country=''):
+def explain_sentiment(title, summary, sentiment, source_name='', country='', keyword=''):
     """
-    Explain why an article has a certain sentiment label.
-    On-demand — called only when user clicks "لماذا؟"
+    Analyze article sentiment relative to its keyword.
+    On-demand — called only when user clicks "حلل المشاعر"
     """
-    prompt = f"""أنت محلل مشاعر إخباري. اشرح بإيجاز (3-4 جمل) باللغة العربية لماذا هذا الخبر يُصنف كـ "{sentiment}".
+    prompt = f"""أنت محلل أخبار متخصص. حلل مشاعر هذا الخبر بالنسبة للكلمة المفتاحية "{keyword or 'الموضوع الرئيسي'}".
 
 العنوان: {title}
 الملخص: {summary or 'غير متوفر'}
-المصدر: {source_name}
+الكلمة المفتاحية: {keyword or 'غير محددة'}
 الدولة: {country}
 
-اشرح التصنيف بناءً على:
-- الكلمات والعبارات المؤثرة في النص
-- السياق العام للخبر
-- التأثير المحتمل على القارئ
+المطلوب:
+1. هل هذا الخبر إيجابي أم سلبي أم محايد بالنسبة لـ "{keyword or 'الموضوع'}"؟ 
+2. اشرح السبب في 2-3 جمل مختصرة.
+3. ما التأثير المحتمل على "{keyword or 'الموضوع'}"؟
 
-التحليل:"""
+اكتب الإجابة باللغة العربية بشكل مختصر ومباشر. لا تستخدم عناوين أو ترقيم."""
 
-    return _call_gemini(prompt, max_tokens=300)
+    return _call_llm(prompt, max_tokens=300)

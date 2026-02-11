@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { FileText, Download, Loader2, AlertCircle, RotateCcw, Radio, AlertTriangle, FileSpreadsheet, Sparkles, RefreshCw } from 'lucide-react'
+import { FileText, Download, Loader2, AlertCircle, RotateCcw, Radio, AlertTriangle, FileSpreadsheet, BarChart3, RefreshCw } from 'lucide-react'
 import StatsOverview from '../components/StatsOverview'
 import FilterBar from '../components/FilterBar'
 import ArticleCard from '../components/ArticleCard'
@@ -452,35 +452,35 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
 
       {/* AI Daily Brief — ملخص ذكي */}
       {articles.length > 0 && (
-        <div className="card p-5" style={{ borderRight: '4px solid #8b5cf6' }}>
+        <div className="card p-5" style={{ borderRight: '4px solid #0f766e' }}>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-violet-500" />
+              <BarChart3 className="w-5 h-5" style={{ color: '#0f766e' }} />
               <h3 className="font-bold text-slate-900">ملخص ذكي</h3>
               <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
-                style={{ background: 'rgba(139,92,246,0.1)', color: '#7c3aed' }}>AI</span>
+                style={{ background: 'rgba(15,118,110,0.08)', color: '#0f766e' }}>AI</span>
             </div>
             <button
               onClick={() => loadDailyBrief(!!dailyBrief)}
               disabled={briefLoading}
               className="btn-ghost !text-xs !px-2.5 !py-1 flex items-center gap-1"
-              style={{ color: '#7c3aed' }}
+              style={{ color: '#0f766e' }}
             >
               {briefLoading
                 ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> جاري التحليل...</>
                 : dailyBrief
                   ? <><RefreshCw className="w-3.5 h-3.5" /> تحديث</>
-                  : <><Sparkles className="w-3.5 h-3.5" /> إنشاء الملخص</>
+                  : <><BarChart3 className="w-3.5 h-3.5" /> إنشاء الملخص</>
               }
             </button>
           </div>
           {dailyBrief?.content ? (
             <div className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">
               {dailyBrief.content}
-              <div className="mt-3 flex items-center gap-3 text-[11px] text-slate-400">
-                <span>📊 {dailyBrief.article_count} مقال</span>
-                <span>📅 {dailyBrief.date}</span>
-                {dailyBrief.cached && <span>⚡ من الذاكرة</span>}
+              <div className="mt-3 pt-2 flex items-center gap-3 text-[11px] text-slate-400" style={{ borderTop: '1px solid rgba(0,0,0,0.05)' }}>
+                <span>{dailyBrief.article_count} مقال</span>
+                <span>{dailyBrief.date}</span>
+                {dailyBrief.cached && <span>من الذاكرة</span>}
               </div>
             </div>
           ) : !briefLoading ? (

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { ExternalLink, ThumbsUp, ThumbsDown, Minus, ChevronDown, ChevronUp, Bookmark, Loader2, HelpCircle } from 'lucide-react'
+import { ExternalLink, ThumbsUp, ThumbsDown, Minus, ChevronDown, ChevronUp, Bookmark, Loader2, BarChart3 } from 'lucide-react'
 import { apiFetch } from '../apiClient'
 
 export default function ArticleCard({ article, isBookmarked, onBookmark, onUnbookmark, bookmarkLoading }) {
@@ -21,6 +21,7 @@ export default function ArticleCard({ article, isBookmarked, onBookmark, onUnboo
           sentiment: article.sentiment || '',
           source_name: article.source_name || '',
           country: article.country || '',
+          keyword: article.keyword_original || '',
         }),
       })
       if (res.ok) {
@@ -146,10 +147,10 @@ export default function ArticleCard({ article, isBookmarked, onBookmark, onUnboo
 
         {/* AI Sentiment Explanation */}
         {sentimentExplanation && (
-          <div className="mb-3 p-3 rounded-lg text-sm text-violet-800 leading-relaxed"
-            style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.12)' }}>
-            <div className="flex items-center gap-1 mb-1 text-[11px] font-semibold text-violet-600">
-              <HelpCircle className="w-3 h-3" /> تحليل المشاعر بالذكاء الاصطناعي
+          <div className="mb-3 p-3 rounded-lg text-sm text-slate-700 leading-relaxed"
+            style={{ background: 'rgba(15,118,110,0.04)', border: '1px solid rgba(15,118,110,0.1)' }}>
+            <div className="flex items-center gap-1 mb-1 text-[11px] font-semibold" style={{ color: '#0f766e' }}>
+              <BarChart3 className="w-3 h-3" /> تحليل المشاعر بالذكاء الاصطناعي
             </div>
             {sentimentExplanation}
           </div>
@@ -162,16 +163,16 @@ export default function ArticleCard({ article, isBookmarked, onBookmark, onUnboo
               <SentimentIcon className="w-3 h-3" />
               {article.sentiment}
             </span>
-            {/* لماذا؟ — AI sentiment explanation */}
+            {/* حلل المشاعر — AI sentiment analysis relative to keyword */}
             <button
               onClick={explainSentiment}
               disabled={explainLoading}
               className="btn-ghost !px-1.5 !py-0.5 !text-[10px] !gap-0.5"
-              style={{ color: sentimentExplanation ? '#7c3aed' : '#94a3b8' }}
-              title="لماذا هذا التصنيف؟"
+              style={{ color: sentimentExplanation ? '#0f766e' : '#94a3b8' }}
+              title="حلل المشاعر بالذكاء الاصطناعي"
             >
-              {explainLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <HelpCircle className="w-3 h-3" />}
-              لماذا؟
+              {explainLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <BarChart3 className="w-3 h-3" />}
+              حلل المشاعر
             </button>
             <span className="text-[11px] text-slate-400">
               {article.published_at ? new Date(article.published_at).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: 'numeric' }) : ''}

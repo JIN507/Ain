@@ -3279,6 +3279,7 @@ def explain_sentiment_endpoint():
             sentiment=sentiment,
             source_name=data.get('source_name', ''),
             country=data.get('country', ''),
+            keyword=data.get('keyword', ''),
         )
         return jsonify({'explanation': explanation})
     except Exception as e:

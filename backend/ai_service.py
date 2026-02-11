@@ -19,7 +19,7 @@ if not GEMINI_API_KEY:
                 if line.strip().startswith('GEMINI_API_KEY='):
                     GEMINI_API_KEY = line.strip().split('=', 1)[1].strip()
                     break
-GEMINI_MODEL = 'gemini-2.0-flash'
+GEMINI_MODEL = 'gemini-1.5-flash'
 GEMINI_URL = f'https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent'
 
 

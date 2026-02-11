@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
-import { FileText, Download, Loader2, AlertCircle, RotateCcw, Radio, AlertTriangle } from 'lucide-react'
+import { FileText, Download, Loader2, AlertCircle, RotateCcw, Radio, AlertTriangle, FileSpreadsheet } from 'lucide-react'
 import StatsOverview from '../components/StatsOverview'
 import FilterBar from '../components/FilterBar'
 import ArticleCard from '../components/ArticleCard'
 import Loader from '../components/Loader'
 import { apiFetch } from '../apiClient'
+import { generateXLSX, buildReportHTML, generatePDFBlob, uploadExport } from '../utils/exportUtils'
 
 export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
   const [loading, setLoading] = useState(false)
@@ -219,542 +220,72 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
     }
   }
 
-  const exportToPDF = async () => {
+  const exportPDF = async () => {
     setExporting(true)
     try {
-      // Create a formal, presentable PDF version
-      const printContent = `
-<!DOCTYPE html>
-<html dir="rtl" lang="ar">
-<head>
-  <meta charset="UTF-8">
-  <title>تقرير أخبار عين</title>
-  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&display=swap" rel="stylesheet">
-  <style>
-    * { 
-      margin: 0; 
-      padding: 0; 
-      box-sizing: border-box; 
-    }
-    
-    body { 
-      font-family: 'Cairo', 'Segoe UI', Tahoma, Arial, sans-serif; 
-      direction: rtl; 
-      padding: 0;
-      background: #ffffff;
-      color: #1a1a1a;
-      line-height: 1.8;
-    }
-    
-    /* Formal Header with Border */
-    .report-header {
-      border: 3px solid #059669;
-      border-radius: 12px;
-      padding: 30px;
-      margin: 40px;
-      background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-      page-break-after: avoid;
-    }
-    
-    .logo-section {
-      text-align: center;
-      margin-bottom: 20px;
-      padding-bottom: 20px;
-      border-bottom: 2px solid #059669;
-    }
-    
-    h1 { 
-      font-family: 'Amiri', serif;
-      color: #065f46; 
-      font-size: 42px; 
-      font-weight: 800;
-      margin-bottom: 10px;
-      text-align: center;
-      text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
-    }
-    
-    .subtitle {
-      text-align: center;
-      color: #047857;
-      font-size: 18px;
-      font-weight: 600;
-      margin-bottom: 20px;
-    }
-    
-    .report-info {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 15px;
-      margin-top: 20px;
-      padding: 20px;
-      background: white;
-      border-radius: 8px;
-      border: 1px solid #059669;
-    }
-    
-    .info-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 14px;
-      color: #374151;
-    }
-    
-    .info-label {
-      font-weight: 700;
-      color: #059669;
-    }
-    
-    /* Stats Section with Fancy Borders */
-    .stats-container {
-      margin: 30px 40px;
-      padding: 25px;
-      border: 2px solid #d1d5db;
-      border-radius: 12px;
-      background: #f9fafb;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-    }
-    
-    .stats-title {
-      font-size: 20px;
-      font-weight: 700;
-      color: #111827;
-      margin-bottom: 20px;
-      padding-bottom: 10px;
-      border-bottom: 2px solid #059669;
-    }
-    
-    .stats { 
-      display: grid; 
-      grid-template-columns: repeat(4, 1fr); 
-      gap: 20px;
-    }
-    
-    .stat-card { 
-      padding: 20px;
-      background: white;
-      border: 2px solid #e5e7eb;
-      border-radius: 10px;
-      text-align: center;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-      transition: transform 0.2s;
-    }
-    
-    .stat-value { 
-      font-size: 40px; 
-      font-weight: 800;
-      margin-bottom: 8px;
-      font-family: 'Cairo', sans-serif;
-    }
-    
-    .stat-label { 
-      font-size: 14px;
-      color: #6b7280;
-      font-weight: 600;
-    }
-    
-    /* Articles Section */
-    .articles-container {
-      margin: 30px 40px;
-    }
-    
-    .articles-title {
-      font-size: 22px;
-      font-weight: 700;
-      color: #111827;
-      margin-bottom: 20px;
-      padding: 15px 20px;
-      background: linear-gradient(90deg, #059669 0%, #10b981 100%);
-      color: white;
-      border-radius: 8px;
-      text-align: center;
-    }
-    
-    .article { 
-      background: white;
-      border: 2px solid #d1d5db;
-      border-right: 5px solid #059669;
-      border-radius: 10px;
-      padding: 0;
-      margin-bottom: 25px;
-      page-break-inside: avoid;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-      position: relative;
-      overflow: hidden;
-    }
-    
-    .article-image {
-      width: 100%;
-      height: 200px;
-      object-fit: cover;
-      background: #f3f4f6;
-    }
-    
-    .article-content {
-      padding: 25px;
-    }
-    
-    .article::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 3px;
-      background: linear-gradient(90deg, #059669, #10b981, #34d399);
-      border-radius: 10px 10px 0 0;
-    }
-    
-    .article-number {
-      position: absolute;
-      top: -10px;
-      right: 20px;
-      background: #059669;
-      color: white;
-      padding: 5px 15px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: 700;
-    }
-    
-    .article-header { 
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 15px;
-      padding-bottom: 10px;
-      border-bottom: 1px solid #e5e7eb;
-    }
-    
-    .article-badges {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-    
-    .badge {
-      padding: 5px 12px;
-      border-radius: 6px;
-      font-size: 11px;
-      font-weight: 600;
-      border: 1px solid;
-    }
-    
-    .badge-country {
-      background: #dbeafe;
-      color: #1e40af;
-      border-color: #93c5fd;
-    }
-    
-    .badge-source {
-      background: #fef3c7;
-      color: #92400e;
-      border-color: #fde68a;
-    }
-    
-    .badge-keyword {
-      background: #e0e7ff;
-      color: #3730a3;
-      border-color: #c7d2fe;
-    }
-    
-    .article-title { 
-      font-size: 20px;
-      font-weight: 700;
-      color: #111827;
-      margin-bottom: 12px;
-      line-height: 1.6;
-    }
-    
-    .article-summary { 
-      font-size: 15px;
-      color: #374151;
-      line-height: 1.8;
-      margin-bottom: 15px;
-      text-align: justify;
-    }
-    
-    .article-summary mark {
-      background-color: #fef08a;
-      font-weight: bold;
-      padding: 2px 4px;
-      border-radius: 3px;
-      color: #374151;
-    }
-    
-    .match-context-indicator {
-      font-size: 12px;
-      color: #059669;
-      font-weight: 600;
-      margin-bottom: 8px;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-    
-    .article-footer {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      padding-top: 15px;
-      border-top: 1px solid #e5e7eb;
-      margin-top: 15px;
-    }
-    
-    .article-link-section {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 5px;
-    }
-    
-    .article-link {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 8px 16px;
-      background: #059669;
-      color: white;
-      text-decoration: none;
-      border-radius: 6px;
-      font-size: 13px;
-      font-weight: 600;
-      transition: background 0.2s;
-      border: none;
-    }
-    
-    .article-link:hover {
-      background: #047857;
-    }
-    
-    .article-link svg {
-      width: 14px;
-      height: 14px;
-    }
-    
-    .article-date {
-      font-size: 11px;
-      color: #9ca3af;
-      margin-top: 5px;
-      margin-right: 5px;
-    }
-    
-    .sentiment { 
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      padding: 6px 14px;
-      border-radius: 20px;
-      font-size: 13px;
-      font-weight: 700;
-      border: 2px solid;
-    }
-    
-    .sentiment.positive { 
-      background: #d1fae5;
-      color: #065f46;
-      border-color: #10b981;
-    }
-    
-    .sentiment.negative { 
-      background: #fee2e2;
-      color: #991b1b;
-      border-color: #ef4444;
-    }
-    
-    .sentiment.neutral { 
-      background: #f3f4f6;
-      color: #374151;
-      border-color: #9ca3af;
-    }
-    
-    /* Footer */
-    .report-footer {
-      margin: 40px;
-      padding: 20px;
-      border: 2px solid #d1d5db;
-      border-radius: 8px;
-      background: #f9fafb;
-      text-align: center;
-      font-size: 12px;
-      color: #6b7280;
-    }
-    
-    @media print {
-      body { padding: 0; }
-      .report-header { margin: 20px; padding: 20px; }
-      .stats-container { margin: 20px; }
-      .articles-container { margin: 20px; }
-      .article { 
-        page-break-inside: avoid;
-        box-shadow: none;
-      }
-      .article-link {
-        background: #059669 !important;
-        color: white !important;
-        text-decoration: none !important;
-      }
-      mark {
-        background-color: #fef08a !important;
-        font-weight: bold !important;
-        padding: 2px 4px !important;
-        border-radius: 3px !important;
-        color: #374151 !important;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-      }
-      .match-context-indicator {
-        display: flex !important;
-        color: #059669 !important;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-      }
-    }
-  </style>
-</head>
-<body>
-  <!-- Formal Header -->
-  <div class="report-header">
-    <div class="logo-section">
-      <h1> تقرير أخبار عين</h1>
-    </div>
-    <div class="report-info">
-      <div class="info-item">
-        <span class="info-label"> تاريخ التقرير:</span>
-        <span>${new Date().toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
-      </div>
-      <div class="info-item">
-        <span class="info-label"> وقت الإصدار:</span>
-        <span>${new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>
-      </div>
-      <div class="info-item">
-        <span class="info-label"> عدد المصادر:</span>
-        <span>${countries.length} دولة</span>
-      </div>
-      <div class="info-item">
-        <span class="info-label"> الكلمات المفتاحية:</span>
-        <span>${keywords.filter(k => k.enabled).length} كلمة</span>
-      </div>
-    </div>
-  </div>
-  
-  <!-- Stats Section -->
-  <div class="stats-container">
-    <div class="stats-title"> ملخص إحصائي للأخبار</div>
-    <div class="stats">
-      <div class="stat-card">
-        <div class="stat-value" style="color: #059669;">${stats.total}</div>
-        <div class="stat-label">إجمالي الأخبار</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value" style="color: #10b981;">${stats.positive}</div>
-        <div class="stat-label">أخبار إيجابية</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value" style="color: #ef4444;">${stats.negative}</div>
-        <div class="stat-label">أخبار سلبية</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value" style="color: #6b7280;">${stats.neutral}</div>
-        <div class="stat-label">أخبار محايدة</div>
-      </div>
-    </div>
-  </div>
+      const sorted = [...articles].sort((a, b) => {
+        const sortBy = filters.sortBy || 'newest'
+        return sortBy === 'newest' ? b.id - a.id : a.id - b.id
+      })
+      const html = buildReportHTML(sorted, { title: 'تقرير أخبار عين', stats, filters, keywords, countries })
 
-  <!-- Articles Section -->
-  <div class="articles-container">
-    <div class="articles-title"> الأخبار المرصودة (${articles.length} خبر)</div>
-    
-    ${[...articles].sort((a, b) => {
-      const sortBy = filters.sortBy || 'newest';
-      return sortBy === 'newest' ? b.id - a.id : a.id - b.id;
-    }).map((article, index) => {
-      // Extract match context (SAME AS ArticleCard.jsx)
-      const hasMatchContext = article.match_context && article.match_context.full_snippet_ar;
-      const displayText = hasMatchContext 
-        ? article.match_context.full_snippet_ar 
-        : (article.summary_ar || article.summary_original || '');
-      
-      // Replace **keyword** markers with highlighted spans
-      const highlightedText = displayText.replace(/\*\*([^*]+)\*\*/g, '<mark style="background-color: #fef08a; font-weight: bold; padding: 2px 4px; border-radius: 3px;">$1</mark>');
-      
-      return `
-      <div class="article">
-        <span class="article-number">خبر ${index + 1}</span>
-        ${article.image_url ? `<img src="${article.image_url}" alt="صورة المقال" class="article-image" onerror="this.style.display='none'">` : ''}
-        <div class="article-content">
-          <div class="article-header">
-            <div class="article-badges">
-              <span class="badge badge-source">📰 ${article.source_name}</span>
-              <span class="badge badge-keyword">🔑 ${article.keyword_original || article.keyword || ''}</span>
-              <span class="badge badge-country">🌍 ${article.country}</span>
-            </div>
-          </div>
-          <h2 class="article-title">${article.title_ar}</h2>
-          ${hasMatchContext ? '<div style="font-size: 12px; color: #059669; font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 4px;"><span>🎯</span><span>سياق المطابقة:</span></div>' : ''}
-          <p class="article-summary">${highlightedText}</p>
-          <div class="article-footer">
-            <div class="article-link-section">
-              <a href="${article.url}" target="_blank" rel="noopener noreferrer" class="article-link">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                </svg>
-                المقال الأصلي
-              </a>
-              <div class="article-date">📅 ${article.published_at ? new Date(article.published_at).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: 'numeric' }) : 'غير محدد'}</div>
-            </div>
-            <span class="sentiment ${article.sentiment === 'إيجابي' ? 'positive' : article.sentiment === 'سلبي' ? 'negative' : 'neutral'}">
-              ${article.sentiment === 'إيجابي' ? '✓' : article.sentiment === 'سلبي' ? '✗' : '○'} ${article.sentiment}
-            </span>
-          </div>
-        </div>
-      </div>
-      `;
-    }).join('')}
-  </div>
-  
-  <!-- Formal Footer -->
-  <div class="report-footer">
-    <p><strong>نظام أخبار عين</strong></p>
-    <p style="margin-top: 10px;">تم إنشاء هذا التقرير تلقائياً • جميع الحقوق محفوظة © ${new Date().getFullYear()}</p>
-  </div>
-</body>
-</html>
-      `
-      
+      // Generate real PDF
+      const pdfBlob = await generatePDFBlob(html)
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-      const filename = `تقرير_أخبار_عين_${timestamp}.html`
+      const filename = `تقرير_أخبار_عين_${timestamp}.pdf`
 
-      // Instant preview for user (no freezing, renders perfectly)
-      const printWindow = window.open('', '_blank')
-      if (printWindow) {
-        printWindow.document.write(printContent)
-        printWindow.document.close()
-      }
+      // Download to user
+      const url = URL.createObjectURL(pdfBlob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
 
-      // Store the SAME HTML content on the server
-      const htmlBlob = new Blob([printContent], { type: 'text/html;charset=utf-8' })
-      const formData = new FormData()
-      formData.append('file', htmlBlob, filename)
-      formData.append('filters', JSON.stringify(filters))
-      formData.append('article_count', articles.length.toString())
-      formData.append('source_type', 'dashboard')
-
-      try {
-        await apiFetch('/api/exports', {
-          method: 'POST',
-          body: formData,
-        })
-      } catch (e) {
-        console.error('Failed to save export:', e)
-      }
-
+      // Store in ملفاتي
+      await uploadExport(apiFetch, pdfBlob, filename, {
+        articleCount: articles.length, filters, sourceType: 'dashboard',
+      })
     } catch (error) {
       console.error('Error exporting PDF:', error)
     } finally {
       setExporting(false)
+    }
+  }
+
+  const [exportingXlsx, setExportingXlsx] = useState(false)
+
+  const exportXLSX = async () => {
+    setExportingXlsx(true)
+    try {
+      const sorted = [...articles].sort((a, b) => {
+        const sortBy = filters.sortBy || 'newest'
+        return sortBy === 'newest' ? b.id - a.id : a.id - b.id
+      })
+      const xlsxBlob = generateXLSX(sorted)
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+      const filename = `تقرير_أخبار_عين_${timestamp}.xlsx`
+
+      // Download to user
+      const url = URL.createObjectURL(xlsxBlob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+
+      // Store in ملفاتي
+      await uploadExport(apiFetch, xlsxBlob, filename, {
+        articleCount: articles.length, filters, sourceType: 'dashboard',
+      })
+    } catch (error) {
+      console.error('Error exporting XLSX:', error)
+    } finally {
+      setExportingXlsx(false)
     }
   }
 
@@ -820,17 +351,30 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
           <p className="text-sm text-slate-500 mt-0.5">جميع الأخبار المرصودة</p>
         </div>
         {articles.length > 0 && (
-          <button 
-            onClick={exportToPDF}
-            disabled={exporting}
-            className="btn"
-          >
-            {exporting ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> جاري التصدير...</>
-            ) : (
-              <><Download className="w-4 h-4" /> تصدير PDF</>
-            )}
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={exportPDF}
+              disabled={exporting}
+              className="btn"
+            >
+              {exporting ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> PDF...</>
+              ) : (
+                <><Download className="w-4 h-4" /> PDF</>
+              )}
+            </button>
+            <button 
+              onClick={exportXLSX}
+              disabled={exportingXlsx}
+              className="btn-outline"
+            >
+              {exportingXlsx ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Excel...</>
+              ) : (
+                <><FileSpreadsheet className="w-4 h-4" /> Excel</>
+              )}
+            </button>
+          </div>
         )}
       </div>
 

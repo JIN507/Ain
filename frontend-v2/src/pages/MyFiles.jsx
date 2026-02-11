@@ -41,7 +41,7 @@ export default function MyFiles() {
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = filename || `export_${exportId}.pdf`
+      a.download = filename || `export_${exportId}`
       document.body.appendChild(a)
       a.click()
       window.URL.revokeObjectURL(url)
@@ -140,7 +140,7 @@ export default function MyFiles() {
             <FileText className="w-7 h-7 text-slate-300" />
           </div>
           <p className="text-slate-500 text-sm">لم تقم بتصدير أي ملفات حتى الآن</p>
-          <p className="text-xs text-slate-400 mt-1">عند تصدير تقرير PDF، سيظهر هنا</p>
+          <p className="text-xs text-slate-400 mt-1">عند تصدير تقرير PDF أو Excel، سيظهر هنا</p>
         </div>
       ) : (
         <div className="space-y-3">

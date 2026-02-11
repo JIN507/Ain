@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Newspaper, ChevronDown, Download, Loader2 } from 'lucide-react'
+import { Newspaper, ChevronDown, Download, Loader2, FileSpreadsheet } from 'lucide-react'
 import ArticleCard from '../components/ArticleCard'
 import Loader from '../components/Loader'
 import { apiFetch } from '../apiClient'
+import { generateXLSX, buildReportHTML, generatePDFBlob, uploadExport } from '../utils/exportUtils'
 
 export default function TopHeadlines() {
   const [countries, setCountries] = useState([])
@@ -97,268 +98,57 @@ export default function TopHeadlines() {
     if (!headlines.length || !selectedCountry) return
     setExporting(true)
     try {
-      const totalArticles = getTotalArticles()
-
-      const printContent = `
-<!DOCTYPE html>
-<html dir="rtl" lang="ar">
-<head>
-  <meta charset="UTF-8">
-  <title>تقرير أهم العناوين - ${selectedCountry}</title>
-  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&display=swap" rel="stylesheet">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: 'Cairo', 'Segoe UI', Tahoma, Arial, sans-serif;
-      direction: rtl;
-      padding: 0;
-      background: #ffffff;
-      color: #1a1a1a;
-      line-height: 1.8;
-    }
-    .report-header {
-      border: 3px solid #059669;
-      border-radius: 12px;
-      padding: 30px;
-      margin: 40px;
-      background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-      page-break-after: avoid;
-    }
-    .logo-section {
-      text-align: center;
-      margin-bottom: 20px;
-      padding-bottom: 20px;
-      border-bottom: 2px solid #059669;
-    }
-    h1 {
-      font-family: 'Amiri', serif;
-      color: #065f46;
-      font-size: 38px;
-      font-weight: 800;
-      margin-bottom: 10px;
-      text-align: center;
-      text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
-    }
-    .subtitle {
-      text-align: center;
-      color: #047857;
-      font-size: 16px;
-      font-weight: 600;
-      margin-bottom: 20px;
-    }
-    .report-info {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 15px;
-      margin-top: 20px;
-      padding: 20px;
-      background: white;
-      border-radius: 8px;
-      border: 1px solid #059669;
-    }
-    .info-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 14px;
-      color: #374151;
-    }
-    .info-label {
-      font-weight: 700;
-      color: #059669;
-    }
-    .articles-container { margin: 30px 40px; }
-    .articles-title {
-      font-size: 20px;
-      font-weight: 700;
-      color: #111827;
-      margin-bottom: 20px;
-      padding: 15px 20px;
-      background: linear-gradient(90deg, #059669 0%, #10b981 100%);
-      color: white;
-      border-radius: 8px;
-      text-align: center;
-    }
-    .source-block { margin-bottom: 30px; page-break-inside: avoid; }
-    .source-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 10px;
-      padding-bottom: 8px;
-      border-bottom: 2px solid #d1d5db;
-    }
-    .source-title {
-      font-size: 18px;
-      font-weight: 700;
-      color: #111827;
-    }
-    .source-meta {
-      font-size: 12px;
-      color: #6b7280;
-    }
-    .article {
-      background: white;
-      border: 2px solid #d1d5db;
-      border-right: 5px solid #059669;
-      border-radius: 10px;
-      padding: 0;
-      margin-bottom: 20px;
-      page-break-inside: avoid;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-      position: relative;
-      overflow: hidden;
-    }
-    .article-content { padding: 22px; }
-    .article-title {
-      font-size: 18px;
-      font-weight: 700;
-      color: #111827;
-      margin-bottom: 10px;
-      line-height: 1.6;
-    }
-    .article-summary {
-      font-size: 14px;
-      color: #374151;
-      line-height: 1.8;
-      margin-bottom: 10px;
-      text-align: justify;
-    }
-    .article-footer {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding-top: 10px;
-      border-top: 1px solid #e5e7eb;
-      margin-top: 10px;
-      font-size: 12px;
-      color: #6b7280;
-    }
-    .article-link {
-      color: #059669;
-      text-decoration: none;
-      font-weight: 600;
-    }
-    .article-link:hover { text-decoration: underline; }
-    .report-footer {
-      margin: 40px;
-      padding: 20px;
-      border: 2px solid #d1d5db;
-      border-radius: 8px;
-      background: #f9fafb;
-      text-align: center;
-      font-size: 12px;
-      color: #6b7280;
-    }
-    @media print {
-      body { padding: 0; }
-      .report-header { margin: 20px; padding: 20px; }
-      .articles-container { margin: 20px; }
-      .article { box-shadow: none; page-break-inside: avoid; }
-    }
-  </style>
-</head>
-<body>
-  <div class="report-header">
-    <div class="logo-section">
-      <h1>تقرير أهم العناوين</h1>
-      <div class="subtitle">${selectedCountry}</div>
-    </div>
-    <div class="report-info">
-      <div class="info-item">
-        <span class="info-label">تاريخ التقرير:</span>
-        <span>${new Date().toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
-      </div>
-      <div class="info-item">
-        <span class="info-label">وقت الإصدار:</span>
-        <span>${new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>
-      </div>
-      <div class="info-item">
-        <span class="info-label">عدد المصادر:</span>
-        <span>${headlines.length} مصدر</span>
-      </div>
-      <div class="info-item">
-        <span class="info-label">عدد الأخبار:</span>
-        <span>${totalArticles} خبر</span>
-      </div>
-    </div>
-  </div>
-
-  <div class="articles-container">
-    <div class="articles-title">أهم العناوين حسب المصدر</div>
-    ${headlines.map((source) => {
-      const safeName = source.source_name || 'مصدر غير معروف';
-      const count = (source.articles || []).length;
-      return `
-      <div class="source-block">
-        <div class="source-header">
-          <div class="source-title">${safeName}</div>
-          <div class="source-meta">${count} خبر${count === 1 ? '' : ''}</div>
-        </div>
-        ${(source.articles || []).map((article, idx) => {
-          const title = article.title_ar || article.title_original || '';
-          const summary = article.summary_ar || article.summary_original || '';
-          const url = article.url || article.link || '';
-          const date = article.published_at || article.pubDate || '';
-          return `
-          <div class="article">
-            <div class="article-content">
-              <div class="article-title">${title}</div>
-              ${summary ? `<div class="article-summary">${summary}</div>` : ''}
-              <div class="article-footer">
-                <span>${date ? `📅 ${new Date(date).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: 'numeric' })}` : ''}</span>
-                ${url ? `<a href="${url}" class="article-link" target="_blank" rel="noopener noreferrer">المقال الأصلي</a>` : ''}
-              </div>
-            </div>
-          </div>
-          `;
-        }).join('')}
-      </div>
-      `;
-    }).join('')}
-  </div>
-
-  <div class="report-footer">
-    <p><strong>نظام أخبار عين</strong></p>
-    <p style="margin-top: 10px;">تم إنشاء هذا التقرير تلقائياً • جميع الحقوق محفوظة © ${new Date().getFullYear()}</p>
-  </div>
-</body>
-</html>
-      `
-
+      // Flatten headlines into article list for the shared utility
+      const allArticles = headlines.flatMap(source =>
+        (source.articles || []).map(a => ({ ...a, source_name: source.source_name, country: selectedCountry }))
+      )
+      const html = buildReportHTML(allArticles, { title: `تقرير أهم العناوين - ${selectedCountry}` })
+      const pdfBlob = await generatePDFBlob(html)
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-      const filename = `تقرير_أهم_العناوين_${selectedCountry}_${timestamp}.html`
+      const filename = `تقرير_أهم_العناوين_${selectedCountry}_${timestamp}.pdf`
 
-      // Instant preview for user
-      const printWindow = window.open('', '_blank')
-      if (printWindow) {
-        printWindow.document.write(printContent)
-        printWindow.document.close()
-      }
+      const url = URL.createObjectURL(pdfBlob)
+      const a = document.createElement('a')
+      a.href = url; a.download = filename
+      document.body.appendChild(a); a.click(); a.remove()
+      URL.revokeObjectURL(url)
 
-      // Store the SAME HTML content on the server
-      const htmlBlob = new Blob([printContent], { type: 'text/html;charset=utf-8' })
-      const formData = new FormData()
-      formData.append('file', htmlBlob, filename)
-      formData.append('filters', JSON.stringify({ country: selectedCountry, type: 'top_headlines' }))
-      formData.append('article_count', totalArticles.toString())
-      formData.append('source_type', 'top_headlines')
-
-      try {
-        await apiFetch('/api/exports', {
-          method: 'POST',
-          body: formData,
-        })
-      } catch (e) {
-        console.error('Failed to save export:', e)
-      }
+      await uploadExport(apiFetch, pdfBlob, filename, {
+        articleCount: allArticles.length, filters: { country: selectedCountry, type: 'top_headlines' }, sourceType: 'top_headlines',
+      })
     } catch (error) {
       console.error('Error exporting headlines PDF:', error)
-      alert('فشل تصدير PDF')
     } finally {
       setExporting(false)
+    }
+  }
+
+  const [exportingXlsx, setExportingXlsx] = useState(false)
+
+  const exportToXLSX = async () => {
+    if (!headlines.length || !selectedCountry) return
+    setExportingXlsx(true)
+    try {
+      const allArticles = headlines.flatMap(source =>
+        (source.articles || []).map(a => ({ ...a, source_name: source.source_name, country: selectedCountry }))
+      )
+      const xlsxBlob = generateXLSX(allArticles)
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+      const filename = `تقرير_أهم_العناوين_${selectedCountry}_${timestamp}.xlsx`
+
+      const url = URL.createObjectURL(xlsxBlob)
+      const a = document.createElement('a')
+      a.href = url; a.download = filename
+      document.body.appendChild(a); a.click(); a.remove()
+      URL.revokeObjectURL(url)
+
+      await uploadExport(apiFetch, xlsxBlob, filename, {
+        articleCount: allArticles.length, filters: { country: selectedCountry, type: 'top_headlines' }, sourceType: 'top_headlines',
+      })
+    } catch (error) {
+      console.error('Error exporting headlines XLSX:', error)
+    } finally {
+      setExportingXlsx(false)
     }
   }
   
@@ -371,9 +161,14 @@ export default function TopHeadlines() {
           <p className="text-sm text-slate-500 mt-0.5">آخر الأخبار من المصادر في كل دولة</p>
         </div>
         {headlines.length > 0 && (
-          <button onClick={exportToPDF} disabled={exporting} className="btn">
-            {exporting ? <><Loader2 className="w-4 h-4 animate-spin" /> جاري...</> : <><Download className="w-4 h-4" /> تصدير PDF</>}
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={exportToPDF} disabled={exporting} className="btn">
+              {exporting ? <><Loader2 className="w-4 h-4 animate-spin" /> PDF...</> : <><Download className="w-4 h-4" /> PDF</>}
+            </button>
+            <button onClick={exportToXLSX} disabled={exportingXlsx} className="btn-outline">
+              {exportingXlsx ? <><Loader2 className="w-4 h-4 animate-spin" /> Excel...</> : <><FileSpreadsheet className="w-4 h-4" /> Excel</>}
+            </button>
+          </div>
         )}
       </div>
       

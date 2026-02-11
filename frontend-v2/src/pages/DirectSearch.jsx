@@ -3,12 +3,13 @@ import {
   Search, ChevronDown, ChevronUp, Loader as LoaderIcon, Download, Loader2, 
   Filter, Calendar, Globe, Languages, Tag, Clock, AlertCircle, RefreshCw,
   FileText, Image, Video, ArrowUpDown, Zap, BarChart3, CheckCircle2,
-  XCircle, Info, Sparkles, BookOpen, ExternalLink, Bookmark
+  XCircle, Info, Sparkles, BookOpen, ExternalLink, Bookmark, FileSpreadsheet
 } from 'lucide-react'
 import ArticleCard from '../components/ArticleCard'
 import Loader from '../components/Loader'
 import GuidedQueryBuilder, { compileToQ, validateQuery } from '../components/GuidedQueryBuilder'
 import { apiFetch } from '../apiClient'
+import { generateXLSX, buildReportHTML, generatePDFBlob, uploadExport } from '../utils/exportUtils'
 
 // Error messages mapping (Arabic)
 const ERROR_MESSAGES = {
@@ -367,82 +368,46 @@ export default function DirectSearch() {
   const exportToPDF = async () => {
     if (!results.length) return
     setExporting(true)
-    
     try {
-      const printContent = `
-<!DOCTYPE html>
-<html dir="rtl" lang="ar">
-<head>
-  <meta charset="UTF-8">
-  <title>نتائج البحث - عين</title>
-  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Cairo', sans-serif; direction: rtl; padding: 40px; background: #fff; color: #1a1a1a; line-height: 1.8; }
-    .header { text-align: center; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 3px solid #10b981; }
-    h1 { color: #10b981; font-size: 28px; margin-bottom: 10px; }
-    .search-info { color: #666; font-size: 14px; }
-    .article { background: #f9fafb; border-right: 4px solid #10b981; border-radius: 8px; padding: 20px; margin-bottom: 20px; page-break-inside: avoid; }
-    .article-title { font-size: 16px; font-weight: 700; color: #111; margin-bottom: 10px; }
-    .article-desc { font-size: 14px; color: #444; margin-bottom: 10px; }
-    .article-meta { font-size: 12px; color: #888; display: flex; gap: 20px; flex-wrap: wrap; }
-    .report-footer { margin-top: 40px; padding: 20px; border: 2px solid #d1d5db; border-radius: 8px; background: #f9fafb; text-align: center; font-size: 12px; color: #6b7280; }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <h1>عين - نتائج البحث</h1>
-    <p class="search-info">عدد النتائج: ${results.length} | التاريخ: ${new Date().toLocaleDateString('ar-SA')}</p>
-  </div>
-  ${results.map(article => `
-    <div class="article">
-      <div class="article-title">${article.title || article.title_ar || 'بدون عنوان'}</div>
-      ${article.description || article.summary_ar ? `<div class="article-desc">${article.description || article.summary_ar}</div>` : ''}
-      <div class="article-meta">
-        <span>${article.source_name || article.source_id || 'غير معروف'}</span>
-        ${article.country ? `<span>${Array.isArray(article.country) ? article.country.join(', ') : article.country}</span>` : ''}
-        ${article.pubDate || article.published_at ? `<span>${new Date(article.pubDate || article.published_at).toLocaleDateString('ar-SA')}</span>` : ''}
-      </div>
-    </div>
-  `).join('')}
-  <div class="report-footer">
-    <p><strong>نظام أخبار عين</strong></p>
-    <p style="margin-top: 10px;">تم إنشاء هذا التقرير تلقائياً • جميع الحقوق محفوظة © ${new Date().getFullYear()}</p>
-  </div>
-</body>
-</html>`
-
+      const html = buildReportHTML(results, { title: 'عين - نتائج البحث' })
+      const pdfBlob = await generatePDFBlob(html)
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-      const filename = `نتائج_البحث_عين_${timestamp}.html`
+      const filename = `نتائج_البحث_عين_${timestamp}.pdf`
 
-      // Instant preview for user
-      const printWindow = window.open('', '_blank')
-      if (printWindow) {
-        printWindow.document.write(printContent)
-        printWindow.document.close()
-      }
+      const url = URL.createObjectURL(pdfBlob)
+      const a = document.createElement('a')
+      a.href = url; a.download = filename
+      document.body.appendChild(a); a.click(); a.remove()
+      URL.revokeObjectURL(url)
 
-      // Store the SAME HTML content on the server
-      const htmlBlob = new Blob([printContent], { type: 'text/html;charset=utf-8' })
-      const formData = new FormData()
-      formData.append('file', htmlBlob, filename)
-      formData.append('filters', JSON.stringify({ type: 'direct_search', query: compiledQuery }))
-      formData.append('article_count', results.length.toString())
-      formData.append('source_type', 'direct_search')
+      await uploadExport(apiFetch, pdfBlob, filename, {
+        articleCount: results.length, filters: { type: 'direct_search', query: compiledQuery }, sourceType: 'direct_search',
+      })
+    } catch (err) { console.error('Export error:', err) }
+    finally { setExporting(false) }
+  }
 
-      try {
-        await apiFetch('/api/exports', {
-          method: 'POST',
-          body: formData,
-        })
-      } catch (e) {
-        console.error('Failed to save export:', e)
-      }
-    } catch (err) {
-      console.error('Export error:', err)
-    } finally {
-      setExporting(false)
-    }
+  const [exportingXlsx, setExportingXlsx] = useState(false)
+
+  const exportToXLSX = async () => {
+    if (!results.length) return
+    setExportingXlsx(true)
+    try {
+      const xlsxBlob = generateXLSX(results)
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+      const filename = `نتائج_البحث_عين_${timestamp}.xlsx`
+
+      const url = URL.createObjectURL(xlsxBlob)
+      const a = document.createElement('a')
+      a.href = url; a.download = filename
+      document.body.appendChild(a); a.click(); a.remove()
+      URL.revokeObjectURL(url)
+
+      await uploadExport(apiFetch, xlsxBlob, filename, {
+        articleCount: results.length, filters: { type: 'direct_search', query: compiledQuery }, sourceType: 'direct_search',
+      })
+    } catch (err) { console.error('Export error:', err) }
+    finally { setExportingXlsx(false) }
   }
   
   // Active filters count
@@ -913,23 +878,30 @@ export default function DirectSearch() {
               )}
             </div>
             
-            <button
-              onClick={exportToPDF}
-              disabled={exporting}
-              className="btn-outline text-sm disabled:opacity-50"
-            >
-              {exporting ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  جاري التصدير...
-                </>
-              ) : (
-                <>
-                  <Download className="w-4 h-4" />
-                  تصدير PDF
-                </>
-              )}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={exportToPDF}
+                disabled={exporting}
+                className="btn-outline text-sm disabled:opacity-50"
+              >
+                {exporting ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> PDF...</>
+                ) : (
+                  <><Download className="w-4 h-4" /> PDF</>
+                )}
+              </button>
+              <button
+                onClick={exportToXLSX}
+                disabled={exportingXlsx}
+                className="btn-outline text-sm disabled:opacity-50"
+              >
+                {exportingXlsx ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Excel...</>
+                ) : (
+                  <><FileSpreadsheet className="w-4 h-4" /> Excel</>
+                )}
+              </button>
+            </div>
           </div>
           
           {/* Results Grid */}

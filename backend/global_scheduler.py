@@ -461,8 +461,6 @@ class GlobalMonitoringScheduler:
             title_ar = strip_html_tags(translation_result['title_ar'])
             summary_ar = strip_html_tags(translation_result['summary_ar'])
             
-            primary_keyword = matched_keywords[0]['keyword_ar']
-            
             # Extract and translate match contexts
             match_contexts = extract_all_match_contexts(
                 article, matched_keywords, words_before=20, words_after=20
@@ -520,7 +518,7 @@ class GlobalMonitoringScheduler:
                     'primary': user_primary,
                     'all_matched': [k['keyword_ar'] for k in user_kws],
                     'match_details': user_kws,
-                    'match_contexts': user_contexts if user_contexts else match_contexts[:1]
+                    'match_contexts': user_contexts
                 }, ensure_ascii=False)
                 
                 new_article = Article(

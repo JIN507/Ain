@@ -9,6 +9,16 @@ import json
 import requests
 
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
+
+# Load from .env file if not in environment (local dev)
+if not GEMINI_API_KEY:
+    _env_path = os.path.join(os.path.dirname(__file__), '.env')
+    if os.path.exists(_env_path):
+        with open(_env_path) as f:
+            for line in f:
+                if line.strip().startswith('GEMINI_API_KEY='):
+                    GEMINI_API_KEY = line.strip().split('=', 1)[1].strip()
+                    break
 GEMINI_MODEL = 'gemini-2.0-flash'
 GEMINI_URL = f'https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent'
 

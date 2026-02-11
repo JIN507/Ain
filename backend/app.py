@@ -2799,7 +2799,7 @@ def get_top_headlines():
                         title_ar = title
                         summary_ar = summary
                         
-                        if translate and translator:
+                        if translate:
                             try:
                                 # Detect language
                                 lang = 'en'

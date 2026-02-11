@@ -71,7 +71,7 @@ class GlobalMonitoringScheduler:
                 "running": self._running,
                 "executing": self._executing,
                 "interval_minutes": self._interval // 60,
-                "last_run": self._last_run.isoformat() if self._last_run else None,
+                "last_run": (self._last_run.isoformat() + 'Z') if self._last_run else None,
                 "next_run": self._calculate_next_run(),
                 "run_count": self._run_count,
                 "error_count": self._error_count,
@@ -102,8 +102,8 @@ class GlobalMonitoringScheduler:
     def _calculate_next_run(self) -> Optional[str]:
         if not self._running or not self._last_run:
             return None
-        next_run = datetime.fromtimestamp(self._last_run.timestamp() + self._interval)
-        return next_run.isoformat()
+        next_run = datetime.utcfromtimestamp(self._last_run.timestamp() + self._interval)
+        return next_run.isoformat() + 'Z'
     
     # ── Lifecycle ─────────────────────────────────────────────────────
     
@@ -114,7 +114,7 @@ class GlobalMonitoringScheduler:
                 return {"success": False, "message": "Global scheduler already running"}
             self._running = True
             self._stop_event.clear()
-            self._last_run = datetime.now()
+            self._last_run = datetime.utcnow()
         
         self._thread = threading.Thread(target=self._run_loop, daemon=True)
         self._thread.start()
@@ -284,7 +284,7 @@ class GlobalMonitoringScheduler:
             job_id = self._acquire_global_lock(db)
             if job_id is None:
                 with self._status_lock:
-                    self._last_run = datetime.now()
+                    self._last_run = datetime.utcnow()
                     self._last_result = {"skipped": True, "reason": "Another worker running"}
                 return
             
@@ -297,7 +297,7 @@ class GlobalMonitoringScheduler:
                 print(f"[GLOBAL-SCHED] No enabled keywords for any user - skipping")
                 self._release_global_lock(db, job_id, True, {"skipped": True})
                 with self._status_lock:
-                    self._last_run = datetime.now()
+                    self._last_run = datetime.utcnow()
                     self._last_result = {"skipped": True, "reason": "No keywords"}
                 return
             
@@ -328,7 +328,7 @@ class GlobalMonitoringScheduler:
                 print(f"[GLOBAL-SCHED] No keyword expansions available - skipping")
                 self._release_global_lock(db, job_id, True, {"skipped": True})
                 with self._status_lock:
-                    self._last_run = datetime.now()
+                    self._last_run = datetime.utcnow()
                     self._last_result = {"skipped": True, "reason": "No expansions"}
                 return
             
@@ -378,7 +378,7 @@ class GlobalMonitoringScheduler:
             self._release_global_lock(db, job_id, True, result)
             
             with self._status_lock:
-                self._last_run = datetime.now()
+                self._last_run = datetime.utcnow()
                 self._run_count += 1
                 self._last_result = result
             
@@ -407,7 +407,7 @@ class GlobalMonitoringScheduler:
             
             with self._status_lock:
                 self._error_count += 1
-                self._last_run = datetime.now()
+                self._last_run = datetime.utcnow()
                 self._last_result = error_result
         finally:
             db.close()

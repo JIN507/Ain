@@ -173,17 +173,19 @@ export function buildReportHTML(articles, { title, stats, filters, keywords, cou
 
 
 export async function generatePDFBlob(htmlContent) {
-  // Render HTML in a hidden iframe, then use html2pdf.js
   const { default: html2pdf } = await import('html2pdf.js')
 
-  const container = document.createElement('div')
-  container.innerHTML = htmlContent
-  // Extract just the body content
-  const bodyMatch = htmlContent.match(/<body[^>]*>([\s\S]*)<\/body>/i)
-  if (bodyMatch) container.innerHTML = bodyMatch[1]
-  container.style.cssText = 'position:fixed;left:-9999px;top:0;width:210mm;direction:rtl;font-family:Cairo,sans-serif;'
+  // Create off-screen wrapper that clips visually but stays in rendering flow
+  const wrapper = document.createElement('div')
+  wrapper.style.cssText = 'position:absolute;left:0;top:0;width:0;height:0;overflow:hidden;z-index:-1;'
 
-  // Inject styles into the container
+  const container = document.createElement('div')
+  // Extract body content
+  const bodyMatch = htmlContent.match(/<body[^>]*>([\s\S]*)<\/body>/i)
+  container.innerHTML = bodyMatch ? bodyMatch[1] : htmlContent
+  container.style.cssText = 'width:794px;direction:rtl;font-family:Cairo,sans-serif;background:white;color:#1a1a1a;line-height:1.8;'
+
+  // Inject the CSS styles
   const styleMatch = htmlContent.match(/<style>([\s\S]*?)<\/style>/i)
   if (styleMatch) {
     const style = document.createElement('style')
@@ -191,25 +193,41 @@ export async function generatePDFBlob(htmlContent) {
     container.prepend(style)
   }
 
-  document.body.appendChild(container)
+  // Inject Google Fonts link for Arabic text
+  const fontLink = document.createElement('link')
+  fontLink.rel = 'stylesheet'
+  fontLink.href = 'https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Amiri:wght@400;700&display=swap'
+  document.head.appendChild(fontLink)
 
-  // Wait for fonts & images
-  await new Promise(r => setTimeout(r, 500))
+  wrapper.appendChild(container)
+  document.body.appendChild(wrapper)
+
+  // Wait for fonts to load and images to render
+  await document.fonts.ready
+  await new Promise(r => setTimeout(r, 800))
 
   const opt = {
     margin: [5, 5, 5, 5],
     filename: 'report.pdf',
-    image: { type: 'jpeg', quality: 0.95 },
-    html2canvas: { scale: 2, useCORS: true, letterRendering: true, scrollY: 0 },
+    image: { type: 'jpeg', quality: 0.92 },
+    html2canvas: {
+      scale: 2,
+      useCORS: true,
+      letterRendering: true,
+      scrollX: 0,
+      scrollY: 0,
+      windowWidth: 794,
+    },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
     pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
   }
 
   try {
-    const blob = await html2pdf().set(opt).from(container).outputPdf('blob')
+    const blob = await html2pdf().set(opt).from(container).toPdf().output('blob')
     return blob
   } finally {
-    document.body.removeChild(container)
+    document.body.removeChild(wrapper)
+    document.head.removeChild(fontLink)
   }
 }
 

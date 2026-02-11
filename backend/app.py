@@ -10,7 +10,7 @@ from flask import Flask, request, jsonify, send_from_directory, send_file, Respo
 from flask_cors import CORS
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_wtf.csrf import CSRFProtect, generate_csrf
-from models import init_db, get_db, Country, Source, Keyword, Article, User, AuditLog, ExportRecord, UserFile, SearchHistory
+from models import init_db, get_db, Country, Source, Keyword, Article, User, AuditLog, ExportRecord, UserFile, SearchHistory, BookmarkedArticle
 import uuid
 from rss_service import fetch_feed
 from translation_service import (
@@ -3164,6 +3164,133 @@ def external_headlines():
             "error": "Internal server error",
             "code": "server_error"
         }), 500
+    finally:
+        db.close()
+
+
+# =============================================================================
+# BOOKMARKS — المفضلة (survives monthly reset)
+# =============================================================================
+
+@app.route('/api/bookmarks', methods=['GET'])
+@login_required
+def get_bookmarks():
+    """Get all bookmarked articles for the current user."""
+    db = get_db()
+    try:
+        bookmarks = db.query(BookmarkedArticle).filter(
+            BookmarkedArticle.user_id == current_user.id
+        ).order_by(BookmarkedArticle.bookmarked_at.desc()).all()
+
+        return jsonify([{
+            'id': b.id,
+            'original_article_id': b.original_article_id,
+            'title_ar': b.title_ar,
+            'title_original': b.title_original,
+            'summary_ar': b.summary_ar,
+            'url': b.original_url,
+            'image_url': b.image_url,
+            'source_name': b.source_name,
+            'country': b.country,
+            'keyword_original': b.keyword_original,
+            'sentiment': b.sentiment,
+            'published_at': b.published_at.isoformat() if b.published_at else None,
+            'bookmarked_at': b.bookmarked_at.isoformat() if b.bookmarked_at else None,
+            'note': b.note,
+        } for b in bookmarks])
+    finally:
+        db.close()
+
+
+@app.route('/api/bookmarks', methods=['POST'])
+@login_required
+@csrf.exempt
+def create_bookmark():
+    """Bookmark an article — saves a snapshot that survives monthly reset."""
+    data = request.get_json() or {}
+    url = data.get('url', '').strip()
+    if not url:
+        return jsonify({'error': 'URL is required'}), 400
+
+    db = get_db()
+    try:
+        existing = db.query(BookmarkedArticle).filter(
+            BookmarkedArticle.user_id == current_user.id,
+            BookmarkedArticle.original_url == url
+        ).first()
+        if existing:
+            return jsonify({'error': 'already_bookmarked', 'id': existing.id}), 409
+
+        pub_at = None
+        if data.get('published_at'):
+            try:
+                pub_at = datetime.fromisoformat(str(data['published_at']).replace('Z', '+00:00'))
+            except Exception:
+                pass
+
+        bookmark = BookmarkedArticle(
+            user_id=current_user.id,
+            original_article_id=data.get('article_id'),
+            title_ar=data.get('title_ar', ''),
+            title_original=data.get('title_original', ''),
+            summary_ar=data.get('summary_ar', ''),
+            original_url=url,
+            image_url=data.get('image_url'),
+            source_name=data.get('source_name', ''),
+            country=data.get('country', ''),
+            keyword_original=data.get('keyword_original', ''),
+            sentiment=data.get('sentiment', ''),
+            published_at=pub_at,
+        )
+        db.add(bookmark)
+        db.commit()
+        return jsonify({'success': True, 'id': bookmark.id}), 201
+    except Exception as e:
+        db.rollback()
+        print(f"[BOOKMARKS] ❌ Error: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        db.close()
+
+
+@app.route('/api/bookmarks/<int:bookmark_id>', methods=['DELETE'])
+@login_required
+@csrf.exempt
+def delete_bookmark(bookmark_id):
+    """Remove a bookmark."""
+    db = get_db()
+    try:
+        bookmark = db.query(BookmarkedArticle).filter(
+            BookmarkedArticle.id == bookmark_id,
+            BookmarkedArticle.user_id == current_user.id
+        ).first()
+        if not bookmark:
+            return jsonify({'error': 'not_found'}), 404
+        db.delete(bookmark)
+        db.commit()
+        return jsonify({'success': True})
+    finally:
+        db.close()
+
+
+@app.route('/api/bookmarks/check', methods=['POST'])
+@login_required
+@csrf.exempt
+def check_bookmarks():
+    """Check which URLs are already bookmarked (batch check)."""
+    data = request.get_json() or {}
+    urls = data.get('urls', [])
+    if not urls:
+        return jsonify({'bookmarked': {}})
+
+    db = get_db()
+    try:
+        existing = db.query(BookmarkedArticle.original_url, BookmarkedArticle.id).filter(
+            BookmarkedArticle.user_id == current_user.id,
+            BookmarkedArticle.original_url.in_(urls)
+        ).all()
+        bookmarked = {row.original_url: row.id for row in existing}
+        return jsonify({'bookmarked': bookmarked})
     finally:
         db.close()
 

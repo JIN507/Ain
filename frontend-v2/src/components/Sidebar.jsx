@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Home, Globe, Key, Newspaper, Search, Activity, Shield, Eye } from 'lucide-react'
+import { Home, Globe, Key, Newspaper, Search, Activity, Shield, Eye, Bookmark } from 'lucide-react'
 
 export default function Sidebar({ currentPage, setCurrentPage, sidebarOpen, setSidebarOpen, isAdmin }) {
   const navItems = [
@@ -7,6 +7,7 @@ export default function Sidebar({ currentPage, setCurrentPage, sidebarOpen, setS
     { id: 'keywords', label: 'الكلمات والمراقبة', icon: Key },
     { id: 'directsearch', label: 'إبحث الآن', icon: Search },
     { id: 'topheadlines', label: 'أهم العناوين', icon: Activity },
+    { id: 'bookmarks', label: 'المفضلة', icon: Bookmark },
     { id: 'myfiles', label: 'ملفاتي', icon: Newspaper },
     { id: 'countries', label: 'الدول', icon: Globe },
   ]

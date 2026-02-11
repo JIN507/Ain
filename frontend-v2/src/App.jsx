@@ -12,6 +12,7 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import Admin from './pages/Admin'
 import MyFiles from './pages/MyFiles'
+import Bookmarks from './pages/Bookmarks'
 import { AuthProvider, useAuth } from './context/AuthContext'
 
 function AppContent() {
@@ -31,6 +32,7 @@ function AppContent() {
     dashboard: <Dashboard initialKeywordFilter={dashboardKeywordFilter} onFilterApplied={() => setDashboardKeywordFilter('')} />,
     directsearch: <DirectSearch />,
     topheadlines: <TopHeadlines />,
+    bookmarks: <Bookmarks />,
     myfiles: <MyFiles />,
     countries: <Countries isAdmin={currentUser?.role === 'ADMIN'} />,
     keywords: <Keywords onKeywordClick={navigateToKeywordResults} />,

@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { ExternalLink, ThumbsUp, ThumbsDown, Minus, ChevronDown, ChevronUp } from 'lucide-react'
+import { ExternalLink, ThumbsUp, ThumbsDown, Minus, ChevronDown, ChevronUp, Bookmark, Loader2 } from 'lucide-react'
 
-export default function ArticleCard({ article }) {
+export default function ArticleCard({ article, isBookmarked, onBookmark, onUnbookmark, bookmarkLoading }) {
   const [isExpanded, setIsExpanded] = useState(false)
   
   const sentimentConfig = {
@@ -131,6 +131,22 @@ export default function ArticleCard({ article }) {
           </div>
 
           <div className="flex items-center gap-1.5">
+            {/* Bookmark button */}
+            {onBookmark && (
+              <button
+                onClick={() => isBookmarked ? onUnbookmark?.(article) : onBookmark?.(article)}
+                disabled={bookmarkLoading}
+                className="btn-ghost !px-2 !py-1 !text-xs"
+                style={{ color: isBookmarked ? '#f59e0b' : '#94a3b8' }}
+                title={isBookmarked ? 'إزالة من المفضلة' : 'حفظ في المفضلة'}
+              >
+                {bookmarkLoading
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : <Bookmark className="w-3.5 h-3.5" fill={isBookmarked ? '#f59e0b' : 'none'} />
+                }
+              </button>
+            )}
+
             {/* Expand/Collapse button - only show if text is long */}
             {shouldShowExpandButton && (
               <button

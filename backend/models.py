@@ -344,6 +344,30 @@ engine = create_engine(DATABASE_URL, connect_args=_connect_args, **_pool_kwargs)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
+class BookmarkedArticle(Base):
+    """User-bookmarked articles — survives monthly reset"""
+    __tablename__ = 'bookmarked_articles'
+    __table_args__ = (
+        UniqueConstraint('user_id', 'original_url', name='uq_bookmark_user_url'),
+    )
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    original_article_id = Column(Integer, nullable=True)
+    title_ar = Column(Text, nullable=True)
+    title_original = Column(Text, nullable=True)
+    summary_ar = Column(Text, nullable=True)
+    original_url = Column(String(2000), nullable=False)
+    image_url = Column(String(2000), nullable=True)
+    source_name = Column(String(200), nullable=True)
+    country = Column(String(100), nullable=True)
+    keyword_original = Column(String(200), nullable=True)
+    sentiment = Column(String(50), nullable=True)
+    published_at = Column(DateTime, nullable=True)
+    bookmarked_at = Column(DateTime, default=datetime.utcnow)
+    note = Column(Text, nullable=True)
+
+
 class SystemConfig(Base):
     """System configuration storage for cleanup dates and other settings"""
     __tablename__ = 'system_config'

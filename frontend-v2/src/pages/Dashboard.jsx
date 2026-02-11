@@ -16,6 +16,8 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
   const [stats, setStats] = useState({ total: 0, positive: 0, negative: 0, neutral: 0 })
   const [monitorStatus, setMonitorStatus] = useState(null)
   const [cleanupStatus, setCleanupStatus] = useState(null)
+  const [bookmarkedUrls, setBookmarkedUrls] = useState({})
+  const [bookmarkLoading, setBookmarkLoading] = useState(null)
   const prevArticleCount = useRef(0)
   // Initialize filters with keyword if provided from navigation
   const [filters, setFilters] = useState(() => 
@@ -40,6 +42,59 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
     loadKeywords()
     loadCleanupStatus()
   }, [filters])
+
+  // Check which articles are bookmarked
+  useEffect(() => {
+    if (articles.length === 0) return
+    const urls = articles.map(a => a.url).filter(Boolean)
+    if (urls.length === 0) return
+    apiFetch('/api/bookmarks/check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ urls }),
+    }).then(r => r.json()).then(d => setBookmarkedUrls(d.bookmarked || {})).catch(() => {})
+  }, [articles])
+
+  const handleBookmark = async (article) => {
+    setBookmarkLoading(article.url)
+    try {
+      const res = await apiFetch('/api/bookmarks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          article_id: article.id,
+          title_ar: article.title_ar,
+          title_original: article.title_original,
+          summary_ar: article.summary_ar,
+          url: article.url,
+          image_url: article.image_url,
+          source_name: article.source_name,
+          country: article.country,
+          keyword_original: article.keyword_original,
+          sentiment: article.sentiment,
+          published_at: article.published_at,
+        }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setBookmarkedUrls(prev => ({ ...prev, [article.url]: data.id }))
+      }
+    } catch (e) { console.error('Bookmark error:', e) }
+    finally { setBookmarkLoading(null) }
+  }
+
+  const handleUnbookmark = async (article) => {
+    const bookmarkId = bookmarkedUrls[article.url]
+    if (!bookmarkId) return
+    setBookmarkLoading(article.url)
+    try {
+      const res = await apiFetch(`/api/bookmarks/${bookmarkId}`, { method: 'DELETE' })
+      if (res.ok) {
+        setBookmarkedUrls(prev => { const n = { ...prev }; delete n[article.url]; return n })
+      }
+    } catch (e) { console.error('Unbookmark error:', e) }
+    finally { setBookmarkLoading(null) }
+  }
 
   // Load cleanup status to show warning
   const loadCleanupStatus = async () => {
@@ -409,7 +464,14 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
               }
             })
             .map((article) => (
-              <ArticleCard key={article.id} article={article} />
+              <ArticleCard
+                key={article.id}
+                article={article}
+                isBookmarked={!!bookmarkedUrls[article.url]}
+                onBookmark={handleBookmark}
+                onUnbookmark={handleUnbookmark}
+                bookmarkLoading={bookmarkLoading === article.url}
+              />
             ))
           }
         </div>

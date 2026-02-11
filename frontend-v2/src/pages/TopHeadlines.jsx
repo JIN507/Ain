@@ -3,7 +3,7 @@ import { Newspaper, ChevronDown, Download, Loader2, FileSpreadsheet } from 'luci
 import ArticleCard from '../components/ArticleCard'
 import Loader from '../components/Loader'
 import { apiFetch } from '../apiClient'
-import { generateXLSX, buildReportHTML, exportPDFViaWindow, uploadExport } from '../utils/exportUtils'
+import { generateXLSX, buildReportHTML, generatePDFBlob, uploadExport } from '../utils/exportUtils'
 
 export default function TopHeadlines() {
   const [countries, setCountries] = useState([])
@@ -102,12 +102,17 @@ export default function TopHeadlines() {
         (source.articles || []).map(a => ({ ...a, source_name: source.source_name, country: selectedCountry }))
       )
       const html = buildReportHTML(allArticles, { title: `تقرير أهم العناوين - ${selectedCountry}` })
-      const htmlBlob = exportPDFViaWindow(html)
-      if (!htmlBlob) return
-
+      const pdfBlob = await generatePDFBlob(html, apiFetch)
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-      const filename = `تقرير_أهم_العناوين_${selectedCountry}_${timestamp}.html`
-      await uploadExport(apiFetch, htmlBlob, filename, {
+      const filename = `تقرير_أهم_العناوين_${selectedCountry}_${timestamp}.pdf`
+
+      const url = URL.createObjectURL(pdfBlob)
+      const a = document.createElement('a')
+      a.href = url; a.download = filename
+      document.body.appendChild(a); a.click(); a.remove()
+      URL.revokeObjectURL(url)
+
+      await uploadExport(apiFetch, pdfBlob, filename, {
         articleCount: allArticles.length, filters: { country: selectedCountry, type: 'top_headlines' }, sourceType: 'top_headlines',
       })
     } catch (error) {

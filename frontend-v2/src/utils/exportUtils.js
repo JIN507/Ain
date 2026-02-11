@@ -172,21 +172,18 @@ export function buildReportHTML(articles, { title, stats, filters, keywords, cou
 }
 
 
-export function exportPDFViaWindow(htmlContent) {
-  // Open full HTML report in a new tab — browser renders it perfectly (Arabic, fonts, styles)
-  const win = window.open('', '_blank')
-  if (!win) {
-    alert('يرجى السماح بالنوافذ المنبثقة لتصدير التقرير')
-    return null
+export async function generatePDFBlob(htmlContent, apiFetch) {
+  // Server-side PDF generation using WeasyPrint — perfect Arabic/RTL rendering
+  const res = await apiFetch('/api/exports/generate-pdf', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ html: htmlContent }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.error || 'فشل إنشاء ملف PDF')
   }
-  win.document.write(htmlContent)
-  win.document.close()
-
-  // Auto-trigger print dialog after content + fonts load (user picks "Save as PDF")
-  win.onload = () => setTimeout(() => win.print(), 600)
-
-  // Return HTML blob for backend storage in ملفاتي
-  return new Blob([htmlContent], { type: 'text/html;charset=utf-8' })
+  return await res.blob()
 }
 
 

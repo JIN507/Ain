@@ -6,7 +6,7 @@ import sys
 sys.stdout.reconfigure(line_buffering=True)
 sys.stderr.reconfigure(line_buffering=True)
 
-from flask import Flask, request, jsonify, send_from_directory, send_file
+from flask import Flask, request, jsonify, send_from_directory, send_file, Response
 from flask_cors import CORS
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_wtf.csrf import CSRFProtect, generate_csrf
@@ -258,6 +258,33 @@ def get_user_exports_folder(user_id):
     user_folder = os.path.join(EXPORTS_FOLDER, str(user_id))
     os.makedirs(user_folder, exist_ok=True)
     return user_folder
+
+
+@app.route('/api/exports/generate-pdf', methods=['POST'])
+@login_required
+@csrf.exempt
+def generate_pdf():
+    """Generate a real PDF from HTML content using WeasyPrint (server-side)."""
+    try:
+        from weasyprint import HTML as WeasyHTML
+    except ImportError:
+        return jsonify({'error': 'PDF engine not available on this server'}), 500
+
+    data = request.get_json() or {}
+    html_content = data.get('html', '')
+    if not html_content:
+        return jsonify({'error': 'No HTML content provided'}), 400
+
+    try:
+        pdf_bytes = WeasyHTML(string=html_content).write_pdf()
+        return Response(
+            pdf_bytes,
+            mimetype='application/pdf',
+            headers={'Content-Disposition': 'inline; filename="report.pdf"'}
+        )
+    except Exception as e:
+        print(f"[PDF] ❌ WeasyPrint error: {e}")
+        return jsonify({'error': f'PDF generation failed: {str(e)}'}), 500
 
 
 @app.route('/api/exports', methods=['POST'])

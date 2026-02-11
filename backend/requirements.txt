@@ -25,6 +25,9 @@ email-validator==2.1.0.post1
 Flask-Login==0.6.3
 Flask-WTF==1.2.1
 
+# PDF generation
+weasyprint==62.3
+
 # Production server
 gunicorn==21.2.0
 

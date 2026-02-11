@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Bookmark, Trash2, ExternalLink, ThumbsUp, ThumbsDown, Minus, Search, Loader2 } from 'lucide-react'
+import { Bookmark, Trash2, ExternalLink, ThumbsUp, ThumbsDown, Minus, Search, Loader2, Download, FileSpreadsheet } from 'lucide-react'
 import { apiFetch } from '../apiClient'
+import { generateXLSX, generatePDFBlob, uploadExport } from '../utils/exportUtils'
 
 export default function Bookmarks() {
   const [bookmarks, setBookmarks] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [removing, setRemoving] = useState(null)
+  const [exporting, setExporting] = useState(false)
+  const [exportingXlsx, setExportingXlsx] = useState(false)
 
   useEffect(() => {
     loadBookmarks()
@@ -48,6 +51,68 @@ export default function Bookmarks() {
     'محايد': { class: 'badge-neutral', icon: Minus },
   }
 
+  // Export helpers — map bookmark fields to what exportUtils expects
+  const toArticleFormat = (b) => ({
+    id: b.id,
+    title_ar: b.title_ar,
+    title_original: b.title_original,
+    summary_ar: b.summary_ar,
+    url: b.url,
+    image_url: b.image_url,
+    source_name: b.source_name,
+    country: b.country,
+    keyword_original: b.keyword_original,
+    sentiment: b.sentiment,
+    published_at: b.published_at,
+  })
+
+  const exportPDF = async () => {
+    if (!bookmarks.length) return
+    setExporting(true)
+    try {
+      const articles = bookmarks.map(toArticleFormat)
+      const pdfBlob = await generatePDFBlob(articles, apiFetch, { title: 'تقرير المفضلة' })
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+      const filename = `المفضلة_${timestamp}.pdf`
+      const url = URL.createObjectURL(pdfBlob)
+      const a = document.createElement('a')
+      a.href = url; a.download = filename
+      document.body.appendChild(a); a.click(); a.remove()
+      URL.revokeObjectURL(url)
+      await uploadExport(apiFetch, pdfBlob, filename, {
+        articleCount: articles.length, filters: { type: 'bookmarks' }, sourceType: 'bookmarks',
+      })
+    } catch (error) {
+      console.error('Error exporting bookmarks PDF:', error)
+      alert('خطأ في تصدير PDF: ' + error.message)
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const exportXLSX = async () => {
+    if (!bookmarks.length) return
+    setExportingXlsx(true)
+    try {
+      const articles = bookmarks.map(toArticleFormat)
+      const xlsxBlob = generateXLSX(articles)
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+      const filename = `المفضلة_${timestamp}.xlsx`
+      const url = URL.createObjectURL(xlsxBlob)
+      const a = document.createElement('a')
+      a.href = url; a.download = filename
+      document.body.appendChild(a); a.click(); a.remove()
+      URL.revokeObjectURL(url)
+      await uploadExport(apiFetch, xlsxBlob, filename, {
+        articleCount: articles.length, filters: { type: 'bookmarks' }, sourceType: 'bookmarks',
+      })
+    } catch (error) {
+      console.error('Error exporting bookmarks XLSX:', error)
+    } finally {
+      setExportingXlsx(false)
+    }
+  }
+
   const filtered = searchQuery.trim()
     ? bookmarks.filter(b =>
         (b.title_ar || '').includes(searchQuery) ||
@@ -70,10 +135,28 @@ export default function Bookmarks() {
             المقالات المحفوظة — لا تُحذف عند إعادة التعيين الشهرية
           </p>
         </div>
-        <span className="text-sm font-semibold px-3 py-1.5 rounded-lg"
-          style={{ background: 'rgba(245,158,11,0.1)', color: '#d97706' }}>
-          {bookmarks.length} محفوظ
-        </span>
+        <div className="flex items-center gap-2">
+          {bookmarks.length > 0 && (
+            <>
+              <button onClick={exportPDF} disabled={exporting}
+                className="btn-ghost flex items-center gap-1.5 !text-xs !px-3 !py-1.5"
+                style={{ color: '#0f766e' }}>
+                {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                PDF
+              </button>
+              <button onClick={exportXLSX} disabled={exportingXlsx}
+                className="btn-ghost flex items-center gap-1.5 !text-xs !px-3 !py-1.5"
+                style={{ color: '#0f766e' }}>
+                {exportingXlsx ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileSpreadsheet className="w-3.5 h-3.5" />}
+                Excel
+              </button>
+            </>
+          )}
+          <span className="text-sm font-semibold px-3 py-1.5 rounded-lg"
+            style={{ background: 'rgba(245,158,11,0.1)', color: '#d97706' }}>
+            {bookmarks.length} محفوظ
+          </span>
+        </div>
       </div>
 
       {/* Search */}

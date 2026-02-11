@@ -21,7 +21,7 @@
       "failed_runs": 17,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host rss.cnn.com:80 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 21110
@@ -43,7 +43,7 @@
       "failed_runs": 16,
       "empty_runs": 1,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host www.okaz.com.sa:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 21098
@@ -54,7 +54,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host aawsat.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 21150
@@ -65,7 +65,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host rss.nytimes.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 11331
@@ -76,7 +76,7 @@
       "failed_runs": 17,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host feeds.washingtonpost.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 4579
@@ -87,7 +87,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host feeds.content.dowjones.io:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 21150
@@ -98,7 +98,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host www.forbes.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 10575
@@ -109,7 +109,7 @@
       "failed_runs": 16,
       "empty_runs": 423,
       "consecutive_empty": 439,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host feeds.npr.org:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -120,7 +120,7 @@
       "failed_runs": 17,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host theintercept.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 8440
@@ -131,7 +131,7 @@
       "failed_runs": 17,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host www.bbc.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 11992
@@ -142,7 +142,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host feeds.bbci.co.uk:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 12541
@@ -153,7 +153,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host www.theguardian.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 19035
@@ -164,10 +164,10 @@
       "failed_runs": 17,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host www.ft.com:443 ssl:default [getaddrinfo failed]",
-      "total_articles_fetched": 4330
+      "total_articles_fetched": 4329
     },
     "RT Arabic": {
       "total_runs": 439,
@@ -175,7 +175,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host arabic.rt.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 21150
@@ -187,7 +187,7 @@
       "empty_runs": 0,
       "consecutive_empty": 380,
       "last_success": "2025-11-27T15:08:34.492563",
-      "last_failure": "2026-02-11T04:24:12.905592",
+      "last_failure": "2026-02-11T04:44:38.919254",
       "last_error": null,
       "total_articles_fetched": 2900
     },
@@ -197,7 +197,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host www.scmp.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 21150
@@ -208,7 +208,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host www.al-jazirah.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 1817
@@ -219,7 +219,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host www.al-jazirah.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 1708
@@ -230,7 +230,7 @@
       "failed_runs": 17,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host identity-mag.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 4220
@@ -241,7 +241,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host www.aa.com.tr:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 5228
@@ -259,14 +259,14 @@
     },
     "طهران تايمز": {
       "total_runs": 439,
-      "successful_runs": 253,
-      "failed_runs": 186,
+      "successful_runs": 254,
+      "failed_runs": 185,
       "empty_runs": 0,
-      "consecutive_empty": 1,
-      "last_success": "2026-02-11T04:05:14.890969",
-      "last_failure": "2026-02-11T04:24:12.905592",
-      "last_error": "Cannot connect to host www.tehrantimes.com:443 ssl:default [getaddrinfo failed]",
-      "total_articles_fetched": 7590
+      "consecutive_empty": 0,
+      "last_success": "2026-02-11T04:44:38.919254",
+      "last_failure": "2026-02-10T18:42:19.457013",
+      "last_error": null,
+      "total_articles_fetched": 7620
     },
     "The National": {
       "total_runs": 439,
@@ -274,7 +274,7 @@
       "failed_runs": 21,
       "empty_runs": 418,
       "consecutive_empty": 439,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host www.thenationalnews.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -285,7 +285,7 @@
       "failed_runs": 32,
       "empty_runs": 844,
       "consecutive_empty": 876,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host gulfnews.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -296,7 +296,7 @@
       "failed_runs": 18,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host rss.dw.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 21050
@@ -307,21 +307,21 @@
       "failed_runs": 18,
       "empty_runs": 421,
       "consecutive_empty": 439,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host rss.dw.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
     },
     "France 24 Arabic": {
       "total_runs": 439,
-      "successful_runs": 338,
+      "successful_runs": 337,
       "failed_runs": 20,
-      "empty_runs": 81,
-      "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "empty_runs": 82,
+      "consecutive_empty": 1,
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host www.france24.com:443 ssl:default [getaddrinfo failed]",
-      "total_articles_fetched": 7905
+      "total_articles_fetched": 7882
     },
     "France 24 English": {
       "total_runs": 439,
@@ -329,7 +329,7 @@
       "failed_runs": 20,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host www.france24.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 9876
@@ -340,7 +340,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host www.lemonde.fr:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 7687
@@ -351,7 +351,7 @@
       "failed_runs": 23,
       "empty_runs": 4,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host www.moroccoworldnews.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 4120
@@ -362,7 +362,7 @@
       "failed_runs": 33,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.744010",
       "last_error": "Cannot connect to host thehindu.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 42150
@@ -373,7 +373,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host asia.nikkei.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 21150
@@ -384,7 +384,7 @@
       "failed_runs": 21,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host japannews.yomiuri.co.jp:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 8360
@@ -395,7 +395,7 @@
       "failed_runs": 18,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host www.straitstimes.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 21050
@@ -407,7 +407,7 @@
       "empty_runs": 0,
       "consecutive_empty": 439,
       "last_success": null,
-      "last_failure": "2026-02-11T04:24:12.905592",
+      "last_failure": "2026-02-11T04:44:38.919254",
       "last_error": "'utf-8' codec can't decode byte 0xc1 in position 1: invalid start byte",
       "total_articles_fetched": 0
     },
@@ -417,7 +417,7 @@
       "failed_runs": 16,
       "empty_runs": 1,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host www.bellingcat.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 4220
@@ -439,7 +439,7 @@
       "failed_runs": 23,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host www.icij.org:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 4339
@@ -450,7 +450,7 @@
       "failed_runs": 22,
       "empty_runs": 417,
       "consecutive_empty": 439,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host www.occrp.org:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -461,7 +461,7 @@
       "failed_runs": 21,
       "empty_runs": 418,
       "consecutive_empty": 439,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host www.politico.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -473,7 +473,7 @@
       "empty_runs": 0,
       "consecutive_empty": 439,
       "last_success": null,
-      "last_failure": "2026-02-11T04:24:12.905592",
+      "last_failure": "2026-02-11T04:44:38.919254",
       "last_error": "Cannot connect to host rss.haberler.com:443 ssl:default [The specified network name is no longer available]",
       "total_articles_fetched": 0
     },
@@ -483,7 +483,7 @@
       "failed_runs": 18,
       "empty_runs": 1,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host www.independent.co.uk:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 14674
@@ -494,7 +494,7 @@
       "failed_runs": 19,
       "empty_runs": 1,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host www.independent.co.uk:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 19701
@@ -505,7 +505,7 @@
       "failed_runs": 32,
       "empty_runs": 5,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host www.diplomatie.gouv.fr:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 4020
@@ -516,7 +516,7 @@
       "failed_runs": 25,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host arabic.cnn.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 8280
@@ -527,7 +527,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host www.rt.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 21150
@@ -538,7 +538,7 @@
       "failed_runs": 70,
       "empty_runs": 369,
       "consecutive_empty": 439,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host rsshub.app:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -550,7 +550,7 @@
       "empty_runs": 0,
       "consecutive_empty": 439,
       "last_success": null,
-      "last_failure": "2026-02-11T04:24:12.905592",
+      "last_failure": "2026-02-11T04:44:38.919254",
       "last_error": "Cannot connect to host www.ntv.com.tr:443 ssl:default [The specified network name is no longer available]",
       "total_articles_fetched": 0
     },
@@ -561,7 +561,7 @@
       "empty_runs": 0,
       "consecutive_empty": 439,
       "last_success": null,
-      "last_failure": "2026-02-11T04:24:12.905592",
+      "last_failure": "2026-02-11T04:44:38.919254",
       "last_error": "Cannot connect to host www.ntv.com.tr:443 ssl:default [The specified network name is no longer available]",
       "total_articles_fetched": 0
     },
@@ -571,7 +571,7 @@
       "failed_runs": 22,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host timesofindia.indiatimes.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 8340
@@ -582,7 +582,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host www.nippon.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 8460
@@ -593,7 +593,7 @@
       "failed_runs": 19,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host feeds.nbcnews.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 10500
@@ -604,7 +604,7 @@
       "failed_runs": 16,
       "empty_runs": 23,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host feeds.npr.org:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 4000
@@ -615,7 +615,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host rss.politico.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 12690
@@ -626,7 +626,7 @@
       "failed_runs": 19,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host feeds.bloomberg.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 12600
@@ -637,7 +637,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host www.cnbc.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 12690
@@ -648,7 +648,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host abcnews.go.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 10574
@@ -659,7 +659,7 @@
       "failed_runs": 18,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host feeds.foxnews.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 10525
@@ -670,7 +670,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host feeds.bbci.co.uk:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 14660
@@ -681,7 +681,7 @@
       "failed_runs": 18,
       "empty_runs": 421,
       "consecutive_empty": 439,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host telegraph.co.uk:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -692,7 +692,7 @@
       "failed_runs": 21,
       "empty_runs": 1,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host independent.co.uk:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 20850
@@ -703,7 +703,7 @@
       "failed_runs": 17,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host feeds.skynews.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 4220
@@ -714,7 +714,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host rss.dw.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 21150
@@ -725,7 +725,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host rss.dw.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 8883
@@ -736,7 +736,7 @@
       "failed_runs": 16,
       "empty_runs": 182,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host nltimes.nl:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 2410
@@ -747,7 +747,7 @@
       "failed_runs": 19,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host dutchnews.nl:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 4200
@@ -758,7 +758,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host www.aljazeera.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 10575
@@ -770,7 +770,7 @@
       "empty_runs": 1,
       "consecutive_empty": 876,
       "last_success": "2026-01-11T22:12:24.770472",
-      "last_failure": "2026-02-11T04:24:55.892900",
+      "last_failure": "2026-02-11T04:45:18.919690",
       "last_error": "Cannot connect to host www.dohanews.co:443 ssl:default [The specified network name is no longer available]",
       "total_articles_fetched": 0
     },
@@ -791,7 +791,7 @@
       "failed_runs": 17,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host timesofindia.indiatimes.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 19335
@@ -802,7 +802,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host feeds.feedburner.com:80 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 8460
@@ -813,7 +813,7 @@
       "failed_runs": 16,
       "empty_runs": 423,
       "consecutive_empty": 439,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host indianexpress.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -824,7 +824,7 @@
       "failed_runs": 18,
       "empty_runs": 419,
       "consecutive_empty": 437,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.744010",
       "last_error": "Cannot connect to host business-standard.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -835,7 +835,7 @@
       "failed_runs": 16,
       "empty_runs": 421,
       "consecutive_empty": 437,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.744010",
       "last_error": "Cannot connect to host japantimes.co.jp:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -846,7 +846,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.744010",
       "last_error": "Cannot connect to host www.asahi.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 16704
@@ -857,7 +857,7 @@
       "failed_runs": 16,
       "empty_runs": 421,
       "consecutive_empty": 437,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.744010",
       "last_error": "Cannot connect to host www3.nhk.or.jp:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -868,7 +868,7 @@
       "failed_runs": 17,
       "empty_runs": 420,
       "consecutive_empty": 437,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.744010",
       "last_error": "Cannot connect to host straitstimes.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -879,7 +879,7 @@
       "failed_runs": 17,
       "empty_runs": 420,
       "consecutive_empty": 437,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.744010",
       "last_error": "Cannot connect to host businesstimes.com.sg:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -890,7 +890,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.744010",
       "last_error": "Cannot connect to host politico.eu:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 4210
@@ -901,7 +901,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.744010",
       "last_error": "Cannot connect to host globalnews.ca:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 4210
@@ -912,7 +912,7 @@
       "failed_runs": 16,
       "empty_runs": 421,
       "consecutive_empty": 437,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.744010",
       "last_error": "Cannot connect to host www.ctvnews.ca:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -923,7 +923,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.744010",
       "last_error": "Cannot connect to host www.cbc.ca:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 8410
@@ -934,7 +934,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.744010",
       "last_error": "Cannot connect to host nationalpost.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 4210
@@ -945,7 +945,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.744010",
       "last_error": "Cannot connect to host financialpost.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 4210
@@ -956,7 +956,7 @@
       "failed_runs": 17,
       "empty_runs": 362,
       "consecutive_empty": 378,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.744010",
       "last_error": "Cannot connect to host excelsior.com.mx:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 870
@@ -968,7 +968,7 @@
       "empty_runs": 0,
       "consecutive_empty": 437,
       "last_success": null,
-      "last_failure": "2026-02-11T04:24:55.892900",
+      "last_failure": "2026-02-11T04:45:18.919690",
       "last_error": "'utf-8' codec can't decode byte 0xfa in position 216: invalid start byte",
       "total_articles_fetched": 0
     },
@@ -978,7 +978,7 @@
       "failed_runs": 16,
       "empty_runs": 2,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.744010",
       "last_error": "Cannot connect to host sinembargo.mx:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 3352
@@ -989,7 +989,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.744010",
       "last_error": "Cannot connect to host e00-elmundo.uecdn.es:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 11054
@@ -1000,7 +1000,7 @@
       "failed_runs": 17,
       "empty_runs": 420,
       "consecutive_empty": 437,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.744010",
       "last_error": "Cannot connect to host corriere.it:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1011,7 +1011,7 @@
       "failed_runs": 16,
       "empty_runs": 421,
       "consecutive_empty": 437,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.744010",
       "last_error": "Cannot connect to host repubblica.it:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1022,7 +1022,7 @@
       "failed_runs": 16,
       "empty_runs": 85,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.744010",
       "last_error": "Cannot connect to host mg.co.za:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 3360
@@ -1033,7 +1033,7 @@
       "failed_runs": 17,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.744010",
       "last_error": "Cannot connect to host dailymaverick.co.za:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 13551
@@ -1044,7 +1044,7 @@
       "failed_runs": 16,
       "empty_runs": 421,
       "consecutive_empty": 437,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.744010",
       "last_error": "Cannot connect to host vanguardngr.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1055,7 +1055,7 @@
       "failed_runs": 19,
       "empty_runs": 178,
       "consecutive_empty": 195,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.744010",
       "last_error": "Cannot connect to host guardian.ng:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 2400
@@ -1066,7 +1066,7 @@
       "failed_runs": 16,
       "empty_runs": 50,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host premiumtimesng.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 5565
@@ -1077,7 +1077,7 @@
       "failed_runs": 16,
       "empty_runs": 421,
       "consecutive_empty": 437,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host nation.africa:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1088,7 +1088,7 @@
       "failed_runs": 17,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host standardmedia.co.ke:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 12600
@@ -1099,7 +1099,7 @@
       "failed_runs": 38,
       "empty_runs": 399,
       "consecutive_empty": 437,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T06:32:48.633583",
       "last_error": null,
       "total_articles_fetched": 0
@@ -1110,7 +1110,7 @@
       "failed_runs": 16,
       "empty_runs": 421,
       "consecutive_empty": 437,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host malaysiakini.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1122,8 +1122,8 @@
       "empty_runs": 0,
       "consecutive_empty": 113,
       "last_success": "2026-02-07T08:17:18.463358",
-      "last_failure": "2026-02-11T04:24:55.892900",
-      "last_error": "'utf-8' codec can't decode byte 0xae in position 26819: invalid start byte",
+      "last_failure": "2026-02-11T04:45:18.919690",
+      "last_error": "'utf-8' codec can't decode byte 0xae in position 28222: invalid start byte",
       "total_articles_fetched": 14600
     },
     "VIVA.co.id": {
@@ -1132,7 +1132,7 @@
       "failed_runs": 17,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host viva.co.id:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 21000
@@ -1143,7 +1143,7 @@
       "failed_runs": 19,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host tribunnews.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 8360
@@ -1154,7 +1154,7 @@
       "failed_runs": 18,
       "empty_runs": 2,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T22:49:53.576706",
       "last_error": null,
       "total_articles_fetched": 20850
@@ -1165,7 +1165,7 @@
       "failed_runs": 16,
       "empty_runs": 421,
       "consecutive_empty": 437,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host vnexpress.net:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1176,7 +1176,7 @@
       "failed_runs": 16,
       "empty_runs": 421,
       "consecutive_empty": 437,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host vietnamnews.vn:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1187,7 +1187,7 @@
       "failed_runs": 16,
       "empty_runs": 421,
       "consecutive_empty": 437,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host inquirer.net:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1198,7 +1198,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host rappler.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 4210
@@ -1209,7 +1209,7 @@
       "failed_runs": 16,
       "empty_runs": 421,
       "consecutive_empty": 437,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host philstar.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1220,7 +1220,7 @@
       "failed_runs": 16,
       "empty_runs": 416,
       "consecutive_empty": 405,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host dawn.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 129
@@ -1231,7 +1231,7 @@
       "failed_runs": 21,
       "empty_runs": 416,
       "consecutive_empty": 437,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host tribune.com.pk:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1242,7 +1242,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host abc.net.au:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 10525
@@ -1253,7 +1253,7 @@
       "failed_runs": 16,
       "empty_runs": 421,
       "consecutive_empty": 437,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host news.com.au:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1264,7 +1264,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host 9news.com.au:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 6980
@@ -1275,7 +1275,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host smh.com.au:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 8420
@@ -1286,7 +1286,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host theage.com.au:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 8420
@@ -1297,7 +1297,7 @@
       "failed_runs": 16,
       "empty_runs": 421,
       "consecutive_empty": 437,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host g1.globo.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1308,7 +1308,7 @@
       "failed_runs": 17,
       "empty_runs": 420,
       "consecutive_empty": 437,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host folha.uol.com.br:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1319,7 +1319,7 @@
       "failed_runs": 16,
       "empty_runs": 421,
       "consecutive_empty": 437,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host estadao.com.br:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1330,7 +1330,7 @@
       "failed_runs": 16,
       "empty_runs": 421,
       "consecutive_empty": 437,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host lanacion.com.ar:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1341,7 +1341,7 @@
       "failed_runs": 17,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host clarin.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 4200
@@ -1352,7 +1352,7 @@
       "failed_runs": 16,
       "empty_runs": 421,
       "consecutive_empty": 437,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host eltiempo.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1363,7 +1363,7 @@
       "failed_runs": 17,
       "empty_runs": 420,
       "consecutive_empty": 437,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host semana.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1374,7 +1374,7 @@
       "failed_runs": 16,
       "empty_runs": 421,
       "consecutive_empty": 437,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host elcomercio.pe:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1386,7 +1386,7 @@
       "empty_runs": 0,
       "consecutive_empty": 437,
       "last_success": null,
-      "last_failure": "2026-02-11T04:24:55.892900",
+      "last_failure": "2026-02-11T04:45:18.919690",
       "last_error": "Cannot connect to host elmercurio.cl:443 ssl:default [The remote computer refused the network connection]",
       "total_articles_fetched": 0
     },
@@ -1396,7 +1396,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host latercera.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 21050
@@ -1407,7 +1407,7 @@
       "failed_runs": 16,
       "empty_runs": 421,
       "consecutive_empty": 437,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host emirates247.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1418,7 +1418,7 @@
       "failed_runs": 16,
       "empty_runs": 421,
       "consecutive_empty": 437,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host emaratalyoum.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1429,7 +1429,7 @@
       "failed_runs": 16,
       "empty_runs": 421,
       "consecutive_empty": 437,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host www.thenationalnews.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1440,7 +1440,7 @@
       "failed_runs": 17,
       "empty_runs": 232,
       "consecutive_empty": 248,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host arabianbusiness.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 7562
@@ -1451,7 +1451,7 @@
       "failed_runs": 19,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host thearabianpost.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 20900
@@ -1462,7 +1462,7 @@
       "failed_runs": 16,
       "empty_runs": 421,
       "consecutive_empty": 437,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host www.arabnews.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1495,7 +1495,7 @@
       "failed_runs": 16,
       "empty_runs": 421,
       "consecutive_empty": 437,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host www.alarabiya.net:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1506,7 +1506,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host english.aawsat.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 21050
@@ -1539,7 +1539,7 @@
       "failed_runs": 16,
       "empty_runs": 421,
       "consecutive_empty": 437,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host www.alwatan.com.sa:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1550,7 +1550,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host al-sharq.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 12630
@@ -1561,7 +1561,7 @@
       "failed_runs": 16,
       "empty_runs": 421,
       "consecutive_empty": 437,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host www.gulf-times.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1573,7 +1573,7 @@
       "empty_runs": 0,
       "consecutive_empty": 437,
       "last_success": null,
-      "last_failure": "2026-02-11T04:24:55.892900",
+      "last_failure": "2026-02-11T04:45:18.919690",
       "last_error": null,
       "total_articles_fetched": 0
     },
@@ -1583,7 +1583,7 @@
       "failed_runs": 17,
       "empty_runs": 420,
       "consecutive_empty": 437,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host www.alqabas.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1594,7 +1594,7 @@
       "failed_runs": 16,
       "empty_runs": 421,
       "consecutive_empty": 437,
-      "last_success": "2026-02-11T04:24:55.892900",
+      "last_success": "2026-02-11T04:45:18.919690",
       "last_failure": "2026-02-10T02:55:06.745011",
       "last_error": "Cannot connect to host www.kuna.net.kw:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1606,7 +1606,7 @@
       "empty_runs": 0,
       "consecutive_empty": 436,
       "last_success": null,
-      "last_failure": "2026-02-11T04:25:32.927234",
+      "last_failure": "2026-02-11T04:45:55.928037",
       "last_error": null,
       "total_articles_fetched": 0
     },
@@ -1616,7 +1616,7 @@
       "failed_runs": 16,
       "empty_runs": 420,
       "consecutive_empty": 436,
-      "last_success": "2026-02-11T04:25:32.927234",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host www.alayam.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1627,7 +1627,7 @@
       "failed_runs": 19,
       "empty_runs": 417,
       "consecutive_empty": 436,
-      "last_success": "2026-02-11T04:25:32.927234",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host www.bna.bh:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1638,7 +1638,7 @@
       "failed_runs": 22,
       "empty_runs": 414,
       "consecutive_empty": 436,
-      "last_success": "2026-02-11T04:25:32.927234",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T11:56:04.976717",
       "last_error": null,
       "total_articles_fetched": 0
@@ -1649,7 +1649,7 @@
       "failed_runs": 21,
       "empty_runs": 415,
       "consecutive_empty": 436,
-      "last_success": "2026-02-11T04:25:32.927234",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host www.omanobserver.om:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1660,7 +1660,7 @@
       "failed_runs": 16,
       "empty_runs": 420,
       "consecutive_empty": 436,
-      "last_success": "2026-02-11T04:25:32.927234",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host www.alwatan.om:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1672,7 +1672,7 @@
       "empty_runs": 0,
       "consecutive_empty": 436,
       "last_success": null,
-      "last_failure": "2026-02-11T04:25:32.927234",
+      "last_failure": "2026-02-11T04:45:55.928037",
       "last_error": "Cannot connect to host www.omannews.gov.om:443 ssl:True [SSLCertVerificationError: (1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1000)",
       "total_articles_fetched": 0
     },
@@ -1682,7 +1682,7 @@
       "failed_runs": 17,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:25:32.927234",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host www.annahar.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 20950
@@ -1693,7 +1693,7 @@
       "failed_runs": 259,
       "empty_runs": 177,
       "consecutive_empty": 436,
-      "last_success": "2026-02-11T04:25:32.927234",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host www.thedailystarnews.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1704,7 +1704,7 @@
       "failed_runs": 21,
       "empty_runs": 415,
       "consecutive_empty": 436,
-      "last_success": "2026-02-11T04:25:32.927234",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host www.aliwaa.com.lb:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1715,7 +1715,7 @@
       "failed_runs": 16,
       "empty_runs": 420,
       "consecutive_empty": 436,
-      "last_success": "2026-02-11T04:25:32.927234",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host www.elnashra.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1727,7 +1727,7 @@
       "empty_runs": 0,
       "consecutive_empty": 436,
       "last_success": null,
-      "last_failure": "2026-02-11T04:25:32.927234",
+      "last_failure": "2026-02-11T04:45:55.928037",
       "last_error": null,
       "total_articles_fetched": 0
     },
@@ -1737,7 +1737,7 @@
       "failed_runs": 75,
       "empty_runs": 361,
       "consecutive_empty": 436,
-      "last_success": "2026-02-11T04:25:32.927234",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host www.lpagency.net:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1748,7 +1748,7 @@
       "failed_runs": 17,
       "empty_runs": 1,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:25:32.927234",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host www.sana.sy:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 4180
@@ -1759,7 +1759,7 @@
       "failed_runs": 16,
       "empty_runs": 216,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:25:32.927234",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host jordantimes.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 10200
@@ -1770,7 +1770,7 @@
       "failed_runs": 16,
       "empty_runs": 2,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:25:32.927234",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host www.alghad.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 6270
@@ -1781,7 +1781,7 @@
       "failed_runs": 17,
       "empty_runs": 419,
       "consecutive_empty": 436,
-      "last_success": "2026-02-11T04:25:32.927234",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host petra.gov.jo:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1792,7 +1792,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:25:32.927234",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host www.almasryalyoum.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 9690
@@ -1803,7 +1803,7 @@
       "failed_runs": 16,
       "empty_runs": 420,
       "consecutive_empty": 436,
-      "last_success": "2026-02-11T04:25:32.927234",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host www.bbc.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1814,7 +1814,7 @@
       "failed_runs": 16,
       "empty_runs": 420,
       "consecutive_empty": 436,
-      "last_success": "2026-02-11T04:25:32.927847",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host www.ahram.org.eg:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1825,7 +1825,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:25:32.927847",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host egyptoil-gas.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 4200
@@ -1836,7 +1836,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:25:32.927847",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host www.dailynewsegypt.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 4200
@@ -1847,7 +1847,7 @@
       "failed_runs": 18,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:25:32.927847",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host egyptianstreets.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 3762
@@ -1858,7 +1858,7 @@
       "failed_runs": 16,
       "empty_runs": 420,
       "consecutive_empty": 436,
-      "last_success": "2026-02-11T04:25:32.927847",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host arabic.cnn.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1869,7 +1869,7 @@
       "failed_runs": 16,
       "empty_runs": 420,
       "consecutive_empty": 436,
-      "last_success": "2026-02-11T04:25:32.927847",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host www.telquel.ma:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1880,7 +1880,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:25:32.927847",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host www.hespress.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 5040
@@ -1892,7 +1892,7 @@
       "empty_runs": 0,
       "consecutive_empty": 377,
       "last_success": "2025-11-27T15:08:34.492563",
-      "last_failure": "2026-02-11T04:25:32.927847",
+      "last_failure": "2026-02-11T04:45:55.928037",
       "last_error": "Cannot connect to host infosports.news:443 ssl:default [The specified network name is no longer available]",
       "total_articles_fetched": 590
     },
@@ -1903,7 +1903,7 @@
       "empty_runs": 0,
       "consecutive_empty": 436,
       "last_success": null,
-      "last_failure": "2026-02-11T04:25:32.927847",
+      "last_failure": "2026-02-11T04:45:55.928037",
       "last_error": null,
       "total_articles_fetched": 0
     },
@@ -1913,7 +1913,7 @@
       "failed_runs": 19,
       "empty_runs": 417,
       "consecutive_empty": 436,
-      "last_success": "2026-02-11T04:25:32.927847",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host www.afriquinfos.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1924,7 +1924,7 @@
       "failed_runs": 28,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:25:32.927847",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host www.businessnews.com.tn:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 4080
@@ -1936,7 +1936,7 @@
       "empty_runs": 0,
       "consecutive_empty": 436,
       "last_success": null,
-      "last_failure": "2026-02-11T04:25:32.927847",
+      "last_failure": "2026-02-11T04:45:55.928037",
       "last_error": "Cannot connect to host www.tap.info.tn:443 ssl:True [SSLCertVerificationError: (1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1000)')]",
       "total_articles_fetched": 0
     },
@@ -1946,7 +1946,7 @@
       "failed_runs": 16,
       "empty_runs": 420,
       "consecutive_empty": 436,
-      "last_success": "2026-02-11T04:25:32.927847",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host www.elkhabar.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1957,7 +1957,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:25:32.927847",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host www.ennaharonline.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 4200
@@ -1968,7 +1968,7 @@
       "failed_runs": 17,
       "empty_runs": 419,
       "consecutive_empty": 436,
-      "last_success": "2026-02-11T04:25:32.927847",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host www.aps.dz:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1979,7 +1979,7 @@
       "failed_runs": 16,
       "empty_runs": 420,
       "consecutive_empty": 436,
-      "last_success": "2026-02-11T04:25:32.927847",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host www.radioalgerie.dz:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -1991,8 +1991,8 @@
       "empty_runs": 0,
       "consecutive_empty": 436,
       "last_success": null,
-      "last_failure": "2026-02-11T04:25:32.927847",
-      "last_error": "Cannot connect to host www.asaaspress.com:443 ssl:default [getaddrinfo failed]",
+      "last_failure": "2026-02-11T04:45:55.928037",
+      "last_error": null,
       "total_articles_fetched": 0
     },
     "Iraqi News": {
@@ -2001,7 +2001,7 @@
       "failed_runs": 16,
       "empty_runs": 420,
       "consecutive_empty": 436,
-      "last_success": "2026-02-11T04:25:32.927847",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host www.iraqinews.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -2012,7 +2012,7 @@
       "failed_runs": 16,
       "empty_runs": 420,
       "consecutive_empty": 436,
-      "last_success": "2026-02-11T04:25:32.927847",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host www.ina.iq:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -2023,7 +2023,7 @@
       "failed_runs": 17,
       "empty_runs": 419,
       "consecutive_empty": 436,
-      "last_success": "2026-02-11T04:25:32.927847",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host www.wafa.ps:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -2034,7 +2034,7 @@
       "failed_runs": 17,
       "empty_runs": 419,
       "consecutive_empty": 436,
-      "last_success": "2026-02-11T04:25:32.927847",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host www.maan-ctr.org:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -2046,8 +2046,8 @@
       "empty_runs": 0,
       "consecutive_empty": 436,
       "last_success": null,
-      "last_failure": "2026-02-11T04:25:32.927847",
-      "last_error": "Cannot connect to host www.sputnikarabic.ae:443 ssl:default [getaddrinfo failed]",
+      "last_failure": "2026-02-11T04:45:55.928037",
+      "last_error": null,
       "total_articles_fetched": 0
     },
     "Sudan Tribune": {
@@ -2056,7 +2056,7 @@
       "failed_runs": 16,
       "empty_runs": 420,
       "consecutive_empty": 436,
-      "last_success": "2026-02-11T04:25:32.927847",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host www.sudantribune.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 0
@@ -2067,7 +2067,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:25:32.927847",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host arabic.rt.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 21000
@@ -2089,7 +2089,7 @@
       "failed_runs": 17,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:25:32.927847",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host www.newarab.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 20950
@@ -2111,7 +2111,7 @@
       "failed_runs": 18,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:25:32.927847",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T09:13:02.801523",
       "last_error": null,
       "total_articles_fetched": 4180
@@ -2122,7 +2122,7 @@
       "failed_runs": 16,
       "empty_runs": 231,
       "consecutive_empty": 247,
-      "last_success": "2026-02-11T04:25:32.927847",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host www.arabianbusiness.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 9450
@@ -2156,7 +2156,7 @@
       "empty_runs": 0,
       "consecutive_empty": 6,
       "last_success": "2026-02-11T00:48:31.681392",
-      "last_failure": "2026-02-11T04:25:32.927847",
+      "last_failure": "2026-02-11T04:45:55.928037",
       "last_error": "Cannot connect to host www.entekhab.ir:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 7700
     },
@@ -2166,7 +2166,7 @@
       "failed_runs": 148,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:25:32.927847",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T08:31:49.761063",
       "last_error": null,
       "total_articles_fetched": 2880
@@ -2177,7 +2177,7 @@
       "failed_runs": 26,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:25:32.927847",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T19:25:16.407632",
       "last_error": null,
       "total_articles_fetched": 4100
@@ -2188,7 +2188,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:25:32.927847",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host www.libe.ma:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 2100
@@ -2199,7 +2199,7 @@
       "failed_runs": 16,
       "empty_runs": 216,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:25:32.927847",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host jordantimes.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 10200
@@ -2210,7 +2210,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:24:12.905592",
+      "last_success": "2026-02-11T04:44:38.919254",
       "last_failure": "2026-02-10T02:55:00.319578",
       "last_error": "Cannot connect to host www.nationalturk.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 5640
@@ -2221,7 +2221,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:25:32.927847",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host www.haaretz.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 18600
@@ -2232,7 +2232,7 @@
       "failed_runs": 16,
       "empty_runs": 361,
       "consecutive_empty": 377,
-      "last_success": "2026-02-11T04:25:32.927847",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host en.globes.co.il:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 110
@@ -2243,7 +2243,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:25:32.927847",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host www.maariv.co.il:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 7440
@@ -2254,7 +2254,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:25:32.927847",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host cursorinfo.co.il:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 18600
@@ -2265,7 +2265,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:25:32.927847",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host feeds.skynews.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 3670
@@ -2287,7 +2287,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:25:32.927847",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host www.al-madina.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 18350
@@ -2298,7 +2298,7 @@
       "failed_runs": 17,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:25:32.927847",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host albiladdaily.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 3660
@@ -2309,7 +2309,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:25:32.927847",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host makkahnewspaper.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 18350
@@ -2320,7 +2320,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:25:32.927847",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host www.al-jazirah.com:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 4349
@@ -2331,7 +2331,7 @@
       "failed_runs": 16,
       "empty_runs": 0,
       "consecutive_empty": 0,
-      "last_success": "2026-02-11T04:25:32.927847",
+      "last_success": "2026-02-11T04:45:55.928037",
       "last_failure": "2026-02-10T02:55:12.922445",
       "last_error": "Cannot connect to host saudigazette.com.sa:443 ssl:default [getaddrinfo failed]",
       "total_articles_fetched": 18350

@@ -25,8 +25,10 @@ email-validator==2.1.0.post1
 Flask-Login==0.6.3
 Flask-WTF==1.2.1
 
-# PDF generation
-weasyprint==62.3
+# PDF generation (pure Python — no system deps)
+reportlab==4.1.0
+arabic-reshaper==3.0.0
+python-bidi==0.4.2
 
 # Production server
 gunicorn==21.2.0

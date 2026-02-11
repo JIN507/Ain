@@ -3,7 +3,6 @@ services:
     name: ain-news-monitor
     runtime: python
     buildCommand: |
-      apt-get update -qq && apt-get install -y -qq libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf-2.0-0 libffi-dev shared-mime-info
       cd frontend-v2 && npm ci && npm run build && mkdir -p ../backend/static && cp -r dist/* ../backend/static/
       cd ../backend && pip install -r requirements.txt
     startCommand: cd backend && gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 120

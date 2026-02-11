@@ -264,26 +264,28 @@ def get_user_exports_folder(user_id):
 @login_required
 @csrf.exempt
 def generate_pdf():
-    """Generate a real PDF from HTML content using WeasyPrint (server-side)."""
-    try:
-        from weasyprint import HTML as WeasyHTML
-    except ImportError:
-        return jsonify({'error': 'PDF engine not available on this server'}), 500
+    """Generate a real PDF from article data using reportlab (pure Python)."""
+    from pdf_generator import generate_report_pdf
 
     data = request.get_json() or {}
-    html_content = data.get('html', '')
-    if not html_content:
-        return jsonify({'error': 'No HTML content provided'}), 400
+    articles = data.get('articles', [])
+    title = data.get('title', 'تقرير أخبار عين')
+    stats = data.get('stats', None)
+
+    if not articles:
+        return jsonify({'error': 'No articles provided'}), 400
 
     try:
-        pdf_bytes = WeasyHTML(string=html_content).write_pdf()
+        pdf_bytes = generate_report_pdf(articles, title=title, stats=stats)
         return Response(
             pdf_bytes,
             mimetype='application/pdf',
             headers={'Content-Disposition': 'inline; filename="report.pdf"'}
         )
     except Exception as e:
-        print(f"[PDF] ❌ WeasyPrint error: {e}")
+        print(f"[PDF] ❌ PDF generation error: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': f'PDF generation failed: {str(e)}'}), 500
 
 

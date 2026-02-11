@@ -172,12 +172,12 @@ export function buildReportHTML(articles, { title, stats, filters, keywords, cou
 }
 
 
-export async function generatePDFBlob(htmlContent, apiFetch) {
-  // Server-side PDF generation using WeasyPrint — perfect Arabic/RTL rendering
+export async function generatePDFBlob(articles, apiFetch, { title, stats } = {}) {
+  // Server-side PDF generation using reportlab (pure Python, guaranteed to work)
   const res = await apiFetch('/api/exports/generate-pdf', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ html: htmlContent }),
+    body: JSON.stringify({ articles, title, stats }),
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))

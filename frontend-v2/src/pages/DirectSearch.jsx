@@ -9,7 +9,7 @@ import ArticleCard from '../components/ArticleCard'
 import Loader from '../components/Loader'
 import GuidedQueryBuilder, { compileToQ, validateQuery } from '../components/GuidedQueryBuilder'
 import { apiFetch } from '../apiClient'
-import { generateXLSX, buildReportHTML, generatePDFBlob, uploadExport } from '../utils/exportUtils'
+import { generateXLSX, generatePDFBlob, uploadExport } from '../utils/exportUtils'
 
 // Error messages mapping (Arabic)
 const ERROR_MESSAGES = {
@@ -369,8 +369,7 @@ export default function DirectSearch() {
     if (!results.length) return
     setExporting(true)
     try {
-      const html = buildReportHTML(results, { title: 'عين - نتائج البحث' })
-      const pdfBlob = await generatePDFBlob(html, apiFetch)
+      const pdfBlob = await generatePDFBlob(results, apiFetch, { title: 'عين - نتائج البحث' })
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
       const filename = `نتائج_البحث_عين_${timestamp}.pdf`
 

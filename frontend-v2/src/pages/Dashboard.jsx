@@ -5,7 +5,7 @@ import FilterBar from '../components/FilterBar'
 import ArticleCard from '../components/ArticleCard'
 import Loader from '../components/Loader'
 import { apiFetch } from '../apiClient'
-import { generateXLSX, buildReportHTML, generatePDFBlob, uploadExport } from '../utils/exportUtils'
+import { generateXLSX, generatePDFBlob, uploadExport } from '../utils/exportUtils'
 
 export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
   const [loading, setLoading] = useState(false)
@@ -227,10 +227,8 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
         const sortBy = filters.sortBy || 'newest'
         return sortBy === 'newest' ? b.id - a.id : a.id - b.id
       })
-      const html = buildReportHTML(sorted, { title: 'تقرير أخبار عين', stats, filters, keywords, countries })
-
-      // Generate real PDF on the server
-      const pdfBlob = await generatePDFBlob(html, apiFetch)
+      // Generate real PDF on the server (sends article data, backend builds PDF)
+      const pdfBlob = await generatePDFBlob(sorted, apiFetch, { title: 'تقرير أخبار عين', stats })
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
       const filename = `تقرير_أخبار_عين_${timestamp}.pdf`
 

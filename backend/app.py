@@ -3169,38 +3169,43 @@ def external_headlines():
 
 
 # =============================================================================
-# DATA LIFECYCLE MANAGEMENT - Auto-cleanup based on article age
+# DATA LIFECYCLE MANAGEMENT - Monthly reset on the 1st of every month
 # =============================================================================
 
-DATA_RETENTION_DAYS = 5  # Delete articles older than 5 days
+def _next_first_of_month():
+    """Return the datetime for the 1st of the next month (00:00 UTC)."""
+    now = datetime.utcnow()
+    if now.month == 12:
+        return datetime(now.year + 1, 1, 1)
+    return datetime(now.year, now.month + 1, 1)
 
 def check_and_run_cleanup():
-    """Delete articles older than DATA_RETENTION_DAYS for every user.
-    Runs per-user based on each article's fetched_at date."""
+    """Delete ALL articles and old monitor jobs on the 1st of every month.
+    Runs on server startup — if today is the 1st, wipe everything."""
     from models import Article, MonitorJob
+    now = datetime.utcnow()
+    
+    if now.day != 1:
+        next_reset = _next_first_of_month()
+        days_left = (next_reset - now).days
+        print(f"[CLEANUP] ℹ️ Not the 1st — next reset in {days_left} days ({next_reset.strftime('%Y-%m-%d')})")
+        return False
+    
     db = get_db()
     try:
-        cutoff = datetime.utcnow() - timedelta(days=DATA_RETENTION_DAYS)
-        old_articles = db.query(Article).filter(Article.fetched_at < cutoff).all()
-        
-        if not old_articles:
-            print(f"[CLEANUP] ℹ️ No articles older than {DATA_RETENTION_DAYS} days")
+        article_count = db.query(Article).count()
+        if article_count == 0:
+            print(f"[CLEANUP] ℹ️ Monthly reset day but no articles to delete")
             return False
         
-        count = len(old_articles)
-        for article in old_articles:
-            db.delete(article)
+        db.query(Article).delete()
         
-        # Also clean up old finished monitor jobs
-        old_jobs = db.query(MonitorJob).filter(
-            MonitorJob.started_at < cutoff,
+        job_count = db.query(MonitorJob).filter(
             MonitorJob.status.in_(['SUCCEEDED', 'FAILED'])
-        ).all()
-        for job in old_jobs:
-            db.delete(job)
+        ).delete(synchronize_session=False)
         
         db.commit()
-        print(f"[CLEANUP] 🗑️ Deleted {count} articles older than {DATA_RETENTION_DAYS} days, {len(old_jobs)} old jobs")
+        print(f"[CLEANUP] 🗑️ Monthly reset: deleted {article_count} articles, {job_count} old jobs")
         return True
     except Exception as e:
         print(f"[CLEANUP] ❌ Error: {e}")
@@ -3212,42 +3217,25 @@ def check_and_run_cleanup():
 @app.route('/api/system/cleanup-status', methods=['GET'])
 @login_required
 def get_cleanup_status():
-    """Get data cleanup status based on the user's oldest article age.
-    Warning shows when the user's oldest article is approaching deletion."""
-    from sqlalchemy import func as sa_func
+    """Get monthly reset status — days until the 1st of next month."""
     db = get_db()
     try:
-        # Find the user's oldest article fetched_at
-        oldest_fetched = db.query(sa_func.min(Article.fetched_at)).filter(
-            Article.user_id == current_user.id
-        ).scalar()
-        
         user_article_count = db.query(Article).filter(
             Article.user_id == current_user.id
         ).count()
         
-        # No articles = no cleanup needed, no warning
-        if not oldest_fetched or user_article_count == 0:
-            return jsonify({
-                'days_remaining': DATA_RETENTION_DAYS,
-                'show_warning': False,
-                'retention_days': DATA_RETENTION_DAYS,
-                'article_count': 0
-            })
+        now = datetime.utcnow()
+        next_reset = _next_first_of_month()
+        days_remaining = (next_reset - now).days
         
-        # Calculate how old the oldest article is
-        age_days = (datetime.utcnow() - oldest_fetched).days
-        days_remaining = max(0, DATA_RETENTION_DAYS - age_days)
-        
-        # Show warning when oldest article has 1 day or less until deletion
-        show_warning = days_remaining <= 1
+        # Show warning when 3 days or less until reset
+        show_warning = days_remaining <= 3 and user_article_count > 0
         
         return jsonify({
             'days_remaining': days_remaining,
             'show_warning': show_warning,
-            'retention_days': DATA_RETENTION_DAYS,
-            'article_count': user_article_count,
-            'oldest_article_date': oldest_fetched.isoformat()
+            'next_reset': next_reset.strftime('%Y-%m-%d'),
+            'article_count': user_article_count
         })
     finally:
         db.close()
@@ -3452,7 +3440,7 @@ def auto_initialize():
     finally:
         db.close()
     
-    # Check and run data cleanup if needed (5-day cycle)
+    # Check and run monthly data reset (1st of every month)
     check_and_run_cleanup()
     
     # Auto-start global scheduler if any user has keywords

@@ -322,15 +322,15 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
         </div>
       )}
 
-      {/* Data Cleanup Warning - only when user has articles */}
+      {/* Monthly Reset Warning - shows 3 days before the 1st */}
       {cleanupStatus?.show_warning && articles.length > 0 && (
         <div className="flex items-center gap-3 px-4 py-3.5 rounded-xl"
           style={{ background: 'rgba(225,29,72,0.06)' }}>
           <AlertTriangle className="w-5 h-5 text-rose-600 flex-shrink-0" />
           <div className="flex-1">
-            <p className="text-sm font-semibold text-rose-700">سيتم حذف المقالات القديمة قريباً</p>
+            <p className="text-sm font-semibold text-rose-700">إعادة تعيين شهرية قريباً</p>
             <p className="text-xs text-rose-500 mt-0.5">
-              يتم حذف المقالات الأقدم من {cleanupStatus.retention_days} أيام تلقائياً. صدّر البيانات المهمة الآن.
+              سيتم حذف جميع المقالات ({cleanupStatus.article_count}) في بداية الشهر القادم ({cleanupStatus.next_reset}). صدّر البيانات المهمة الآن.
             </p>
           </div>
           <span className="text-lg font-bold text-rose-600 px-3 py-1 rounded-lg"

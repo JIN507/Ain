@@ -175,15 +175,17 @@ export function buildReportHTML(articles, { title, stats, filters, keywords, cou
 export async function generatePDFBlob(htmlContent) {
   const { default: html2pdf } = await import('html2pdf.js')
 
-  // Create off-screen wrapper that clips visually but stays in rendering flow
-  const wrapper = document.createElement('div')
-  wrapper.style.cssText = 'position:absolute;left:0;top:0;width:0;height:0;overflow:hidden;z-index:-1;'
+  // Show loading overlay so user sees progress (not raw content)
+  const overlay = document.createElement('div')
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(255,255,255,0.97);z-index:100000;display:flex;align-items:center;justify-content:center;direction:rtl;'
+  overlay.innerHTML = '<div style="text-align:center;font-family:Cairo,sans-serif;"><div style="width:44px;height:44px;border:3px solid #059669;border-top-color:transparent;border-radius:50%;animation:_spin 0.8s linear infinite;margin:0 auto 12px;"></div><p style="color:#374151;font-size:15px;font-weight:600;">جاري إنشاء ملف PDF...</p></div><style>@keyframes _spin{to{transform:rotate(360deg)}}</style>'
+  document.body.appendChild(overlay)
 
+  // Render content VISIBLY in the DOM (behind the overlay) so html2canvas can capture it
   const container = document.createElement('div')
-  // Extract body content
   const bodyMatch = htmlContent.match(/<body[^>]*>([\s\S]*)<\/body>/i)
   container.innerHTML = bodyMatch ? bodyMatch[1] : htmlContent
-  container.style.cssText = 'width:794px;direction:rtl;font-family:Cairo,sans-serif;background:white;color:#1a1a1a;line-height:1.8;'
+  container.style.cssText = 'position:absolute;left:0;top:0;width:794px;direction:rtl;font-family:Cairo,sans-serif;background:white;color:#1a1a1a;line-height:1.8;z-index:99999;'
 
   // Inject the CSS styles
   const styleMatch = htmlContent.match(/<style>([\s\S]*?)<\/style>/i)
@@ -193,29 +195,27 @@ export async function generatePDFBlob(htmlContent) {
     container.prepend(style)
   }
 
-  // Inject Google Fonts link for Arabic text
+  // Inject Google Fonts
   const fontLink = document.createElement('link')
   fontLink.rel = 'stylesheet'
   fontLink.href = 'https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Amiri:wght@400;700&display=swap'
   document.head.appendChild(fontLink)
 
-  wrapper.appendChild(container)
-  document.body.appendChild(wrapper)
+  document.body.appendChild(container)
 
-  // Wait for fonts to load and images to render
+  // Wait for fonts + images to fully render
   await document.fonts.ready
-  await new Promise(r => setTimeout(r, 800))
+  await new Promise(r => setTimeout(r, 1500))
 
   const opt = {
     margin: [5, 5, 5, 5],
-    filename: 'report.pdf',
     image: { type: 'jpeg', quality: 0.92 },
     html2canvas: {
       scale: 2,
       useCORS: true,
       letterRendering: true,
       scrollX: 0,
-      scrollY: 0,
+      scrollY: -window.scrollY,
       windowWidth: 794,
     },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
@@ -226,7 +226,8 @@ export async function generatePDFBlob(htmlContent) {
     const blob = await html2pdf().set(opt).from(container).toPdf().output('blob')
     return blob
   } finally {
-    document.body.removeChild(wrapper)
+    document.body.removeChild(container)
+    document.body.removeChild(overlay)
     document.head.removeChild(fontLink)
   }
 }

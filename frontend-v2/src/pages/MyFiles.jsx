@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { apiFetch } from '../apiClient'
-import { Download, FileText, Trash2, RefreshCw, Eye, Loader2 } from 'lucide-react'
+import { Download, FileText, Trash2, RefreshCw, Eye, Loader2, FileSpreadsheet, File } from 'lucide-react'
+import * as XLSX from 'xlsx'
 
 export default function MyFiles() {
   const [exportsList, setExportsList] = useState([])
@@ -30,6 +31,23 @@ export default function MyFiles() {
     loadExports()
   }, [])
 
+  const getFileType = (rec) => {
+    const fn = (rec.filename || '').toLowerCase()
+    if (fn.endsWith('.xlsx') || fn.endsWith('.xls')) return 'xlsx'
+    if (fn.endsWith('.pdf')) return 'pdf'
+    if (fn.endsWith('.html') || fn.endsWith('.htm')) return 'html'
+    return 'other'
+  }
+
+  const getDisplayName = (rec) => {
+    const source = getSourceLabel(rec.source_type)
+    const type = getFileType(rec)
+    const ext = type === 'xlsx' ? 'Excel' : type === 'pdf' ? 'PDF' : type === 'html' ? 'HTML' : ''
+    const count = rec.article_count ? `${rec.article_count} خبر` : ''
+    const date = rec.created_at ? formatDate(rec.created_at) : ''
+    return `${ext ? ext + ' · ' : ''}${source}${count ? ' · ' + count : ''}${date ? ' · ' + date : ''}`
+  }
+
   const handleDownload = async (exportId, filename) => {
     try {
       const res = await apiFetch(`/api/exports/${exportId}/download`)
@@ -51,7 +69,8 @@ export default function MyFiles() {
     }
   }
 
-  const handleView = async (exportId) => {
+  const handleView = async (exportId, rec) => {
+    const fileType = getFileType(rec)
     try {
       const res = await apiFetch(`/api/exports/${exportId}/download?view=1`)
       if (!res.ok) {
@@ -59,8 +78,30 @@ export default function MyFiles() {
         throw new Error(data.error || 'فشل عرض الملف')
       }
       const blob = await res.blob()
-      const url = window.URL.createObjectURL(blob)
-      window.open(url, '_blank')
+
+      if (fileType === 'xlsx') {
+        // Parse XLSX and show as HTML table
+        const buf = await blob.arrayBuffer()
+        const wb = XLSX.read(buf)
+        const ws = wb.Sheets[wb.SheetNames[0]]
+        const htmlTable = XLSX.utils.sheet_to_html(ws, { editable: false })
+        const win = window.open('', '_blank')
+        if (win) {
+          win.document.write(`<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8"><title>معاينة Excel</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;direction:rtl;padding:24px;background:#f8fafc}
+table{width:100%;border-collapse:collapse;background:white;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1)}
+th{background:#059669;color:white;padding:10px 14px;font-size:13px;font-weight:600;text-align:right;white-space:nowrap}
+td{padding:8px 14px;font-size:12px;border-bottom:1px solid #e5e7eb;text-align:right;max-width:400px;overflow:hidden;text-overflow:ellipsis}
+tr:hover td{background:#f0fdf4}tr:nth-child(even) td{background:#f9fafb}
+h2{text-align:center;color:#059669;margin-bottom:16px;font-size:20px}</style></head>
+<body><h2>معاينة ملف Excel</h2>${htmlTable}</body></html>`)
+          win.document.close()
+        }
+      } else {
+        // PDF or HTML: open blob directly
+        const url = window.URL.createObjectURL(blob)
+        window.open(url, '_blank')
+      }
     } catch (e) {
       setError(e.message || 'خطأ غير متوقع')
     }
@@ -78,6 +119,14 @@ export default function MyFiles() {
     } catch (e) {
       setError(e.message || 'خطأ غير متوقع')
     }
+  }
+
+  const formatDate = (iso) => {
+    if (!iso) return ''
+    try {
+      const d = new Date(iso)
+      return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+    } catch { return '' }
   }
 
   const formatDateTime = (iso) => {
@@ -101,12 +150,35 @@ export default function MyFiles() {
     return parts.join(' \u00B7 ')
   }
 
+  const getSourceLabel = (sourceType) => {
+    switch (sourceType) {
+      case 'direct_search': return 'البحث المباشر'
+      case 'top_headlines':  return 'أهم العناوين'
+      default:               return 'لوحة المتابعة'
+    }
+  }
+
   const getSourceColor = (sourceType) => {
     switch (sourceType) {
-      case 'direct_search': return { bg: 'rgba(59,130,246,0.08)', color: '#2563eb', label: 'البحث المباشر' }
-      case 'top_headlines':  return { bg: 'rgba(139,92,246,0.08)', color: '#7c3aed', label: 'أهم العناوين' }
-      default:               return { bg: 'rgba(15,118,110,0.08)', color: '#0f766e', label: 'لوحة المتابعة' }
+      case 'direct_search': return { bg: 'rgba(59,130,246,0.08)', color: '#2563eb' }
+      case 'top_headlines':  return { bg: 'rgba(139,92,246,0.08)', color: '#7c3aed' }
+      default:               return { bg: 'rgba(15,118,110,0.08)', color: '#0f766e' }
     }
+  }
+
+  const getFileIcon = (rec) => {
+    const type = getFileType(rec)
+    if (type === 'xlsx') return <FileSpreadsheet className="w-5 h-5" />
+    if (type === 'pdf') return <FileText className="w-5 h-5" />
+    return <File className="w-5 h-5" />
+  }
+
+  const getFileTypeBadge = (rec) => {
+    const type = getFileType(rec)
+    if (type === 'xlsx') return { bg: '#dcfce7', color: '#166534', label: 'Excel' }
+    if (type === 'pdf') return { bg: '#fee2e2', color: '#991b1b', label: 'PDF' }
+    if (type === 'html') return { bg: '#fef3c7', color: '#92400e', label: 'HTML' }
+    return { bg: '#f1f5f9', color: '#475569', label: 'ملف' }
   }
 
   return (
@@ -146,6 +218,7 @@ export default function MyFiles() {
         <div className="space-y-3">
           {exportsList.map((rec, idx) => {
             const src = getSourceColor(rec.source_type)
+            const fileBadge = getFileTypeBadge(rec)
             return (
               <motion.div
                 key={rec.id}
@@ -156,19 +229,19 @@ export default function MyFiles() {
               >
                 {/* Icon */}
                 <div className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center"
-                  style={{ background: src.bg }}>
-                  <FileText className="w-5 h-5" style={{ color: src.color }} />
+                  style={{ background: src.bg, color: src.color }}>
+                  {getFileIcon(rec)}
                 </div>
 
                 {/* Info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
-                    <h3 className="text-sm font-semibold text-slate-900">تقرير {rec.article_count} خبر</h3>
-                    <span className="badge" style={{ background: src.bg, color: src.color }}>{src.label}</span>
+                    <h3 className="text-sm font-semibold text-slate-900 truncate">{getDisplayName(rec)}</h3>
+                    <span className="badge flex-shrink-0" style={{ background: fileBadge.bg, color: fileBadge.color, fontSize: '10px', padding: '2px 8px' }}>{fileBadge.label}</span>
                   </div>
                   <div className="flex items-center gap-2 text-[11px] text-slate-400">
                     <span>{formatDateTime(rec.created_at)}</span>
-                    <span>\u00B7</span>
+                    <span>·</span>
                     <span className="truncate">{summarizeFilters(rec.filters)}</span>
                   </div>
                 </div>
@@ -177,12 +250,14 @@ export default function MyFiles() {
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                   {rec.has_file && (
                     <>
-                      <button onClick={() => handleView(rec.id)}
-                        className="btn-ghost !px-2.5 !py-1.5" style={{ color: '#0f766e' }}>
+                      <button onClick={() => handleView(rec.id, rec)}
+                        className="btn-ghost !px-2.5 !py-1.5" style={{ color: '#0f766e' }}
+                        title="معاينة">
                         <Eye className="w-3.5 h-3.5" />
                       </button>
                       <button onClick={() => handleDownload(rec.id, rec.filename)}
-                        className="btn-ghost !px-2.5 !py-1.5" style={{ color: '#2563eb' }}>
+                        className="btn-ghost !px-2.5 !py-1.5" style={{ color: '#2563eb' }}
+                        title="تحميل">
                         <Download className="w-3.5 h-3.5" />
                       </button>
                     </>
@@ -190,6 +265,7 @@ export default function MyFiles() {
                   <button onClick={() => handleDelete(rec.id)}
                     className="btn-ghost !px-2.5 !py-1.5"
                     style={{ color: '#94a3b8' }}
+                    title="حذف"
                     onMouseEnter={(e) => e.currentTarget.style.color = '#e11d48'}
                     onMouseLeave={(e) => e.currentTarget.style.color = '#94a3b8'}>
                     <Trash2 className="w-3.5 h-3.5" />

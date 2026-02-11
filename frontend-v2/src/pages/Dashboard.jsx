@@ -5,7 +5,7 @@ import FilterBar from '../components/FilterBar'
 import ArticleCard from '../components/ArticleCard'
 import Loader from '../components/Loader'
 import { apiFetch } from '../apiClient'
-import { generateXLSX, buildReportHTML, generatePDFBlob, uploadExport } from '../utils/exportUtils'
+import { generateXLSX, buildReportHTML, exportPDFViaWindow, uploadExport } from '../utils/exportUtils'
 
 export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
   const [loading, setLoading] = useState(false)
@@ -229,23 +229,14 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
       })
       const html = buildReportHTML(sorted, { title: 'تقرير أخبار عين', stats, filters, keywords, countries })
 
-      // Generate real PDF
-      const pdfBlob = await generatePDFBlob(html)
+      // Open in new tab with auto-print for PDF save
+      const htmlBlob = exportPDFViaWindow(html)
+      if (!htmlBlob) return
+
+      // Store HTML in ملفاتي
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-      const filename = `تقرير_أخبار_عين_${timestamp}.pdf`
-
-      // Download to user
-      const url = URL.createObjectURL(pdfBlob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = filename
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(url)
-
-      // Store in ملفاتي
-      await uploadExport(apiFetch, pdfBlob, filename, {
+      const filename = `تقرير_أخبار_عين_${timestamp}.html`
+      await uploadExport(apiFetch, htmlBlob, filename, {
         articleCount: articles.length, filters, sourceType: 'dashboard',
       })
     } catch (error) {

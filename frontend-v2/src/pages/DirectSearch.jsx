@@ -9,7 +9,7 @@ import ArticleCard from '../components/ArticleCard'
 import Loader from '../components/Loader'
 import GuidedQueryBuilder, { compileToQ, validateQuery } from '../components/GuidedQueryBuilder'
 import { apiFetch } from '../apiClient'
-import { generateXLSX, buildReportHTML, generatePDFBlob, uploadExport } from '../utils/exportUtils'
+import { generateXLSX, buildReportHTML, exportPDFViaWindow, uploadExport } from '../utils/exportUtils'
 
 // Error messages mapping (Arabic)
 const ERROR_MESSAGES = {
@@ -370,17 +370,12 @@ export default function DirectSearch() {
     setExporting(true)
     try {
       const html = buildReportHTML(results, { title: 'عين - نتائج البحث' })
-      const pdfBlob = await generatePDFBlob(html)
+      const htmlBlob = exportPDFViaWindow(html)
+      if (!htmlBlob) return
+
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-      const filename = `نتائج_البحث_عين_${timestamp}.pdf`
-
-      const url = URL.createObjectURL(pdfBlob)
-      const a = document.createElement('a')
-      a.href = url; a.download = filename
-      document.body.appendChild(a); a.click(); a.remove()
-      URL.revokeObjectURL(url)
-
-      await uploadExport(apiFetch, pdfBlob, filename, {
+      const filename = `نتائج_البحث_عين_${timestamp}.html`
+      await uploadExport(apiFetch, htmlBlob, filename, {
         articleCount: results.length, filters: { type: 'direct_search', query: compiledQuery }, sourceType: 'direct_search',
       })
     } catch (err) { console.error('Export error:', err) }

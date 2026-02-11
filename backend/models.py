@@ -368,6 +368,18 @@ class BookmarkedArticle(Base):
     note = Column(Text, nullable=True)
 
 
+class DailyBrief(Base):
+    """Cached AI daily briefs — one per user per day"""
+    __tablename__ = 'daily_briefs'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    date_key = Column(String(10), nullable=False)  # YYYY-MM-DD
+    content = Column(Text, nullable=False)
+    article_count = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class SystemConfig(Base):
     """System configuration storage for cleanup dates and other settings"""
     __tablename__ = 'system_config'

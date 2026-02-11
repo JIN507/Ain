@@ -10,7 +10,7 @@ from flask import Flask, request, jsonify, send_from_directory, send_file, Respo
 from flask_cors import CORS
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_wtf.csrf import CSRFProtect, generate_csrf
-from models import init_db, get_db, Country, Source, Keyword, Article, User, AuditLog, ExportRecord, UserFile, SearchHistory, BookmarkedArticle
+from models import init_db, get_db, Country, Source, Keyword, Article, User, AuditLog, ExportRecord, UserFile, SearchHistory, BookmarkedArticle, DailyBrief
 import uuid
 from rss_service import fetch_feed
 from translation_service import (
@@ -3166,6 +3166,124 @@ def external_headlines():
         }), 500
     finally:
         db.close()
+
+
+# =============================================================================
+# AI FEATURES — ملخص ذكي + تحليل المشاعر
+# =============================================================================
+
+@app.route('/api/ai/daily-brief', methods=['POST'])
+@login_required
+@csrf.exempt
+def get_daily_brief():
+    """Generate or return cached AI daily brief for the user's articles."""
+    from ai_service import generate_daily_brief
+
+    today = datetime.utcnow().strftime('%Y-%m-%d')
+    force = (request.get_json() or {}).get('force', False)
+
+    db = get_db()
+    try:
+        # Check cache first (unless force refresh)
+        if not force:
+            cached = db.query(DailyBrief).filter(
+                DailyBrief.user_id == current_user.id,
+                DailyBrief.date_key == today
+            ).first()
+            if cached:
+                return jsonify({
+                    'content': cached.content,
+                    'article_count': cached.article_count,
+                    'cached': True,
+                    'date': today,
+                })
+
+        # Get today's articles for this user
+        start_of_day = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        articles = db.query(Article).filter(
+            Article.user_id == current_user.id,
+            Article.fetched_at >= start_of_day
+        ).all()
+
+        if not articles:
+            return jsonify({
+                'content': 'لا توجد مقالات مرصودة اليوم بعد. ستظهر الملخص عند وصول أخبار جديدة.',
+                'article_count': 0,
+                'cached': False,
+                'date': today,
+            })
+
+        # Build article dicts for AI
+        article_dicts = [{
+            'title_ar': a.title_ar or a.title_original or '',
+            'sentiment': a.sentiment_label or a.sentiment or '',
+            'source_name': a.source_name or '',
+            'keyword_original': a.keyword_original or '',
+            'country': a.country or '',
+        } for a in articles]
+
+        content = generate_daily_brief(article_dicts)
+
+        # Cache the result
+        existing = db.query(DailyBrief).filter(
+            DailyBrief.user_id == current_user.id,
+            DailyBrief.date_key == today
+        ).first()
+        if existing:
+            existing.content = content
+            existing.article_count = len(articles)
+            existing.created_at = datetime.utcnow()
+        else:
+            db.add(DailyBrief(
+                user_id=current_user.id,
+                date_key=today,
+                content=content,
+                article_count=len(articles),
+            ))
+        db.commit()
+
+        return jsonify({
+            'content': content,
+            'article_count': len(articles),
+            'cached': False,
+            'date': today,
+        })
+    except Exception as e:
+        print(f"[AI] ❌ Daily brief error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        db.close()
+
+
+@app.route('/api/ai/explain-sentiment', methods=['POST'])
+@login_required
+@csrf.exempt
+def explain_sentiment_endpoint():
+    """AI explains why an article has a certain sentiment — on-demand."""
+    from ai_service import explain_sentiment
+
+    data = request.get_json() or {}
+    title = data.get('title', '')
+    summary = data.get('summary', '')
+    sentiment = data.get('sentiment', '')
+
+    if not title:
+        return jsonify({'error': 'Title is required'}), 400
+
+    try:
+        explanation = explain_sentiment(
+            title=title,
+            summary=summary,
+            sentiment=sentiment,
+            source_name=data.get('source_name', ''),
+            country=data.get('country', ''),
+        )
+        return jsonify({'explanation': explanation})
+    except Exception as e:
+        print(f"[AI] ❌ Sentiment explanation error: {e}")
+        return jsonify({'error': str(e)}), 500
 
 
 # =============================================================================

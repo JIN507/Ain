@@ -1,9 +1,35 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { ExternalLink, ThumbsUp, ThumbsDown, Minus, ChevronDown, ChevronUp, Bookmark, Loader2 } from 'lucide-react'
+import { ExternalLink, ThumbsUp, ThumbsDown, Minus, ChevronDown, ChevronUp, Bookmark, Loader2, HelpCircle } from 'lucide-react'
+import { apiFetch } from '../apiClient'
 
 export default function ArticleCard({ article, isBookmarked, onBookmark, onUnbookmark, bookmarkLoading }) {
   const [isExpanded, setIsExpanded] = useState(false)
+  const [sentimentExplanation, setSentimentExplanation] = useState(null)
+  const [explainLoading, setExplainLoading] = useState(false)
+
+  const explainSentiment = async () => {
+    if (sentimentExplanation) { setSentimentExplanation(null); return }
+    setExplainLoading(true)
+    try {
+      const res = await apiFetch('/api/ai/explain-sentiment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: article.title_ar || article.title_original || '',
+          summary: article.summary_ar || '',
+          sentiment: article.sentiment || '',
+          source_name: article.source_name || '',
+          country: article.country || '',
+        }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setSentimentExplanation(data.explanation)
+      }
+    } catch (e) { console.error('Explain error:', e) }
+    finally { setExplainLoading(false) }
+  }
   
   const sentimentConfig = {
     'إيجابي': { class: 'badge-positive', icon: ThumbsUp },
@@ -118,6 +144,17 @@ export default function ArticleCard({ article, isBookmarked, onBookmark, onUnboo
           )}
         </div>
 
+        {/* AI Sentiment Explanation */}
+        {sentimentExplanation && (
+          <div className="mb-3 p-3 rounded-lg text-sm text-violet-800 leading-relaxed"
+            style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.12)' }}>
+            <div className="flex items-center gap-1 mb-1 text-[11px] font-semibold text-violet-600">
+              <HelpCircle className="w-3 h-3" /> تحليل المشاعر بالذكاء الاصطناعي
+            </div>
+            {sentimentExplanation}
+          </div>
+        )}
+
         {/* Footer */}
         <div className="flex items-center justify-between pt-3 mt-auto" style={{ borderTop: '1px solid rgba(0,0,0,0.05)' }}>
           <div className="flex items-center gap-2">
@@ -125,6 +162,17 @@ export default function ArticleCard({ article, isBookmarked, onBookmark, onUnboo
               <SentimentIcon className="w-3 h-3" />
               {article.sentiment}
             </span>
+            {/* لماذا؟ — AI sentiment explanation */}
+            <button
+              onClick={explainSentiment}
+              disabled={explainLoading}
+              className="btn-ghost !px-1.5 !py-0.5 !text-[10px] !gap-0.5"
+              style={{ color: sentimentExplanation ? '#7c3aed' : '#94a3b8' }}
+              title="لماذا هذا التصنيف؟"
+            >
+              {explainLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <HelpCircle className="w-3 h-3" />}
+              لماذا؟
+            </button>
             <span className="text-[11px] text-slate-400">
               {article.published_at ? new Date(article.published_at).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: 'numeric' }) : ''}
             </span>

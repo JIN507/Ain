@@ -881,7 +881,7 @@ ALLOWED_EMAILS = ["t09301970@gmail.com"]
 def load_user(user_id):
     db = get_db()
     try:
-        return db.query(User).get(int(user_id))
+        return db.get(User, int(user_id))
     finally:
         db.close()
 
@@ -1773,10 +1773,16 @@ def run_monitoring():
 @app.route('/api/articles', methods=['GET'])
 @login_required
 def get_articles():
-    """Get current user's articles with optional filters.
+    """Get current user's articles with optional filters and pagination.
     
     SECURITY: Uses force_user_filter=True to ensure each user 
     only sees their own articles, even admins.
+    
+    Pagination params:
+      - page: 1-indexed page number (default 1)
+      - per_page: articles per page (default 30, max 100)
+    
+    Returns: { articles: [...], total, page, per_page, total_pages }
     """
     db = get_db()
     try:
@@ -1785,6 +1791,14 @@ def get_articles():
         keyword = request.args.get('keyword')
         sentiment = request.args.get('sentiment')
         search = request.args.get('search')
+        
+        # Pagination params (per_page=0 means return ALL — used by exports)
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 30, type=int)
+        page = max(1, page)
+        return_all = (per_page == 0)
+        if not return_all:
+            per_page = max(1, min(per_page, 100))
         
         # SECURITY FIX: Force user filter to ensure isolation (even for admin)
         query = scoped(db.query(Article), Article, force_user_filter=True).order_by(Article.created_at.desc())
@@ -1805,9 +1819,23 @@ def get_articles():
                 (Article.summary_ar.like(search_term))
             )
         
-        # Return all articles (no limit) so we can see all countries
-        # If performance becomes an issue, increase limit or add pagination
-        articles = query.all()
+        # Get total count (lightweight — no data loaded)
+        total = query.count()
+        
+        if return_all:
+            # Export mode: return everything, no pagination
+            per_page = total
+            total_pages = 1
+            page = 1
+            articles = query.all()
+        else:
+            total_pages = max(1, (total + per_page - 1) // per_page)
+            # Clamp page to valid range
+            if page > total_pages:
+                page = total_pages
+            # Paginate: only fetch the rows we need
+            offset = (page - 1) * per_page
+            articles = query.offset(offset).limit(per_page).all()
         
         result = []
         for a in articles:
@@ -1850,7 +1878,13 @@ def get_articles():
             }
             result.append(article_data)
         
-        return jsonify(result)
+        return jsonify({
+            'articles': result,
+            'total': total,
+            'page': page,
+            'per_page': per_page,
+            'total_pages': total_pages,
+        })
     finally:
         db.close()
 
@@ -3388,6 +3422,9 @@ def delete_bookmark(bookmark_id):
         db.delete(bookmark)
         db.commit()
         return jsonify({'success': True})
+    except Exception as e:
+        db.rollback()
+        return jsonify({'error': str(e)}), 500
     finally:
         db.close()
 

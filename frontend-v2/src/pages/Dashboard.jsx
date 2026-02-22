@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { FileText, Download, Loader2, AlertCircle, RotateCcw, Radio, AlertTriangle, FileSpreadsheet, BarChart3, RefreshCw } from 'lucide-react'
+import { FileText, Download, Loader2, AlertCircle, RotateCcw, Radio, AlertTriangle, FileSpreadsheet, BarChart3, RefreshCw, ChevronRight, ChevronLeft, ChevronsRight, ChevronsLeft } from 'lucide-react'
 import StatsOverview from '../components/StatsOverview'
 import FilterBar from '../components/FilterBar'
 import ArticleCard from '../components/ArticleCard'
@@ -14,6 +14,9 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
   const [resetResult, setResetResult] = useState(null)
   const [articles, setArticles] = useState([])
   const [stats, setStats] = useState({ total: 0, positive: 0, negative: 0, neutral: 0 })
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalArticles, setTotalArticles] = useState(0)
   const [monitorStatus, setMonitorStatus] = useState(null)
   const [cleanupStatus, setCleanupStatus] = useState(null)
   const [bookmarkedUrls, setBookmarkedUrls] = useState({})
@@ -39,7 +42,8 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
   }, [])
 
   useEffect(() => {
-    loadArticles()
+    setCurrentPage(1)
+    loadArticles(1)
     loadStats()
     loadKeywords()
     loadCleanupStatus()
@@ -159,18 +163,30 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
     loadCountriesFromArticles()
   }, [articles])
 
-  const loadArticles = async () => {
+  const loadArticles = async (page = currentPage) => {
     setLoading(true)
     try {
       const params = new URLSearchParams(filters)
+      params.set('page', page)
+      params.set('per_page', 30)
       const res = await apiFetch(`/api/articles?${params}`)
       const data = await res.json()
-      setArticles(data)
+      setArticles(data.articles || [])
+      setCurrentPage(data.page || 1)
+      setTotalPages(data.total_pages || 1)
+      setTotalArticles(data.total || 0)
     } catch (error) {
       console.error('Error loading articles:', error)
     } finally {
       setLoading(false)
     }
+  }
+
+  const goToPage = (page) => {
+    const p = Math.max(1, Math.min(page, totalPages))
+    setCurrentPage(p)
+    loadArticles(p)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const loadStats = async () => {
@@ -293,15 +309,20 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
     }
   }
 
+  const fetchAllArticles = async () => {
+    const params = new URLSearchParams(filters)
+    params.set('per_page', 0)
+    const res = await apiFetch(`/api/articles?${params}`)
+    const data = await res.json()
+    return data.articles || []
+  }
+
   const exportPDF = async () => {
     setExporting(true)
     try {
-      const sorted = [...articles].sort((a, b) => {
-        const sortBy = filters.sortBy || 'newest'
-        return sortBy === 'newest' ? b.id - a.id : a.id - b.id
-      })
+      const allArticles = await fetchAllArticles()
       // Generate real PDF on the server (sends article data, backend builds PDF)
-      const pdfBlob = await generatePDFBlob(sorted, apiFetch, { title: 'تقرير أخبار عين', stats })
+      const pdfBlob = await generatePDFBlob(allArticles, apiFetch, { title: 'تقرير أخبار عين', stats })
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
       const filename = `تقرير_أخبار_عين_${timestamp}.pdf`
 
@@ -314,7 +335,7 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
 
       // Store in ملفاتي
       await uploadExport(apiFetch, pdfBlob, filename, {
-        articleCount: articles.length, filters, sourceType: 'dashboard',
+        articleCount: allArticles.length, filters, sourceType: 'dashboard',
       })
     } catch (error) {
       console.error('Error exporting PDF:', error)
@@ -329,11 +350,8 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
   const exportXLSX = async () => {
     setExportingXlsx(true)
     try {
-      const sorted = [...articles].sort((a, b) => {
-        const sortBy = filters.sortBy || 'newest'
-        return sortBy === 'newest' ? b.id - a.id : a.id - b.id
-      })
-      const xlsxBlob = generateXLSX(sorted)
+      const allArticles = await fetchAllArticles()
+      const xlsxBlob = generateXLSX(allArticles)
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
       const filename = `تقرير_أخبار_عين_${timestamp}.xlsx`
 
@@ -349,7 +367,7 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
 
       // Store in ملفاتي
       await uploadExport(apiFetch, xlsxBlob, filename, {
-        articleCount: articles.length, filters, sourceType: 'dashboard',
+        articleCount: allArticles.length, filters, sourceType: 'dashboard',
       })
     } catch (error) {
       console.error('Error exporting XLSX:', error)
@@ -417,9 +435,9 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">الخلاصة</h1>
-          <p className="text-sm text-slate-500 mt-0.5">جميع الأخبار المرصودة</p>
+          <p className="text-sm text-slate-500 mt-0.5">{totalArticles > 0 ? `${totalArticles} خبر مرصود` : 'جميع الأخبار المرصودة'}</p>
         </div>
-        {articles.length > 0 && (
+        {totalArticles > 0 && (
           <div className="flex items-center gap-2">
             <button 
               onClick={exportPDF}
@@ -451,7 +469,7 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
       <StatsOverview stats={stats} keywordCount={keywords.length} />
 
       {/* AI Daily Brief — ملخص ذكي */}
-      {articles.length > 0 && (
+      {totalArticles > 0 && (
         <div className="card p-5" style={{ borderRight: '4px solid #0f766e' }}>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
@@ -510,17 +528,15 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
           <p className="text-sm text-slate-400">أضف كلمات مفتاحية لبدء الرصد التلقائي</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[...articles]
-            .sort((a, b) => {
-              const sortBy = filters.sortBy || 'newest'
-              if (sortBy === 'newest') {
-                return b.id - a.id // الأحدث أولاً (ID كبير → صغير)
-              } else {
-                return a.id - b.id // الأقدم أولاً (ID صغير → كبير)
-              }
-            })
-            .map((article) => (
+        <>
+          {/* Page info bar */}
+          <div className="flex items-center justify-between text-xs text-slate-400 px-1">
+            <span>صفحة {currentPage} من {totalPages}</span>
+            <span>عرض {articles.length} من {totalArticles} خبر</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {articles.map((article) => (
               <ArticleCard
                 key={article.id}
                 article={article}
@@ -529,13 +545,135 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
                 onUnbookmark={handleUnbookmark}
                 bookmarkLoading={bookmarkLoading === article.url}
               />
-            ))
-          }
-        </div>
+            ))}
+          </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-1 pt-2">
+              {/* First page */}
+              <button
+                onClick={() => goToPage(1)}
+                disabled={currentPage === 1}
+                className="w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200"
+                style={{
+                  background: currentPage === 1 ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.9)',
+                  color: currentPage === 1 ? '#cbd5e1' : '#475569',
+                  border: '1px solid rgba(0,0,0,0.06)',
+                  cursor: currentPage === 1 ? 'default' : 'pointer',
+                }}
+                title="الصفحة الأولى"
+              >
+                <ChevronsRight className="w-4 h-4" />
+              </button>
+
+              {/* Previous page */}
+              <button
+                onClick={() => goToPage(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200"
+                style={{
+                  background: currentPage === 1 ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.9)',
+                  color: currentPage === 1 ? '#cbd5e1' : '#475569',
+                  border: '1px solid rgba(0,0,0,0.06)',
+                  cursor: currentPage === 1 ? 'default' : 'pointer',
+                }}
+                title="السابق"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+
+              {/* Page numbers */}
+              {(() => {
+                const pages = []
+                let start = Math.max(1, currentPage - 2)
+                let end = Math.min(totalPages, currentPage + 2)
+                // Ensure we always show 5 buttons when possible
+                if (end - start < 4) {
+                  if (start === 1) end = Math.min(totalPages, start + 4)
+                  else start = Math.max(1, end - 4)
+                }
+                if (start > 1) {
+                  pages.push(
+                    <button key={1} onClick={() => goToPage(1)}
+                      className="w-9 h-9 rounded-lg text-sm font-medium transition-all duration-200"
+                      style={{ background: 'rgba(255,255,255,0.9)', color: '#475569', border: '1px solid rgba(0,0,0,0.06)' }}>
+                      1
+                    </button>
+                  )
+                  if (start > 2) pages.push(<span key="dots-start" className="text-slate-300 px-1">...</span>)
+                }
+                for (let i = start; i <= end; i++) {
+                  if (i === 1 && start > 1) continue
+                  if (i === totalPages && end < totalPages) continue
+                  const isActive = i === currentPage
+                  pages.push(
+                    <button
+                      key={i}
+                      onClick={() => goToPage(i)}
+                      className="w-9 h-9 rounded-lg text-sm font-medium transition-all duration-200"
+                      style={{
+                        background: isActive ? '#0f766e' : 'rgba(255,255,255,0.9)',
+                        color: isActive ? '#ffffff' : '#475569',
+                        border: isActive ? '1px solid #0f766e' : '1px solid rgba(0,0,0,0.06)',
+                        boxShadow: isActive ? '0 2px 8px rgba(15,118,110,0.3)' : 'none',
+                      }}
+                    >
+                      {i}
+                    </button>
+                  )
+                }
+                if (end < totalPages) {
+                  if (end < totalPages - 1) pages.push(<span key="dots-end" className="text-slate-300 px-1">...</span>)
+                  pages.push(
+                    <button key={totalPages} onClick={() => goToPage(totalPages)}
+                      className="w-9 h-9 rounded-lg text-sm font-medium transition-all duration-200"
+                      style={{ background: 'rgba(255,255,255,0.9)', color: '#475569', border: '1px solid rgba(0,0,0,0.06)' }}>
+                      {totalPages}
+                    </button>
+                  )
+                }
+                return pages
+              })()}
+
+              {/* Next page */}
+              <button
+                onClick={() => goToPage(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200"
+                style={{
+                  background: currentPage === totalPages ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.9)',
+                  color: currentPage === totalPages ? '#cbd5e1' : '#475569',
+                  border: '1px solid rgba(0,0,0,0.06)',
+                  cursor: currentPage === totalPages ? 'default' : 'pointer',
+                }}
+                title="التالي"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              {/* Last page */}
+              <button
+                onClick={() => goToPage(totalPages)}
+                disabled={currentPage === totalPages}
+                className="w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200"
+                style={{
+                  background: currentPage === totalPages ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.9)',
+                  color: currentPage === totalPages ? '#cbd5e1' : '#475569',
+                  border: '1px solid rgba(0,0,0,0.06)',
+                  cursor: currentPage === totalPages ? 'default' : 'pointer',
+                }}
+                title="الصفحة الأخيرة"
+              >
+                <ChevronsLeft className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+        </>
       )}
 
       {/* Reset Section */}
-      {articles.length > 0 && (
+      {totalArticles > 0 && (
         <div className="card p-5" style={{ borderColor: 'rgba(234,88,12,0.15)' }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">

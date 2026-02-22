@@ -5,7 +5,6 @@ Uses OpenAI GPT-4o-mini for:
   - Deep Sentiment (لماذا؟): Explain why an article is positive/negative
 """
 import os
-import json
 import requests
 
 OPENAI_API_KEY = ''

@@ -3633,6 +3633,8 @@ def auto_initialize():
                 conn.execute(text("ALTER TABLE articles ALTER COLUMN url TYPE VARCHAR(2000)"))
                 conn.execute(text("ALTER TABLE articles ALTER COLUMN image_url TYPE VARCHAR(2000)"))
                 conn.execute(text("ALTER TABLE sources ALTER COLUMN url TYPE VARCHAR(2000)"))
+                # Widen daily_briefs.date_key for keyword-specific cache keys (YYYY-MM-DD:keyword)
+                conn.execute(text("ALTER TABLE daily_briefs ALTER COLUMN date_key TYPE VARCHAR(100)"))
                 # Exports file_data for Render compatibility
                 conn.execute(text("ALTER TABLE exports ADD COLUMN IF NOT EXISTS file_data BYTEA"))
                 # Migrate articles unique constraint: url-only → (url, user_id)

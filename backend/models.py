@@ -374,7 +374,7 @@ class DailyBrief(Base):
 
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
-    date_key = Column(String(10), nullable=False)  # YYYY-MM-DD
+    date_key = Column(String(100), nullable=False)  # YYYY-MM-DD or YYYY-MM-DD:keyword
     content = Column(Text, nullable=False)
     article_count = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)

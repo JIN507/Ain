@@ -1568,7 +1568,14 @@ from global_scheduler import global_scheduler
 @app.route('/api/monitor/status', methods=['GET'])
 @login_required
 def get_monitor_status():
-    """Get monitoring status for current user (backed by global scheduler)"""
+    """Get monitoring status for current user (backed by global scheduler).
+    
+    Also acts as a WATCHDOG: if the scheduler thread crashed, this will
+    detect it and restart it automatically (called every 30s by Dashboard).
+    """
+    # Watchdog: auto-restart dead scheduler thread
+    global_scheduler.ensure_running()
+    
     user_id = current_user.id
     return jsonify(global_scheduler.get_user_status(user_id))
 

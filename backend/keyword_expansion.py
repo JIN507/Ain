@@ -18,7 +18,7 @@ TRANSLATE_TARGETS = os.getenv(
     'TRANSLATE_TARGETS', 
     'en,fr,es,de,ru,zh-cn,ja,hi,id,pt,tr,ar,ko,it,nl,pl,vi,th,uk,ro,el,cs,sv,hu,fi,da,no,sk,bg,hr,ms,fa,ur'
 ).split(',')
-EXPANSION_TTL_DAYS = int(os.getenv('EXPANSION_TTL_DAYS', '7'))
+EXPANSION_TTL_DAYS = int(os.getenv('EXPANSION_TTL_DAYS', '365'))
 TRANSLATION_TIMEOUT_S = int(os.getenv('TRANSLATION_TIMEOUT_S', '8'))
 
 
@@ -205,34 +205,62 @@ def clear_expansion_cache():
         db.close()
 
 
-def load_expansions_from_keywords(keywords):
+def load_expansions_from_keywords(keywords, auto_refresh=True):
     """
-    Load expansions from DATABASE for keywords - NEVER translates during runtime!
+    Load expansions from DATABASE for keywords.
     
-    CRITICAL: This function is called during monitoring and must be FAST.
-    It ONLY loads pre-stored expansions from the database. If expansion is 
-    missing, it skips the keyword with a warning.
-    
-    Translation/expansion happens ONLY when adding keywords via /api/keywords.
+    If auto_refresh=True and a keyword's translations are missing or expired,
+    attempt to re-expand on the fly so monitoring is never silently broken.
     
     Args:
         keywords: List of Keyword objects with text_ar and translations_json fields
+        auto_refresh: If True, auto-expand keywords with missing/expired translations
         
     Returns:
-        List of expansions (skips keywords without translations)
+        List of expansions (skips keywords only if auto-refresh also fails)
     """
     expansions = []
     skipped = []
+    refreshed = []
     
     for kw in keywords:
-        # Load from DATABASE instead of RAM cache
+        # Load from DATABASE
         expansion = get_expansion_from_db(kw)
         
         if expansion:
             expansions.append(expansion)
+        elif auto_refresh:
+            # Auto-refresh: re-expand the keyword instead of silently dropping it
+            print(f"🔄 Auto-refreshing expired/missing translations for: {kw.text_ar}")
+            try:
+                from models import get_db
+                db = get_db()
+                try:
+                    # Re-fetch the keyword object in this session
+                    from models import Keyword as KW
+                    kw_fresh = db.query(KW).filter(KW.id == kw.id).first()
+                    if kw_fresh:
+                        new_expansion = expand_keyword(kw_fresh.text_ar, keyword_obj=kw_fresh, db=db)
+                        if new_expansion and new_expansion.get('status') != 'failed':
+                            expansions.append(new_expansion)
+                            refreshed.append(kw.text_ar)
+                            print(f"   ✅ Refreshed '{kw.text_ar}' successfully")
+                        else:
+                            skipped.append(kw.text_ar)
+                            print(f"   ❌ Refresh failed for '{kw.text_ar}'")
+                    else:
+                        skipped.append(kw.text_ar)
+                finally:
+                    db.close()
+            except Exception as e:
+                skipped.append(kw.text_ar)
+                print(f"   ❌ Auto-refresh error for '{kw.text_ar}': {str(e)[:80]}")
         else:
             skipped.append(kw.text_ar)
             print(f"⚠️  Keyword '{kw.text_ar}' has no translations (skipping)")
+    
+    if refreshed:
+        print(f"\n🔄 Auto-refreshed {len(refreshed)} keywords: {', '.join(refreshed[:5])}")
     
     if skipped:
         print(f"\n⚠️  {len(skipped)} keywords skipped (no translations in database)")

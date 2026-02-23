@@ -178,25 +178,80 @@ class GlobalMonitoringScheduler:
     # ── Main Loop ─────────────────────────────────────────────────────
     
     def _run_loop(self):
-        """Main scheduler loop - runs monitoring then sleeps"""
-        self._execute_global_monitoring()
+        """Main scheduler loop - runs monitoring then sleeps.
         
-        while not self._stop_event.is_set():
-            self._trigger_event.clear()
-            
-            # Wait for interval, interruptible by stop or trigger
-            for _ in range(self._interval):
-                if self._stop_event.is_set():
-                    return
-                if self._trigger_event.is_set():
+        Wrapped in top-level try/except to prevent silent thread death.
+        If ANY unhandled exception kills the loop, it auto-restarts after 60s.
+        """
+        MAX_CONSECUTIVE_CRASHES = 5
+        crash_count = 0
+        
+        while not self._stop_event.is_set() and crash_count < MAX_CONSECUTIVE_CRASHES:
+            try:
+                self._execute_global_monitoring()
+                crash_count = 0  # Reset on success
+                
+                while not self._stop_event.is_set():
                     self._trigger_event.clear()
-                    break
-                time.sleep(1)
-            
+                    
+                    # Wait for interval, interruptible by stop or trigger
+                    for _ in range(self._interval):
+                        if self._stop_event.is_set():
+                            return
+                        if self._trigger_event.is_set():
+                            self._trigger_event.clear()
+                            break
+                        time.sleep(1)
+                    
+                    if not self._running:
+                        return
+                    
+                    self._execute_global_monitoring()
+                    crash_count = 0  # Reset on success
+                    
+            except Exception as e:
+                crash_count += 1
+                print(f"[GLOBAL-SCHED] ⚠️ THREAD CRASH #{crash_count}: {str(e)}")
+                import traceback
+                traceback.print_exc()
+                
+                if crash_count < MAX_CONSECUTIVE_CRASHES and not self._stop_event.is_set():
+                    wait_secs = min(60 * crash_count, 300)  # Back off: 60s, 120s, 180s...
+                    print(f"[GLOBAL-SCHED] Auto-restarting in {wait_secs}s...")
+                    for _ in range(wait_secs):
+                        if self._stop_event.is_set():
+                            return
+                        time.sleep(1)
+        
+        if crash_count >= MAX_CONSECUTIVE_CRASHES:
+            print(f"[GLOBAL-SCHED] ❌ FATAL: {MAX_CONSECUTIVE_CRASHES} consecutive crashes - thread stopped")
+            with self._status_lock:
+                self._running = False
+    
+    def ensure_running(self) -> bool:
+        """
+        Watchdog: Check if the scheduler thread is alive and restart if dead.
+        Call this from API request handlers to self-heal after crashes/restarts.
+        
+        Returns True if scheduler is (now) running.
+        """
+        with self._status_lock:
             if not self._running:
-                break
+                return False  # Intentionally stopped, don't restart
             
-            self._execute_global_monitoring()
+            # Thread should be alive
+            if self._thread and self._thread.is_alive():
+                return True  # All good
+            
+            # Thread is dead but _running is True → crashed!
+            print(f"[GLOBAL-SCHED] ⚠️ WATCHDOG: Thread dead, restarting...")
+        
+        # Restart (outside lock to avoid deadlock)
+        self._stop_event.clear()
+        self._thread = threading.Thread(target=self._run_loop, daemon=True)
+        self._thread.start()
+        print(f"[GLOBAL-SCHED] ✅ WATCHDOG: Thread restarted")
+        return True
     
     # ── DB Lock (multi-worker safe) ───────────────────────────────────
     
@@ -309,12 +364,19 @@ class GlobalMonitoringScheduler:
                 keyword_user_map[kw.text_ar].add(kw.user_id)
             
             # Unique keywords for expansion loading (one per text)
-            seen_texts = set()
-            unique_keywords = []
+            # IMPORTANT: prefer the keyword with the freshest translations
+            best_per_text: Dict[str, Any] = {}
             for kw in all_keywords:
-                if kw.text_ar not in seen_texts:
-                    seen_texts.add(kw.text_ar)
-                    unique_keywords.append(kw)
+                existing = best_per_text.get(kw.text_ar)
+                if existing is None:
+                    best_per_text[kw.text_ar] = kw
+                else:
+                    # Prefer the keyword with the most recent translations
+                    kw_ts = getattr(kw, 'translations_updated_at', None)
+                    ex_ts = getattr(existing, 'translations_updated_at', None)
+                    if kw_ts and (not ex_ts or kw_ts > ex_ts):
+                        best_per_text[kw.text_ar] = kw
+            unique_keywords = list(best_per_text.values())
             
             total_users = len(set(kw.user_id for kw in all_keywords))
             print(f"[GLOBAL-SCHED] {len(unique_keywords)} unique keywords across {total_users} users")

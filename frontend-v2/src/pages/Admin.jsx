@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { ChevronDown, ChevronLeft, Key, FileText } from 'lucide-react'
 import { apiFetch } from '../apiClient'
 
 export default function Admin() {
@@ -8,6 +9,9 @@ export default function Admin() {
   const [creating, setCreating] = useState(false)
   const [form, setForm] = useState({ name: '', email: '', role: 'USER', password: '' })
   const [passwordModal, setPasswordModal] = useState({ open: false, userId: null, userName: '', newPassword: '' })
+  const [expandedUser, setExpandedUser] = useState(null)
+  const [userKeywords, setUserKeywords] = useState({})
+  const [loadingKeywords, setLoadingKeywords] = useState(null)
 
   const loadUsers = async () => {
     setLoading(true)
@@ -30,6 +34,28 @@ export default function Admin() {
   useEffect(() => {
     loadUsers()
   }, [])
+
+  const toggleExpand = async (userId) => {
+    if (expandedUser === userId) {
+      setExpandedUser(null)
+      return
+    }
+    setExpandedUser(userId)
+    if (!userKeywords[userId]) {
+      setLoadingKeywords(userId)
+      try {
+        const res = await apiFetch(`/api/admin/users/${userId}/keywords`)
+        if (res.ok) {
+          const data = await res.json()
+          setUserKeywords(prev => ({ ...prev, [userId]: data.keywords }))
+        }
+      } catch (e) {
+        console.error('Failed to load keywords:', e)
+      } finally {
+        setLoadingKeywords(null)
+      }
+    }
+  }
 
   const handleChangeUser = async (id, changes) => {
     try {
@@ -170,27 +196,39 @@ export default function Admin() {
           <table className="min-w-full text-xs">
             <thead>
               <tr style={{ borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+                <th className="py-2.5 px-3 text-right font-semibold text-slate-500 w-8"></th>
                 <th className="py-2.5 px-3 text-right font-semibold text-slate-500">الاسم</th>
                 <th className="py-2.5 px-3 text-right font-semibold text-slate-500">المستخدم</th>
                 <th className="py-2.5 px-3 text-right font-semibold text-slate-500">الدور</th>
+                <th className="py-2.5 px-3 text-right font-semibold text-slate-500">الكلمات</th>
+                <th className="py-2.5 px-3 text-right font-semibold text-slate-500">المقالات</th>
                 <th className="py-2.5 px-3 text-right font-semibold text-slate-500">الحالة</th>
                 <th className="py-2.5 px-3 text-right font-semibold text-slate-500">إجراءات</th>
               </tr>
             </thead>
             <tbody>
               {users.map((u) => (
-                <tr key={u.id} style={{ borderBottom: '1px solid rgba(0,0,0,0.03)' }} className="hover:bg-slate-50/50">
-                  <td className="py-2 px-3">
+                <>
+                <tr key={u.id} style={{ borderBottom: expandedUser === u.id ? 'none' : '1px solid rgba(0,0,0,0.03)' }}
+                    className={`hover:bg-slate-50/50 cursor-pointer ${expandedUser === u.id ? 'bg-slate-50/80' : ''}`}
+                    onClick={() => toggleExpand(u.id)}>
+                  <td className="py-2 px-2 text-center">
+                    {expandedUser === u.id
+                      ? <ChevronDown className="w-3.5 h-3.5 text-teal-600 inline" />
+                      : <ChevronLeft className="w-3.5 h-3.5 text-slate-400 inline" />
+                    }
+                  </td>
+                  <td className="py-2 px-3" onClick={e => e.stopPropagation()}>
                     <input type="text" defaultValue={u.name || ''}
                       className="w-full bg-transparent border border-transparent hover:border-slate-200 rounded-lg px-2 py-1 text-xs transition"
                       onBlur={(e) => e.target.value !== (u.name || '') && handleChangeUser(u.id, { name: e.target.value })} />
                   </td>
-                  <td className="py-2 px-3">
+                  <td className="py-2 px-3" onClick={e => e.stopPropagation()}>
                     <input type="email" defaultValue={u.email}
                       className="w-full bg-transparent border border-transparent hover:border-slate-200 rounded-lg px-2 py-1 text-xs transition"
                       onBlur={(e) => e.target.value !== u.email && handleChangeUser(u.id, { email: e.target.value })} />
                   </td>
-                  <td className="py-2 px-3">
+                  <td className="py-2 px-3" onClick={e => e.stopPropagation()}>
                     <select defaultValue={u.role}
                       className="bg-transparent border border-transparent hover:border-slate-200 rounded-lg px-2 py-1 text-xs transition"
                       onChange={(e) => handleChangeUser(u.id, { role: e.target.value })}>
@@ -199,6 +237,18 @@ export default function Admin() {
                     </select>
                   </td>
                   <td className="py-2 px-3">
+                    <span className="inline-flex items-center gap-1 text-xs font-medium" style={{ color: u.keyword_count > 0 ? '#0f766e' : '#94a3b8' }}>
+                      <Key className="w-3 h-3" />
+                      {u.keyword_count || 0}
+                    </span>
+                  </td>
+                  <td className="py-2 px-3">
+                    <span className="inline-flex items-center gap-1 text-xs font-medium" style={{ color: u.article_count > 0 ? '#2563eb' : '#94a3b8' }}>
+                      <FileText className="w-3 h-3" />
+                      {u.article_count || 0}
+                    </span>
+                  </td>
+                  <td className="py-2 px-3" onClick={e => e.stopPropagation()}>
                     <button
                       onClick={() => handleChangeUser(u.id, { is_active: !u.is_active })}
                       className="badge cursor-pointer"
@@ -208,7 +258,7 @@ export default function Admin() {
                       {u.is_active ? 'مفعل' : 'معلّق'}
                     </button>
                   </td>
-                  <td className="py-2 px-3">
+                  <td className="py-2 px-3" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => setPasswordModal({ open: true, userId: u.id, userName: u.name || u.email, newPassword: '' })}
@@ -224,6 +274,52 @@ export default function Admin() {
                     </div>
                   </td>
                 </tr>
+
+                {/* Expanded keywords row */}
+                {expandedUser === u.id && (
+                  <tr key={`kw-${u.id}`} style={{ borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+                    <td colSpan={8} className="px-4 pb-4 pt-1">
+                      <div className="rounded-xl p-4" style={{ background: 'rgba(15,23,42,0.02)', border: '1px solid rgba(0,0,0,0.04)' }}>
+                        <div className="flex items-center gap-2 mb-3">
+                          <Key className="w-3.5 h-3.5 text-teal-600" />
+                          <span className="text-xs font-semibold text-slate-700">كلمات المستخدم: {u.name || u.email}</span>
+                        </div>
+                        {loadingKeywords === u.id ? (
+                          <div className="text-[11px] text-slate-400 py-2">جاري تحميل الكلمات...</div>
+                        ) : !userKeywords[u.id] || userKeywords[u.id].length === 0 ? (
+                          <div className="text-[11px] text-slate-400 py-2">لا توجد كلمات مفتاحية لهذا المستخدم</div>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                            {userKeywords[u.id].map((kw) => (
+                              <div key={kw.id} className="flex items-center justify-between rounded-lg px-3 py-2.5"
+                                style={{ background: 'rgba(255,255,255,0.8)', border: '1px solid rgba(0,0,0,0.04)' }}>
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className={`inline-block w-1.5 h-1.5 rounded-full flex-shrink-0 ${kw.enabled ? 'bg-teal-500' : 'bg-slate-300'}`} />
+                                  <div className="min-w-0">
+                                    <div className="text-xs font-semibold text-slate-800 truncate">{kw.text_ar}</div>
+                                    {kw.text_en && <div className="text-[10px] text-slate-400 truncate">{kw.text_en}</div>}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 flex-shrink-0 mr-2">
+                                  <span className="badge text-[10px]" style={{
+                                    background: kw.has_translations ? 'rgba(20,184,166,0.08)' : 'rgba(239,68,68,0.08)',
+                                    color: kw.has_translations ? '#0f766e' : '#dc2626',
+                                  }}>
+                                    {kw.has_translations ? 'مترجمة' : 'غير مترجمة'}
+                                  </span>
+                                  <span className="text-[10px] font-medium" style={{ color: kw.article_count > 0 ? '#2563eb' : '#94a3b8' }}>
+                                    {kw.article_count} مقال
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                </>
               ))}
             </tbody>
           </table>

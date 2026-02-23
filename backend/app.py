@@ -691,14 +691,20 @@ def admin_list_users():
                 (User.email.ilike(like)) | (User.name.ilike(like))
             )
         users = query.order_by(User.created_at.desc()).all()
-        result = [{
-            'id': u.id,
-            'name': u.name,
-            'email': u.email,
-            'role': u.role,
-            'is_active': u.is_active,
-            'created_at': u.created_at.isoformat() if u.created_at else None
-        } for u in users]
+        result = []
+        for u in users:
+            keyword_count = db.query(Keyword).filter(Keyword.user_id == u.id, Keyword.enabled == True).count()
+            article_count = db.query(Article).filter(Article.user_id == u.id).count()
+            result.append({
+                'id': u.id,
+                'name': u.name,
+                'email': u.email,
+                'role': u.role,
+                'is_active': u.is_active,
+                'created_at': u.created_at.isoformat() if u.created_at else None,
+                'keyword_count': keyword_count,
+                'article_count': article_count,
+            })
         return jsonify(result)
     finally:
         db.close()
@@ -847,6 +853,53 @@ def admin_delete_user(user_id):
         except Exception:
             pass
         return jsonify({'success': True})
+    finally:
+        db.close()
+
+
+@app.route('/api/admin/users/<int:user_id>/keywords', methods=['GET'])
+@admin_required
+def admin_get_user_keywords(user_id):
+    """Get all keywords for a specific user (ADMIN only)."""
+    db = get_db()
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        keywords = db.query(Keyword).filter(Keyword.user_id == user_id).order_by(Keyword.created_at.desc()).all()
+
+        result = []
+        for kw in keywords:
+            # Count articles matched by this keyword for this user
+            article_count = db.query(Article).filter(
+                Article.user_id == user_id,
+                Article.keyword_original == kw.text_ar
+            ).count()
+
+            has_translations = bool(kw.translations_json)
+            translations_age = None
+            if kw.translations_updated_at:
+                age = datetime.utcnow() - kw.translations_updated_at
+                translations_age = age.days
+
+            result.append({
+                'id': kw.id,
+                'text_ar': kw.text_ar,
+                'text_en': kw.text_en,
+                'enabled': kw.enabled,
+                'has_translations': has_translations,
+                'translations_age_days': translations_age,
+                'article_count': article_count,
+                'created_at': kw.created_at.isoformat() if kw.created_at else None,
+            })
+
+        return jsonify({
+            'user_id': user_id,
+            'user_name': user.name or user.email,
+            'keywords': result,
+            'total': len(result),
+        })
     finally:
         db.close()
 

@@ -502,6 +502,8 @@ class GlobalMonitoringScheduler:
         
         total_saved = 0
         user_save_counts: Dict[int, int] = {}
+        user_duplicate_counts: Dict[int, int] = {}
+        user_eligible_counts: Dict[int, int] = {}
         duplicates = 0
         
         # Apply save limit
@@ -509,6 +511,12 @@ class GlobalMonitoringScheduler:
         if limit and len(matches) > limit:
             print(f"[GLOBAL-SCHED] Applying save limit: {limit} (from {len(matches)} matches)")
             matches = matches[:limit]
+        
+        # Log the keyword→user distribution
+        all_user_ids = set()
+        for users in keyword_user_map.values():
+            all_user_ids.update(users)
+        print(f"[GLOBAL-SCHED] keyword_user_map covers {len(all_user_ids)} users: {sorted(all_user_ids)}")
         
         for article, source, matched_keywords in matches:
             # ── Prepare article ONCE (expensive translation) ──────────
@@ -561,6 +569,8 @@ class GlobalMonitoringScheduler:
                     user_matched_keywords[uid].append(mk)
             
             for user_id, user_kws in user_matched_keywords.items():
+                user_eligible_counts[user_id] = user_eligible_counts.get(user_id, 0) + 1
+                
                 # Per-user duplicate check (composite unique: url + user_id)
                 exists = db.query(Article).filter(
                     Article.url == article['url'],
@@ -569,6 +579,7 @@ class GlobalMonitoringScheduler:
                 
                 if exists:
                     duplicates += 1
+                    user_duplicate_counts[user_id] = user_duplicate_counts.get(user_id, 0) + 1
                     continue
                 
                 # Use this user's first matched keyword as primary
@@ -612,6 +623,19 @@ class GlobalMonitoringScheduler:
                 except Exception as e:
                     db.rollback()
                     print(f"[GLOBAL-SCHED] ⚠️ Save error for user {user_id}: {str(e)[:80]}")
+        
+        # Diagnostic summary
+        print(f"\n[GLOBAL-SCHED] 📊 Save diagnostics:")
+        print(f"   Total duplicates skipped: {duplicates}")
+        print(f"   Per-user breakdown:")
+        for uid in sorted(all_user_ids):
+            eligible = user_eligible_counts.get(uid, 0)
+            dupes = user_duplicate_counts.get(uid, 0)
+            saved = user_save_counts.get(uid, 0)
+            if eligible == 0:
+                print(f"      User {uid}: 0 eligible (no matching keywords in this batch)")
+            else:
+                print(f"      User {uid}: {eligible} eligible → {dupes} duplicates, {saved} NEW saved")
         
         print(f"[GLOBAL-SCHED] Saved {total_saved} articles, skipped {duplicates} duplicates")
         return total_saved, user_save_counts

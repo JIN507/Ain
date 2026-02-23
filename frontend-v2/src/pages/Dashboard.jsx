@@ -105,10 +105,12 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
   const loadDailyBrief = async (force = false) => {
     setBriefLoading(true)
     try {
+      const payload = { force }
+      if (filters.keyword) payload.keyword = filters.keyword
       const res = await apiFetch('/api/ai/daily-brief', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ force }),
+        body: JSON.stringify(payload),
       })
       if (res.ok) {
         const data = await res.json()
@@ -117,6 +119,11 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
     } catch (e) { console.error('Daily brief error:', e) }
     finally { setBriefLoading(false) }
   }
+
+  // Clear brief when keyword filter changes so user gets a fresh brief for the new keyword
+  useEffect(() => {
+    setDailyBrief(null)
+  }, [filters.keyword])
 
   // Load cleanup status to show warning
   const loadCleanupStatus = async () => {
@@ -474,7 +481,9 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <BarChart3 className="w-5 h-5" style={{ color: '#0f766e' }} />
-              <h3 className="font-bold text-slate-900">ملخص ذكي</h3>
+              <h3 className="font-bold text-slate-900">
+                ملخص ذكي{filters.keyword ? ` — ${filters.keyword}` : ''}
+              </h3>
               <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
                 style={{ background: 'rgba(15,118,110,0.08)', color: '#0f766e' }}>AI</span>
             </div>
@@ -498,6 +507,7 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
               <div className="mt-3 pt-2 flex items-center gap-3 text-[11px] text-slate-400" style={{ borderTop: '1px solid rgba(0,0,0,0.05)' }}>
                 <span>{dailyBrief.article_count} مقال</span>
                 <span>{dailyBrief.date}</span>
+                {dailyBrief.keyword && <span>الكلمة: {dailyBrief.keyword}</span>}
                 {dailyBrief.cached && <span>من الذاكرة</span>}
               </div>
             </div>

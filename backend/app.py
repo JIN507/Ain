@@ -3270,11 +3270,20 @@ def external_headlines():
 @login_required
 @csrf.exempt
 def get_daily_brief():
-    """Generate or return cached AI daily brief for the user's articles."""
+    """Generate or return cached AI daily brief for the user's articles.
+    
+    Accepts optional 'keyword' in JSON body. When provided, only articles
+    matching that keyword are used and the cache key is keyword-specific.
+    """
     from ai_service import generate_daily_brief
 
+    body = request.get_json() or {}
     today = datetime.utcnow().strftime('%Y-%m-%d')
-    force = (request.get_json() or {}).get('force', False)
+    force = body.get('force', False)
+    keyword_filter = (body.get('keyword') or '').strip()
+
+    # Cache key: "2026-02-23" for all, "2026-02-23:السعودية" for a specific keyword
+    cache_key = f"{today}:{keyword_filter}" if keyword_filter else today
 
     db = get_db()
     try:
@@ -3282,7 +3291,7 @@ def get_daily_brief():
         if not force:
             cached = db.query(DailyBrief).filter(
                 DailyBrief.user_id == current_user.id,
-                DailyBrief.date_key == today
+                DailyBrief.date_key == cache_key
             ).first()
             if cached:
                 return jsonify({
@@ -3290,21 +3299,31 @@ def get_daily_brief():
                     'article_count': cached.article_count,
                     'cached': True,
                     'date': today,
+                    'keyword': keyword_filter or None,
                 })
 
         # Get today's articles for this user
         start_of_day = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-        articles = db.query(Article).filter(
+        q = db.query(Article).filter(
             Article.user_id == current_user.id,
             Article.fetched_at >= start_of_day
-        ).all()
+        )
+        if keyword_filter:
+            q = q.filter(Article.keyword_original == keyword_filter)
+        articles = q.all()
 
         if not articles:
+            no_articles_msg = (
+                f'لا توجد مقالات لكلمة "{keyword_filter}" اليوم بعد.'
+                if keyword_filter
+                else 'لا توجد مقالات مرصودة اليوم بعد. ستظهر الملخص عند وصول أخبار جديدة.'
+            )
             return jsonify({
-                'content': 'لا توجد مقالات مرصودة اليوم بعد. ستظهر الملخص عند وصول أخبار جديدة.',
+                'content': no_articles_msg,
                 'article_count': 0,
                 'cached': False,
                 'date': today,
+                'keyword': keyword_filter or None,
             })
 
         # Build article dicts for AI
@@ -3318,10 +3337,10 @@ def get_daily_brief():
 
         content = generate_daily_brief(article_dicts)
 
-        # Cache the result
+        # Cache the result (keyword-specific cache key)
         existing = db.query(DailyBrief).filter(
             DailyBrief.user_id == current_user.id,
-            DailyBrief.date_key == today
+            DailyBrief.date_key == cache_key
         ).first()
         if existing:
             existing.content = content
@@ -3330,7 +3349,7 @@ def get_daily_brief():
         else:
             db.add(DailyBrief(
                 user_id=current_user.id,
-                date_key=today,
+                date_key=cache_key,
                 content=content,
                 article_count=len(articles),
             ))
@@ -3341,6 +3360,7 @@ def get_daily_brief():
             'article_count': len(articles),
             'cached': False,
             'date': today,
+            'keyword': keyword_filter or None,
         })
     except Exception as e:
         print(f"[AI] ❌ Daily brief error: {e}")

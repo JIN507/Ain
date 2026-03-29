@@ -19,7 +19,15 @@ def _get_env(name: str, default: Optional[str] = None) -> str:
     return value
 
 
-JWT_SECRET = _get_env("JWT_SECRET", "dev-secret-change-me")
+# C2 FIX: Never use a hardcoded default. Fail in production; use ephemeral secret in dev.
+_is_production = bool(os.getenv('RENDER') or os.getenv('FLASK_ENV') == 'production')
+if os.getenv('JWT_SECRET'):
+    JWT_SECRET = os.getenv('JWT_SECRET')
+elif _is_production:
+    raise RuntimeError("JWT_SECRET environment variable is required in production")
+else:
+    JWT_SECRET = secrets.token_urlsafe(32)
+    print("[AUTH] \u26a0\ufe0f JWT_SECRET not set \u2014 using ephemeral dev secret (sessions won't persist across restarts)")
 ACCESS_TTL_SECONDS = int(os.getenv("ACCESS_TTL", "900"))  # 15m
 REFRESH_TTL_SECONDS = int(os.getenv("REFRESH_TTL", "604800"))  # 7d
 
@@ -78,6 +86,15 @@ def decode_token(token: str) -> Optional[Dict[str, Any]]:
 
 def generate_csrf_token() -> str:
     return secrets.token_urlsafe(32)
+
+
+def validate_password_strength(password: str) -> Optional[str]:
+    """Return error message if password is too weak, None if OK."""
+    if not password:
+        return "Password cannot be empty"
+    if len(password) < 8:
+        return "Password must be at least 8 characters"
+    return None
 
 
 def mask_email(email: str) -> str:

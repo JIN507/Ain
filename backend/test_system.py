@@ -73,7 +73,7 @@ def test_login():
     
     # Correct login
     r = session.post(f"{BASE}/api/auth/login", json={
-        "email": "elite@local", "password": "135813581234"
+        "email": "elite@local", "password": os.environ.get("ADMIN_INIT_PASSWORD", "test-password")
     })
     if r.status_code == 200:
         data = r.json()

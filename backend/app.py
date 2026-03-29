@@ -9,7 +9,8 @@ sys.stderr.reconfigure(line_buffering=True)
 from flask import Flask, request, jsonify, send_from_directory, send_file, Response
 from flask_cors import CORS
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
-from flask_wtf.csrf import CSRFProtect, generate_csrf
+from flask_wtf.csrf import CSRFProtect, generate_csrf, validate_csrf, CSRFError
+import hmac
 from models import init_db, get_db, Country, Source, Keyword, Article, User, AuditLog, ExportRecord, UserFile, SearchHistory, BookmarkedArticle, DailyBrief
 import uuid
 from rss_service import fetch_feed
@@ -44,19 +45,42 @@ try:
 except Exception:
     pass
 
-# Basic security config (can be overridden via .env)
-app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-change-me')
+# ── Security config ──────────────────────────────────────────────────
+_is_production = bool(os.getenv('RENDER') or os.getenv('FLASK_ENV') == 'production')
+
+# C2 FIX: No hardcoded secret. Fail in production; use ephemeral in dev.
+_secret = os.environ.get('SECRET_KEY', '')
+if not _secret:
+    if _is_production:
+        raise RuntimeError('SECRET_KEY environment variable is required in production')
+    import secrets as _sec
+    _secret = _sec.token_urlsafe(32)
+    print('[APP] ⚠️ SECRET_KEY not set — using ephemeral dev secret')
+app.secret_key = _secret
+
 app.config.setdefault('SESSION_COOKIE_HTTPONLY', True)
 app.config.setdefault('SESSION_COOKIE_SAMESITE', 'Lax')
-if os.environ.get('SESSION_COOKIE_SECURE', 'false').lower() == 'true':
+if _is_production or os.environ.get('SESSION_COOKIE_SECURE', 'false').lower() == 'true':
     app.config['SESSION_COOKIE_SECURE'] = True
+
+# C3 FIX: Disable Flask-WTF auto-check; we enforce CSRF via before_request instead.
+app.config['WTF_CSRF_CHECK_DEFAULT'] = False
 
 login_manager = LoginManager(app)
 csrf = CSRFProtect(app)
 
-# Single-origin deployment: frontend is served by Flask from backend/static
-# This keeps behavior identical between local dev (with proxy) and Render.
-CORS(app, supports_credentials=True)
+# H6 FIX: Restrict CORS origins (env var or dev-only localhost list).
+_cors_origins = os.environ.get('CORS_ORIGINS', '').strip()
+if _cors_origins:
+    _allowed_origins = [o.strip() for o in _cors_origins.split(',') if o.strip()]
+else:
+    _allowed_origins = [
+        'http://localhost:5173',
+        'http://localhost:5555',
+        'http://127.0.0.1:5173',
+        'http://127.0.0.1:5555',
+    ]
+CORS(app, supports_credentials=True, origins=_allowed_origins)
 
 # Initialize database on startup
 init_db()
@@ -71,6 +95,44 @@ except Exception:
 def shutdown_session(exception=None):
     """Close database sessions after each request"""
     pass  # Sessions are now managed per-request
+
+# C3 FIX: Custom CSRF enforcement for SPA — validates token on authenticated
+# state-changing requests.  Login/signup/external-API are exempt (pre-auth).
+_CSRF_EXEMPT_PREFIXES = ('/api/auth/login', '/api/auth/signup', '/api/auth/check', '/api/external/')
+
+@app.before_request
+def _csrf_protect():
+    if request.method in ('GET', 'HEAD', 'OPTIONS', 'TRACE'):
+        return
+    if any(request.path.startswith(p) for p in _CSRF_EXEMPT_PREFIXES):
+        return
+    if not current_user.is_authenticated:
+        return
+    token = request.headers.get('X-CSRFToken') or request.headers.get('X-CSRF-Token')
+    if not token:
+        return jsonify({'error': 'Missing CSRF token'}), 403
+    try:
+        validate_csrf(token)
+    except CSRFError:
+        return jsonify({'error': 'Invalid CSRF token'}), 403
+
+@app.after_request
+def _set_csrf_cookie(response):
+    if response.status_code < 400:
+        try:
+            token = generate_csrf()
+            is_secure = app.config.get('SESSION_COOKIE_SECURE', False)
+            response.set_cookie(
+                'csrf_token', token,
+                httponly=False,       # JS must read this
+                samesite='Lax',
+                secure=is_secure,
+                path='/',
+            )
+        except Exception:
+            pass
+    return response
+
 
 def admin_required(fn):
     """Decorator that requires the current user to be an ADMIN."""
@@ -262,7 +324,6 @@ def get_user_exports_folder(user_id):
 
 @app.route('/api/exports/generate-pdf', methods=['POST'])
 @login_required
-@csrf.exempt
 def generate_pdf():
     """Generate a real PDF from article data using reportlab (pure Python)."""
     data = request.get_json() or {}
@@ -290,7 +351,6 @@ def generate_pdf():
 
 @app.route('/api/exports', methods=['POST'])
 @login_required
-@csrf.exempt
 def create_export_record():
     """Create an export record for the current user with optional file upload.
 
@@ -414,7 +474,6 @@ def download_export(export_id):
 
 @app.route('/api/exports/<int:export_id>', methods=['DELETE'])
 @login_required
-@csrf.exempt
 def delete_export(export_id):
     """Delete an export record and its file. Admins can delete any file.
     
@@ -492,7 +551,6 @@ def list_user_files():
 
 @app.route('/api/files', methods=['POST'])
 @login_required
-@csrf.exempt
 def upload_user_file():
     """Upload a file for the current user."""
     if 'file' not in request.files:
@@ -572,7 +630,6 @@ def download_user_file(file_id):
 
 @app.route('/api/files/<int:file_id>', methods=['DELETE'])
 @login_required
-@csrf.exempt
 def delete_user_file(file_id):
     """Delete a user file."""
     db = get_db()
@@ -630,7 +687,6 @@ def list_search_history():
 
 @app.route('/api/search-history', methods=['POST'])
 @login_required
-@csrf.exempt
 def create_search_history():
     """Record a search in history."""
     data = request.get_json() or {}
@@ -657,7 +713,6 @@ def create_search_history():
 
 @app.route('/api/search-history/<int:history_id>', methods=['DELETE'])
 @login_required
-@csrf.exempt
 def delete_search_history(history_id):
     """Delete a search history entry."""
     db = get_db()
@@ -712,7 +767,6 @@ def admin_list_users():
 
 @app.route('/api/admin/users', methods=['POST'])
 @admin_required
-@csrf.exempt
 def admin_create_user():
     """Create a new user (ADMIN only).
 
@@ -723,7 +777,9 @@ def admin_create_user():
     name = (data.get('name') or '').strip()
     role = data.get('role') or 'USER'
     is_active = bool(data.get('is_active', True))
-    password = data.get('password') or '0000'
+    # H1 FIX: Generate secure random password if none provided (never default to '0000')
+    import secrets as _s
+    password = data.get('password') or _s.token_urlsafe(12)
 
     if not email or not name:
         return jsonify({'error': 'Name and email are required'}), 400
@@ -764,7 +820,6 @@ def admin_create_user():
 
 @app.route('/api/admin/users/<int:user_id>', methods=['PATCH'])
 @admin_required
-@csrf.exempt
 def admin_update_user(user_id):
     """Update basic user fields (name, role, is_active, optional password reset)."""
     data = request.get_json() or {}
@@ -786,7 +841,11 @@ def admin_update_user(user_id):
             user.is_active = bool(data['is_active'])
         from auth_utils import hash_password
         if data.get('reset_password'):
-            user.password_hash = hash_password('0000')
+            # H1 FIX: Generate random temp password instead of weak '0000'
+            import secrets as _s
+            _temp_pw = _s.token_urlsafe(12)
+            user.password_hash = hash_password(_temp_pw)
+            user.must_change_password = True
         if data.get('password'):
             user.password_hash = hash_password(data['password'])
         db.commit()
@@ -806,7 +865,6 @@ def admin_update_user(user_id):
 
 @app.route('/api/admin/users/<int:user_id>', methods=['DELETE'])
 @admin_required
-@csrf.exempt
 def admin_delete_user(user_id):
     """Delete a user (ADMIN only)."""
     db = get_db()
@@ -967,7 +1025,6 @@ from auth_utils import hash_password, verify_password
 
 
 @app.route('/api/auth/signup', methods=['POST'])
-@csrf.exempt
 def signup():
     """Public signup endpoint.
 
@@ -981,6 +1038,12 @@ def signup():
 
     if not name or not email or not password:
         return jsonify({"error": "Name, email and password are required"}), 400
+
+    # H2 FIX: Enforce password complexity on signup
+    from auth_utils import validate_password_strength
+    pw_error = validate_password_strength(password)
+    if pw_error:
+        return jsonify({"error": pw_error}), 400
 
     db = get_db()
     try:
@@ -1009,7 +1072,6 @@ def signup():
 
 
 @app.route('/api/auth/login', methods=['POST'])
-@csrf.exempt  # CSRF token can be added later from frontend; keep simple for now
 def login():
     data = request.get_json() or {}
     email = (data.get('email') or '').strip().lower()
@@ -1046,7 +1108,6 @@ def login():
 
 @app.route('/api/auth/logout', methods=['POST'])
 @login_required
-@csrf.exempt
 def logout():
     uid = getattr(current_user, 'id', None)
     logout_user()
@@ -1076,6 +1137,7 @@ def auth_me():
 # ==================== Countries ====================
 
 @app.route('/api/countries', methods=['GET'])
+@login_required
 def get_countries():
     """Get all countries"""
     db = get_db()
@@ -1093,7 +1155,6 @@ def get_countries():
         db.close()
 
 @app.route('/api/countries/<int:country_id>/toggle', methods=['POST'])
-@csrf.exempt
 @admin_required
 def toggle_country(country_id):
     """Toggle country enabled status"""
@@ -1114,6 +1175,7 @@ def toggle_country(country_id):
 # ==================== Sources ====================
 
 @app.route('/api/sources', methods=['GET'])
+@login_required
 def get_sources():
     """Get all sources"""
     db = get_db()
@@ -1136,7 +1198,6 @@ def get_sources():
 
 @app.route('/api/sources', methods=['POST'])
 @admin_required
-@csrf.exempt
 def add_source():
     """Add new RSS source"""
     data = request.get_json()
@@ -1164,7 +1225,6 @@ def add_source():
 
 @app.route('/api/sources/<int:source_id>', methods=['PUT'])
 @admin_required
-@csrf.exempt
 def update_source(source_id):
     """Update source"""
     db = get_db()
@@ -1192,7 +1252,6 @@ def update_source(source_id):
 
 @app.route('/api/sources/<int:source_id>', methods=['DELETE'])
 @admin_required
-@csrf.exempt
 def delete_source(source_id):
     """Delete source"""
     db = get_db()
@@ -1210,7 +1269,6 @@ def delete_source(source_id):
         db.close()
 
 @app.route('/api/sources/<int:source_id>/toggle', methods=['POST'])
-@csrf.exempt
 @admin_required
 def toggle_source(source_id):
     """Toggle source enabled status"""
@@ -1356,7 +1414,6 @@ def get_keywords_expanded():
 
 @app.route('/api/keywords', methods=['POST'])
 @login_required
-@csrf.exempt
 def add_keyword():
     """Add new keyword with auto-translation to 7 languages + expansion"""
     MAX_KEYWORDS_PER_USER = 20
@@ -1457,7 +1514,6 @@ def add_keyword():
 
 @app.route('/api/keywords/<int:keyword_id>', methods=['DELETE'])
 @login_required
-@csrf.exempt
 def delete_keyword(keyword_id):
     """Delete keyword - stops monitoring if no keywords remain"""
     db = get_db()
@@ -1485,7 +1541,6 @@ def delete_keyword(keyword_id):
         db.close()
 
 @app.route('/api/keywords/<int:keyword_id>/toggle', methods=['POST'])
-@csrf.exempt
 @login_required
 def toggle_keyword(keyword_id):
     """Toggle keyword enabled status"""
@@ -1509,7 +1564,6 @@ def toggle_keyword(keyword_id):
 from job_executor import job_executor
 
 @app.route('/api/monitor/job/start', methods=['POST'])
-@csrf.exempt
 @login_required
 def start_monitor_job():
     """
@@ -1589,7 +1643,6 @@ def get_monitor_job_by_id(job_id):
 
 
 @app.route('/api/monitor/job/<int:job_id>/cancel', methods=['POST'])
-@csrf.exempt
 @login_required
 def cancel_monitor_job(job_id):
     """Cancel a running monitoring job"""
@@ -1633,16 +1686,14 @@ def get_monitor_status():
     return jsonify(global_scheduler.get_user_status(user_id))
 
 @app.route('/api/monitor/start', methods=['POST'])
-@csrf.exempt
-@login_required
+@admin_required
 def start_monitoring_scheduler():
     """Start the global monitoring scheduler (admin action, benefits all users)"""
     result = global_scheduler.start()
     return jsonify(result)
 
 @app.route('/api/monitor/stop', methods=['POST'])
-@csrf.exempt
-@login_required
+@admin_required
 def stop_monitoring_scheduler():
     """Stop the global monitoring scheduler (admin action)"""
     result = global_scheduler.stop()
@@ -1652,7 +1703,6 @@ def stop_monitoring_scheduler():
 
 @app.route('/api/monitor/run', methods=['POST'])
 @login_required
-@csrf.exempt
 def run_monitoring():
     """
     Main monitoring function - fetches news and analyzes with Gemini
@@ -2112,7 +2162,6 @@ def get_article_stats():
 
 @app.route('/api/articles/clear', methods=['POST'])
 @login_required
-@csrf.exempt
 def clear_articles():
     """Clear current user's articles only.
     
@@ -2130,7 +2179,6 @@ def clear_articles():
 
 @app.route('/api/articles/export-and-reset', methods=['POST'])
 @login_required
-@csrf.exempt
 def export_and_reset():
     """
     Export current user's articles to Excel, then delete user's articles and keywords.
@@ -2267,6 +2315,7 @@ def export_and_reset():
 # ==================== Diagnostics ====================
 
 @app.route('/api/feeds/diagnose', methods=['GET'])
+@admin_required
 def diagnose_feeds():
     """
     Diagnose all feeds - check their status and errors
@@ -2325,6 +2374,7 @@ def diagnose_feeds():
         db.close()
 
 @app.route('/api/feeds/selftest', methods=['GET'])
+@admin_required
 def selftest_feeds():
     """
     Quick self-test - test first N enabled feeds
@@ -2444,6 +2494,7 @@ def calculate_relevance_score(article_data, keywords):
 import requests
 
 @app.route('/api/direct-search', methods=['GET'])
+@login_required
 def direct_search():
     """
     Simple NewsData.io direct search:
@@ -2579,7 +2630,7 @@ def direct_search():
 from newsdata_client import newsdata_client
 
 @app.route('/api/newsdata/search', methods=['GET', 'POST'])
-@csrf.exempt
+@login_required
 def newsdata_search():
     """
     Advanced NewsData.io search supporting multiple endpoints and query builder.
@@ -2685,7 +2736,7 @@ def newsdata_search():
 
 
 @app.route('/api/newsdata/count', methods=['GET', 'POST'])
-@csrf.exempt
+@login_required
 def newsdata_count():
     """
     Get estimated article count for a query (credit-saving preview).
@@ -2745,7 +2796,7 @@ def newsdata_count():
 
 
 @app.route('/api/newsdata/build-query', methods=['POST'])
-@csrf.exempt
+@login_required
 def build_query():
     """
     Build a NewsData.io query string from structured inputs.
@@ -2781,6 +2832,7 @@ def build_query():
 
 
 @app.route('/api/newsdata/sources', methods=['GET'])
+@login_required
 def get_newsdata_sources():
     """Get available NewsData.io sources with filters."""
     country = request.args.get('country', '').strip() or None
@@ -2797,6 +2849,7 @@ def get_newsdata_sources():
 
 
 @app.route('/api/headlines/top', methods=['GET'])
+@login_required
 def get_top_headlines():
     """
     Get top headlines from all sources in a country
@@ -3003,12 +3056,11 @@ def get_top_headlines():
 
 
 @app.route('/api/external/headlines', methods=['POST'])
-@csrf.exempt
 def external_headlines():
     """External API: Get top headlines (أهم العناوين) for a given country.
 
     - Method: POST
-    - Auth: X-API-Key header OR ?api_key=... query param
+    - Auth: X-API-Key header
     - Body (JSON): {"country": "اسم الدولة بالعربية", "per_source": 5, "translate": true}
 
     Response JSON has the same structure as /api/headlines/top:
@@ -3041,10 +3093,11 @@ def external_headlines():
             "code": "config_error"
         }), 500
 
-    provided_key = (request.headers.get('X-API-Key') or '').strip() or \
-                   (request.args.get('api_key', '') or '').strip()
+    # H7 FIX: Accept API key only via header (never query param — URLs leak in logs)
+    provided_key = (request.headers.get('X-API-Key') or '').strip()
 
-    if not provided_key or provided_key != external_key:
+    # H8 FIX: Constant-time comparison to prevent timing side-channel attacks
+    if not provided_key or not hmac.compare_digest(provided_key, external_key):
         return jsonify({
             "error": "Unauthorized",
             "code": "unauthorized"
@@ -3268,7 +3321,6 @@ def external_headlines():
 
 @app.route('/api/ai/daily-brief', methods=['POST'])
 @login_required
-@csrf.exempt
 def get_daily_brief():
     """Generate or return cached AI daily brief for the user's articles.
     
@@ -3373,7 +3425,6 @@ def get_daily_brief():
 
 @app.route('/api/ai/explain-sentiment', methods=['POST'])
 @login_required
-@csrf.exempt
 def explain_sentiment_endpoint():
     """AI explains why an article has a certain sentiment — on-demand."""
     from ai_service import explain_sentiment
@@ -3437,7 +3488,6 @@ def get_bookmarks():
 
 @app.route('/api/bookmarks', methods=['POST'])
 @login_required
-@csrf.exempt
 def create_bookmark():
     """Bookmark an article — saves a snapshot that survives monthly reset."""
     data = request.get_json() or {}
@@ -3488,7 +3538,6 @@ def create_bookmark():
 
 @app.route('/api/bookmarks/<int:bookmark_id>', methods=['DELETE'])
 @login_required
-@csrf.exempt
 def delete_bookmark(bookmark_id):
     """Remove a bookmark."""
     db = get_db()
@@ -3511,7 +3560,6 @@ def delete_bookmark(bookmark_id):
 
 @app.route('/api/bookmarks/check', methods=['POST'])
 @login_required
-@csrf.exempt
 def check_bookmarks():
     """Check which URLs are already bookmarked (batch check)."""
     data = request.get_json() or {}
@@ -3758,25 +3806,37 @@ def auto_initialize():
             except Exception:
                 db.rollback()  # Already exists or auto-increment conflict
         
-        # Check if admin exists
+        # C1 FIX: Admin password from env var (never hardcoded)
+        import secrets as _init_sec
+        _admin_pw = os.environ.get('ADMIN_INIT_PASSWORD', '').strip()
+        _pw_was_generated = False
+        if not _admin_pw:
+            _admin_pw = _init_sec.token_urlsafe(16)
+            _pw_was_generated = True
+
         admin = db.query(User).filter(User.email == "elite@local").first()
         if not admin:
             admin = User(
                 name="عبدالله الكلثمي",
                 email="elite@local",
-                password_hash=hash_password("135813581234"),
+                password_hash=hash_password(_admin_pw),
                 role="ADMIN",
                 is_active=True,
             )
             db.add(admin)
             db.commit()
-            print("[INIT] ✅ Admin user created: elite@local")
+            print(f"[INIT] ✅ Admin user created: elite@local")
+            if _pw_was_generated:
+                print(f"[INIT] ⚠️ Generated admin password: {_admin_pw}")
+                print("[INIT]    Set ADMIN_INIT_PASSWORD env var to use a fixed password.")
         else:
             # Ensure admin is active and has correct role
             admin.is_active = True
             admin.role = "ADMIN"
             if not admin.password_hash or len(admin.password_hash) < 10:
-                admin.password_hash = hash_password("135813581234")
+                admin.password_hash = hash_password(_admin_pw)
+                if _pw_was_generated:
+                    print(f"[INIT] ⚠️ Admin password was missing/invalid. New password: {_admin_pw}")
             db.commit()
             print("[INIT] ✅ Admin user verified: elite@local")
         

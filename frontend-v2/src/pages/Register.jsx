@@ -19,7 +19,12 @@ export default function Register({ onRegister, onSwitchToLogin }) {
     if (!email.trim()) { setError('يرجى إدخال اسم المستخدم'); return }
     if (!password) { setError('يرجى إدخال كلمة المرور'); return }
     if (password !== confirmPassword) { setError('كلمة المرور غير متطابقة'); return }
-    if (password.length < 4) { setError('كلمة المرور يجب أن تكون 4 أحرف على الأقل'); return }
+    const pwErrors = []
+    if (password.length < 8) pwErrors.push('8 أحرف على الأقل')
+    if (!/[A-Z]/.test(password)) pwErrors.push('حرف كبير واحد على الأقل')
+    if (!/[a-z]/.test(password)) pwErrors.push('حرف صغير واحد على الأقل')
+    if (!/[!@#$%&*\-]/.test(password)) pwErrors.push('رمز خاص واحد على الأقل (!@#$%&*-)')
+    if (pwErrors.length > 0) { setError('يجب أن تحتوي كلمة المرور على: ' + pwErrors.join(' و')); return }
 
     setLoading(true)
     try {

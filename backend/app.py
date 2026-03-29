@@ -1106,6 +1106,65 @@ def login():
         db.close()
 
 
+@app.route('/api/auth/profile', methods=['PATCH'])
+@login_required
+def update_profile():
+    """Update current user's display name."""
+    data = request.get_json() or {}
+    new_name = (data.get('name') or '').strip()
+    if not new_name:
+        return jsonify({"error": "الاسم مطلوب"}), 400
+    if len(new_name) > 100:
+        return jsonify({"error": "الاسم طويل جداً"}), 400
+
+    db = get_db()
+    try:
+        user = db.query(User).filter(User.id == current_user.id).first()
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+        user.name = new_name
+        db.commit()
+        return jsonify({
+            "success": True,
+            "name": user.name,
+        })
+    finally:
+        db.close()
+
+
+@app.route('/api/auth/change-password', methods=['POST'])
+@login_required
+def change_password():
+    """Change current user's password. Requires old password verification."""
+    data = request.get_json() or {}
+    old_password = data.get('old_password', '')
+    new_password = data.get('new_password', '')
+
+    if not old_password or not new_password:
+        return jsonify({"error": "كلمة المرور القديمة والجديدة مطلوبتان"}), 400
+
+    from auth_utils import validate_password_strength
+    pw_error = validate_password_strength(new_password)
+    if pw_error:
+        return jsonify({"error": pw_error}), 400
+
+    db = get_db()
+    try:
+        user = db.query(User).filter(User.id == current_user.id).first()
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+
+        if not verify_password(old_password, user.password_hash):
+            return jsonify({"error": "كلمة المرور القديمة غير صحيحة"}), 400
+
+        user.password_hash = hash_password(new_password)
+        user.must_change_password = False
+        db.commit()
+        return jsonify({"success": True})
+    finally:
+        db.close()
+
+
 @app.route('/api/auth/logout', methods=['POST'])
 @login_required
 def logout():

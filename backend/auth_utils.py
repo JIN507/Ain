@@ -93,7 +93,13 @@ def validate_password_strength(password: str) -> Optional[str]:
     if not password:
         return "Password cannot be empty"
     if len(password) < 8:
-        return "Password must be at least 8 characters"
+        return "كلمة المرور يجب أن تكون 8 أحرف على الأقل"
+    if not any(c.isupper() for c in password):
+        return "كلمة المرور يجب أن تحتوي على حرف كبير واحد على الأقل"
+    if not any(c.islower() for c in password):
+        return "كلمة المرور يجب أن تحتوي على حرف صغير واحد على الأقل"
+    if not any(c in '!@#$%&*-' for c in password):
+        return "كلمة المرور يجب أن تحتوي على رمز خاص واحد على الأقل (!@#$%&*-)"
     return None
 
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { FileText, Download, Loader2, AlertCircle, RotateCcw, Radio, AlertTriangle, FileSpreadsheet, BarChart3, RefreshCw, ChevronRight, ChevronLeft, ChevronsRight, ChevronsLeft } from 'lucide-react'
+import { FileText, Download, Loader2, AlertCircle, RotateCcw, Radio, FileSpreadsheet, BarChart3, RefreshCw, ChevronRight, ChevronLeft, ChevronsRight, ChevronsLeft } from 'lucide-react'
 import StatsOverview from '../components/StatsOverview'
 import FilterBar from '../components/FilterBar'
 import ArticleCard from '../components/ArticleCard'
@@ -18,7 +18,6 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
   const [totalPages, setTotalPages] = useState(1)
   const [totalArticles, setTotalArticles] = useState(0)
   const [monitorStatus, setMonitorStatus] = useState(null)
-  const [cleanupStatus, setCleanupStatus] = useState(null)
   const [bookmarkedUrls, setBookmarkedUrls] = useState({})
   const [bookmarkLoading, setBookmarkLoading] = useState(null)
   const [dailyBrief, setDailyBrief] = useState(null)
@@ -46,7 +45,6 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
     loadArticles(1)
     loadStats()
     loadKeywords()
-    loadCleanupStatus()
   }, [filters])
 
   // Check which articles are bookmarked
@@ -125,16 +123,6 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
     setDailyBrief(null)
   }, [filters.keyword])
 
-  // Load cleanup status to show warning
-  const loadCleanupStatus = async () => {
-    try {
-      const res = await apiFetch('/api/system/cleanup-status')
-      const data = await res.json()
-      setCleanupStatus(data)
-    } catch (error) {
-      console.error('Error loading cleanup status:', error)
-    }
-  }
 
   // Load monitor status only when keywords exist, clear when none
   useEffect(() => {
@@ -420,23 +408,6 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
         </div>
       )}
 
-      {/* Monthly Reset Warning - shows 3 days before the 1st */}
-      {cleanupStatus?.show_warning && articles.length > 0 && (
-        <div className="flex items-center gap-3 px-4 py-3.5 rounded-xl"
-          style={{ background: 'rgba(225,29,72,0.06)' }}>
-          <AlertTriangle className="w-5 h-5 text-rose-600 flex-shrink-0" />
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-rose-700">إعادة تعيين شهرية قريباً</p>
-            <p className="text-xs text-rose-500 mt-0.5">
-              سيتم حذف جميع المقالات ({cleanupStatus.article_count}) في بداية الشهر القادم ({cleanupStatus.next_reset}). صدّر البيانات المهمة الآن.
-            </p>
-          </div>
-          <span className="text-lg font-bold text-rose-600 px-3 py-1 rounded-lg"
-            style={{ background: 'rgba(225,29,72,0.08)' }}>
-            {cleanupStatus.days_remaining} يوم
-          </span>
-        </div>
-      )}
 
       {/* Header */}
       <div className="flex items-center justify-between">

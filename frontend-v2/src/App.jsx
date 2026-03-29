@@ -13,6 +13,7 @@ import Register from './pages/Register'
 import Admin from './pages/Admin'
 import MyFiles from './pages/MyFiles'
 import Bookmarks from './pages/Bookmarks'
+import Profile from './pages/Profile'
 import { AuthProvider, useAuth } from './context/AuthContext'
 
 function AppContent() {
@@ -38,6 +39,7 @@ function AppContent() {
     keywords: <Keywords onKeywordClick={navigateToKeywordResults} />,
     settings: <Settings />,
     admin: <Admin />,
+    profile: <Profile onBack={() => setCurrentPage('dashboard')} />,
   }
 
   if (authLoading) {
@@ -111,7 +113,9 @@ function AppContent() {
             }}>
             <div />
             <div className="flex items-center gap-2.5">
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs"
+              <button
+                onClick={() => setCurrentPage('profile')}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs cursor-pointer transition-all duration-200 hover:shadow-md"
                 style={{
                   background: 'rgba(255,255,255,0.8)',
                   border: '1px solid rgba(0,0,0,0.06)',
@@ -121,7 +125,7 @@ function AppContent() {
                 <span className="text-slate-500 font-medium">
                   {currentUser.name || currentUser.email}
                 </span>
-              </div>
+              </button>
               <button
                 onClick={logout}
                 className="text-xs px-3 py-1.5 rounded-full font-medium transition-all duration-200"

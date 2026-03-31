@@ -3,7 +3,6 @@ import { motion } from 'framer-motion'
 import { Eye, CheckCircle, Loader2 } from 'lucide-react'
 
 export default function Register({ onRegister, onSwitchToLogin }) {
-  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -15,7 +14,6 @@ export default function Register({ onRegister, onSwitchToLogin }) {
     e.preventDefault()
     setError('')
 
-    if (!name.trim()) { setError('يرجى إدخال الاسم'); return }
     if (!email.trim()) { setError('يرجى إدخال اسم المستخدم'); return }
     if (!password) { setError('يرجى إدخال كلمة المرور'); return }
     if (password !== confirmPassword) { setError('كلمة المرور غير متطابقة'); return }
@@ -28,7 +26,7 @@ export default function Register({ onRegister, onSwitchToLogin }) {
 
     setLoading(true)
     try {
-      await onRegister(name, email, password)
+      await onRegister(email, email, password)
       setSuccess(true)
     } catch (e) {
       setError(e.message || 'فشل إنشاء الحساب')
@@ -89,13 +87,6 @@ export default function Register({ onRegister, onSwitchToLogin }) {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1.5">الاسم</label>
-              <input type="text" value={name} onChange={(e) => setName(e.target.value)}
-                className={inputClass} placeholder="الاسم الكامل" style={inputStyle}
-                onFocus={(e) => e.target.style.borderColor = '#14b8a6'}
-                onBlur={(e) => e.target.style.borderColor = 'rgba(0,0,0,0.08)'} />
-            </div>
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1.5">اسم المستخدم</label>
               <input type="text" value={email} onChange={(e) => setEmail(e.target.value)}

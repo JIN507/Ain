@@ -1,15 +1,10 @@
 import { useState } from 'react'
-import { User, Lock, Loader2, Check, AlertCircle, ArrowRight } from 'lucide-react'
+import { Lock, Loader2, Check, AlertCircle, ArrowRight } from 'lucide-react'
 import { apiFetch } from '../apiClient'
 import { useAuth } from '../context/AuthContext'
 
 export default function Profile({ onBack }) {
-  const { currentUser, refreshUser } = useAuth()
-
-  // Name form
-  const [name, setName] = useState(currentUser?.name || '')
-  const [nameSaving, setNameSaving] = useState(false)
-  const [nameMsg, setNameMsg] = useState(null)
+  const { currentUser } = useAuth()
 
   // Password form
   const [oldPassword, setOldPassword] = useState('')
@@ -17,36 +12,6 @@ export default function Profile({ onBack }) {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [pwSaving, setPwSaving] = useState(false)
   const [pwMsg, setPwMsg] = useState(null)
-
-  const handleNameSave = async (e) => {
-    e.preventDefault()
-    const trimmed = name.trim()
-    if (!trimmed) {
-      setNameMsg({ type: 'error', text: 'الاسم مطلوب' })
-      return
-    }
-    if (trimmed === currentUser?.name) {
-      setNameMsg({ type: 'info', text: 'لم يتغير الاسم' })
-      return
-    }
-    setNameSaving(true)
-    setNameMsg(null)
-    try {
-      const res = await apiFetch('/api/auth/profile', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: trimmed }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'فشل التحديث')
-      setNameMsg({ type: 'success', text: 'تم تحديث الاسم بنجاح' })
-      await refreshUser()
-    } catch (err) {
-      setNameMsg({ type: 'error', text: err.message })
-    } finally {
-      setNameSaving(false)
-    }
-  }
 
   const handlePasswordChange = async (e) => {
     e.preventDefault()
@@ -108,42 +73,6 @@ export default function Profile({ onBack }) {
           <p className="text-sm text-slate-500 mt-0.5">{currentUser?.email}</p>
         </div>
       </div>
-
-      {/* Name Card */}
-      <form onSubmit={handleNameSave} className="card p-6 space-y-4">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center"
-            style={{ background: 'rgba(15,118,110,0.08)' }}>
-            <User className="w-4.5 h-4.5" style={{ color: '#0f766e' }} />
-          </div>
-          <h2 className="text-base font-semibold text-slate-900">الاسم</h2>
-        </div>
-
-        <div>
-          <label className="block text-xs font-medium text-slate-500 mb-1.5">الاسم الحالي</label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="أدخل اسمك"
-            className="w-full px-4 py-2.5 rounded-xl text-sm border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-400"
-            style={{ background: 'rgba(0,0,0,0.02)', borderColor: 'rgba(0,0,0,0.08)' }}
-            maxLength={100}
-          />
-        </div>
-
-        {nameMsg && (
-          <div className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-medium" style={msgStyle(nameMsg.type)}>
-            {nameMsg.type === 'success' ? <Check className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
-            {nameMsg.text}
-          </div>
-        )}
-
-        <button type="submit" disabled={nameSaving} className="btn !text-sm">
-          {nameSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-          حفظ الاسم
-        </button>
-      </form>
 
       {/* Password Card */}
       <form onSubmit={handlePasswordChange} className="card p-6 space-y-4">

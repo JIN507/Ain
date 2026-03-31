@@ -123,7 +123,7 @@ function AppContent() {
                 }}>
                 <span className="inline-flex h-1.5 w-1.5 rounded-full bg-teal-500 pulse-glow"></span>
                 <span className="text-slate-500 font-medium">
-                  {currentUser.name || currentUser.email}
+                  {currentUser.email}
                 </span>
               </button>
               <button

@@ -7,7 +7,7 @@ export default function Admin() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [creating, setCreating] = useState(false)
-  const [form, setForm] = useState({ name: '', email: '', role: 'USER', password: '' })
+  const [form, setForm] = useState({ email: '', role: 'USER', password: '' })
   const [passwordModal, setPasswordModal] = useState({ open: false, userId: null, userName: '', newPassword: '' })
   const [expandedUser, setExpandedUser] = useState(null)
   const [userKeywords, setUserKeywords] = useState({})
@@ -120,7 +120,7 @@ export default function Admin() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: form.name,
+          name: form.email,
           email: form.email,
           role: form.role,
           password: form.password,
@@ -131,7 +131,7 @@ export default function Admin() {
       if (!res.ok) {
         throw new Error(data.error || 'فشل إنشاء المستخدم')
       }
-      setForm({ name: '', email: '', role: 'USER', password: '' })
+      setForm({ email: '', role: 'USER', password: '' })
       await loadUsers()
     } catch (e) {
       setError(e.message || 'خطأ غير متوقع')
@@ -156,11 +156,7 @@ export default function Admin() {
       {/* Create user */}
       <div className="card p-5 space-y-4">
         <h2 className="text-sm font-semibold text-slate-900">إضافة مستخدم جديد</h2>
-        <form onSubmit={handleCreateUser} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
-          <div>
-            <label className="block text-[11px] font-medium text-slate-500 mb-1">الاسم</label>
-            <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input" />
-          </div>
+        <form onSubmit={handleCreateUser} className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
           <div>
             <label className="block text-[11px] font-medium text-slate-500 mb-1">اسم المستخدم</label>
             <input type="text" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="input" />
@@ -187,7 +183,12 @@ export default function Admin() {
 
       {/* Users table */}
       <div className="card p-5 overflow-x-auto">
-        <h2 className="text-sm font-semibold text-slate-900 mb-4">المستخدمون</h2>
+        <div className="flex items-center gap-3 mb-4">
+          <h2 className="text-sm font-semibold text-slate-900">المستخدمون</h2>
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold" style={{ background: 'rgba(15,118,110,0.08)', color: '#0f766e' }}>
+            {users.length}
+          </span>
+        </div>
         {loading ? (
           <div className="text-xs text-slate-400 py-4">جاري التحميل...</div>
         ) : users.length === 0 ? (
@@ -196,8 +197,7 @@ export default function Admin() {
           <table className="min-w-full text-xs">
             <thead>
               <tr style={{ borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
-                <th className="py-2.5 px-3 text-right font-semibold text-slate-500 w-8"></th>
-                <th className="py-2.5 px-3 text-right font-semibold text-slate-500">الاسم</th>
+                <th className="py-2.5 px-3 text-center font-semibold text-slate-400 w-10">#</th>
                 <th className="py-2.5 px-3 text-right font-semibold text-slate-500">المستخدم</th>
                 <th className="py-2.5 px-3 text-right font-semibold text-slate-500">الدور</th>
                 <th className="py-2.5 px-3 text-right font-semibold text-slate-500">الكلمات</th>
@@ -207,21 +207,13 @@ export default function Admin() {
               </tr>
             </thead>
             <tbody>
-              {users.map((u) => (
+              {users.map((u, index) => (
                 <>
                 <tr key={u.id} style={{ borderBottom: expandedUser === u.id ? 'none' : '1px solid rgba(0,0,0,0.03)' }}
                     className={`hover:bg-slate-50/50 cursor-pointer ${expandedUser === u.id ? 'bg-slate-50/80' : ''}`}
                     onClick={() => toggleExpand(u.id)}>
-                  <td className="py-2 px-2 text-center">
-                    {expandedUser === u.id
-                      ? <ChevronDown className="w-3.5 h-3.5 text-teal-600 inline" />
-                      : <ChevronLeft className="w-3.5 h-3.5 text-slate-400 inline" />
-                    }
-                  </td>
-                  <td className="py-2 px-3" onClick={e => e.stopPropagation()}>
-                    <input type="text" defaultValue={u.name || ''}
-                      className="w-full bg-transparent border border-transparent hover:border-slate-200 rounded-lg px-2 py-1 text-xs transition"
-                      onBlur={(e) => e.target.value !== (u.name || '') && handleChangeUser(u.id, { name: e.target.value })} />
+                  <td className="py-2 px-3 text-center text-xs font-medium text-slate-400">
+                    {index + 1}
                   </td>
                   <td className="py-2 px-3" onClick={e => e.stopPropagation()}>
                     <input type="email" defaultValue={u.email}
@@ -261,7 +253,7 @@ export default function Admin() {
                   <td className="py-2 px-3" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center gap-1">
                       <button
-                        onClick={() => setPasswordModal({ open: true, userId: u.id, userName: u.name || u.email, newPassword: '' })}
+                        onClick={() => setPasswordModal({ open: true, userId: u.id, userName: u.email, newPassword: '' })}
                         className="btn-ghost !px-2 !py-1 !text-[11px]" style={{ color: '#2563eb' }}>
                         كلمة المرور
                       </button>
@@ -278,11 +270,11 @@ export default function Admin() {
                 {/* Expanded keywords row */}
                 {expandedUser === u.id && (
                   <tr key={`kw-${u.id}`} style={{ borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
-                    <td colSpan={8} className="px-4 pb-4 pt-1">
+                    <td colSpan={7} className="px-4 pb-4 pt-1">
                       <div className="rounded-xl p-4" style={{ background: 'rgba(15,23,42,0.02)', border: '1px solid rgba(0,0,0,0.04)' }}>
                         <div className="flex items-center gap-2 mb-3">
                           <Key className="w-3.5 h-3.5 text-teal-600" />
-                          <span className="text-xs font-semibold text-slate-700">كلمات المستخدم: {u.name || u.email}</span>
+                          <span className="text-xs font-semibold text-slate-700">كلمات المستخدم: {u.email}</span>
                         </div>
                         {loadingKeywords === u.id ? (
                           <div className="text-[11px] text-slate-400 py-2">جاري تحميل الكلمات...</div>

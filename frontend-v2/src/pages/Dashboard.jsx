@@ -163,7 +163,7 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
     try {
       const params = new URLSearchParams(filters)
       params.set('page', page)
-      params.set('per_page', 30)
+      params.set('per_page', 50)
       const res = await apiFetch(`/api/articles?${params}`)
       const data = await res.json()
       setArticles(data.articles || [])
@@ -313,13 +313,17 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
   }
 
   const exportPDF = async () => {
+    if (!articles.length) return
     setExporting(true)
     try {
-      const allArticles = await fetchAllArticles()
-      // Generate real PDF on the server (sends article data, backend builds PDF)
-      const pdfBlob = await generatePDFBlob(allArticles, apiFetch, { title: 'تقرير أخبار عين', stats })
+      // Export current page articles (max 50 per file)
+      const pageArticles = articles
+      const pdfBlob = await generatePDFBlob(pageArticles, apiFetch, {
+        title: `تقرير أخبار عين — صفحة ${currentPage}`,
+        stats,
+      })
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-      const filename = `تقرير_أخبار_عين_${timestamp}.pdf`
+      const filename = `تقرير_أخبار_عين_صفحة${currentPage}_${timestamp}.pdf`
 
       // Download to user
       const url = URL.createObjectURL(pdfBlob)
@@ -330,7 +334,7 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
 
       // Store in ملفاتي
       await uploadExport(apiFetch, pdfBlob, filename, {
-        articleCount: allArticles.length, filters, sourceType: 'dashboard',
+        articleCount: pageArticles.length, filters, sourceType: 'dashboard',
       })
     } catch (error) {
       console.error('Error exporting PDF:', error)
@@ -425,7 +429,7 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
               {exporting ? (
                 <><Loader2 className="w-4 h-4 animate-spin" /> PDF...</>
               ) : (
-                <><Download className="w-4 h-4" /> PDF</>
+                <><Download className="w-4 h-4" /> PDF ({articles.length})</>
               )}
             </button>
             <button 

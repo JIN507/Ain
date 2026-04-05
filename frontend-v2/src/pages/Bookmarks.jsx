@@ -67,11 +67,12 @@ export default function Bookmarks() {
   })
 
   const exportPDF = async () => {
-    if (!bookmarks.length) return
+    if (!filtered.length) return
     setExporting(true)
     try {
-      const articles = bookmarks.map(toArticleFormat)
-      const pdfBlob = await generatePDFBlob(articles, apiFetch, { title: 'تقرير المفضلة' })
+      // Export currently visible bookmarks (max 50 per file)
+      const articles = filtered.map(toArticleFormat)
+      const pdfBlob = await generatePDFBlob(articles, apiFetch, { title: 'تقرير المفضلة — عين' })
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
       const filename = `المفضلة_${timestamp}.pdf`
       const url = URL.createObjectURL(pdfBlob)
@@ -142,7 +143,7 @@ export default function Bookmarks() {
                 className="btn-ghost flex items-center gap-1.5 !text-xs !px-3 !py-1.5"
                 style={{ color: '#0f766e' }}>
                 {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-                PDF
+                PDF ({Math.min(filtered.length, 50)})
               </button>
               <button onClick={exportXLSX} disabled={exportingXlsx}
                 className="btn-ghost flex items-center gap-1.5 !text-xs !px-3 !py-1.5"

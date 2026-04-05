@@ -1,10 +1,13 @@
-"""
-Flask API for Ain News Monitor
-"""
+
 import sys
 # Force unbuffered output for Windows CMD
 sys.stdout.reconfigure(line_buffering=True)
 sys.stderr.reconfigure(line_buffering=True)
+
+# Load .env FIRST before anything else reads env vars
+from pathlib import Path as _Path
+from dotenv import load_dotenv as _load_dotenv
+_load_dotenv(_Path(__file__).resolve().parent / '.env', override=True)
 
 from flask import Flask, request, jsonify, send_from_directory, send_file, Response
 from flask_cors import CORS
@@ -68,6 +71,11 @@ app.config['WTF_CSRF_CHECK_DEFAULT'] = False
 
 login_manager = LoginManager(app)
 csrf = CSRFProtect(app)
+
+@login_manager.unauthorized_handler
+def unauthorized_json():
+    """Return JSON 401 instead of HTML so the SPA can handle it."""
+    return jsonify({"error": "يرجى تسجيل الدخول أولاً", "code": "unauthorized"}), 401
 
 # H6 FIX: Restrict CORS origins (env var or dev-only localhost list).
 _cors_origins = os.environ.get('CORS_ORIGINS', '').strip()
@@ -2138,6 +2146,27 @@ def get_articles_countries():
     finally:
         db.close()
 
+@app.route('/api/health/newsdata', methods=['GET'])
+def health_check_newsdata():
+    """Test NewsData.io API key — no auth required."""
+    from newsdata_client import _read_env_key
+    key = _read_env_key('NEWSDATA_API_KEY')
+    if not key:
+        return jsonify({"ok": False, "error": "Key not found in .env"}), 500
+    try:
+        import requests as _r
+        resp = _r.get('https://newsdata.io/api/1/latest', params={'apikey': key, 'q': 'test', 'size': 1}, timeout=10)
+        data = resp.json()
+        return jsonify({
+            "ok": data.get('status') == 'success',
+            "key_prefix": key[:12] + '...',
+            "api_status": data.get('status'),
+            "api_message": data.get('message', ''),
+            "total": data.get('totalResults', 0),
+        })
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)[:200]}), 500
+
 @app.route('/api/health/translation', methods=['GET'])
 def health_check_translation():
     """Test Google Translate service (no API key needed)"""
@@ -2165,6 +2194,43 @@ def health_check_translation():
             "ok": False,
             "error": str(e)
         }), 500
+
+@app.route('/api/translate-text', methods=['POST'])
+@login_required
+def translate_text_endpoint():
+    """Translate title and/or summary to Arabic using Google Translate (free)."""
+    data = request.get_json() or {}
+    title = (data.get('title') or '').strip()
+    summary = (data.get('summary') or '').strip()
+
+    if not title and not summary:
+        return jsonify({'error': 'No text provided'}), 400
+
+    try:
+        from deep_translator import GoogleTranslator
+
+        def _is_arabic(text):
+            if not text:
+                return True
+            arabic_count = sum(1 for c in text if '\u0600' <= c <= '\u06FF' or '\u0750' <= c <= '\u077F')
+            return arabic_count / max(len(text), 1) > 0.3
+
+        title_ar = title
+        summary_ar = summary
+
+        if title and not _is_arabic(title):
+            title_ar = GoogleTranslator(source='auto', target='ar').translate(title) or title
+        if summary and not _is_arabic(summary):
+            summary_ar = GoogleTranslator(source='auto', target='ar').translate(summary[:1000]) or summary
+
+        return jsonify({
+            'title_ar': title_ar,
+            'summary_ar': summary_ar,
+            'translated': (title_ar != title) or (summary_ar != summary),
+        })
+    except Exception as e:
+        print(f"[Translate] error: {e}")
+        return jsonify({'error': str(e)[:200]}), 500
 
 @app.route('/api/articles/stats', methods=['GET'])
 @login_required
@@ -2684,174 +2750,117 @@ def direct_search():
     }), 200
 
 
-# ==================== NewsData.io Advanced API Endpoints ====================
+# ==================== NewsData.io Search (Basic Plan) ====================
 
-from newsdata_client import newsdata_client
-
-@app.route('/api/newsdata/search', methods=['GET', 'POST'])
+@app.route('/api/newsdata/search', methods=['GET'])
 @login_required
 def newsdata_search():
-    """
-    Advanced NewsData.io search supporting multiple endpoints and query builder.
-    
-    Query params (GET) or JSON body (POST):
-    - endpoint: 'latest' (default), 'crypto', 'archive', 'market'
-    - q: search query (can use AND/OR/NOT operators)
-    - qInTitle: search in title only
-    - mustInclude: comma-separated terms (joined with AND)
-    - anyOf: comma-separated terms (joined with OR)
-    - exactPhrase: exact phrase to search
-    - exclude: comma-separated terms (prefixed with NOT)
-    - country, excludeCountry, language, excludeLanguage
-    - category, excludeCategory, domain, excludeDomain
-    - timeframe, timezone, fromDate, toDate (archive only)
-    - fullContent, image, video, removeDuplicate
-    - coin, symbol, exchange (crypto/market specific)
-    - page: pagination token
-    """
-    
-    # Get params from either GET query string or POST JSON body
-    if request.method == 'POST':
-        params = request.get_json() or {}
-    else:
-        params = request.args.to_dict()
-    
-    # Determine endpoint
-    endpoint = params.get('endpoint', 'latest').lower()
-    
-    # Build query string from query builder params or use raw q
-    raw_q = params.get('q', '').strip()
-    must_include = [t.strip() for t in params.get('mustInclude', '').split(',') if t.strip()]
-    any_of = [t.strip() for t in params.get('anyOf', '').split(',') if t.strip()]
-    exact_phrase = params.get('exactPhrase', '').strip()
-    exclude_terms = [t.strip() for t in params.get('exclude', '').split(',') if t.strip()]
-    
-    # Use query builder if builder params provided, otherwise use raw q
-    if must_include or any_of or exact_phrase or exclude_terms:
-        q = newsdata_client.build_query_string(
-            must_include=must_include,
-            any_of=any_of,
-            exact_phrase=exact_phrase,
-            exclude=exclude_terms
-        )
-    else:
-        q = newsdata_client.build_query_string(raw_query=raw_q) if raw_q else ''
-    
-    # Validate query
-    page = params.get('page', '').strip()
-    if not q and not page and endpoint != 'sources':
+    """Simple NewsData.io /latest search for Basic plan."""
+    import requests as _req
+    from pathlib import Path as _P
+
+    # --- Read API key directly from .env file (bulletproof) ---
+    api_key = ''
+    try:
+        for line in (_P(__file__).resolve().parent / '.env').read_text(encoding='utf-8').splitlines():
+            if line.strip().startswith('NEWSDATA_API_KEY='):
+                api_key = line.strip().split('=', 1)[1].strip()
+                break
+    except Exception:
+        pass
+    if not api_key:
+        api_key = os.getenv('NEWSDATA_API_KEY', '').strip()
+
+    if not api_key:
+        return jsonify({"success": False, "error": "مفتاح API غير موجود في ملف .env", "results": []}), 500
+
+    # --- Collect params from query string ---
+    p = request.args
+    api_params = {'apikey': api_key}
+
+    # Query (mutually exclusive: q, qInTitle, qInMeta)
+    if p.get('qInTitle', '').strip():
+        api_params['qInTitle'] = p['qInTitle'].strip()
+    elif p.get('qInMeta', '').strip():
+        api_params['qInMeta'] = p['qInMeta'].strip()
+    elif p.get('q', '').strip():
+        api_params['q'] = p['q'].strip()
+
+    # Basic plan filters
+    if p.get('country'):
+        api_params['country'] = p['country']
+    if p.get('language'):
+        api_params['language'] = p['language']
+    if p.get('category'):
+        api_params['category'] = p['category']
+    if p.get('domain'):
+        api_params['domain'] = p['domain']
+    if p.get('excludeDomain'):
+        api_params['excludedomain'] = p['excludeDomain']
+    if p.get('timeframe'):
+        api_params['timeframe'] = p['timeframe']
+    if p.get('image') == 'true':
+        api_params['image'] = 1
+    if p.get('video') == 'true':
+        api_params['video'] = 1
+    if p.get('removeDuplicate') == 'true':
+        api_params['removeduplicate'] = 1
+    if p.get('page'):
+        api_params['page'] = p['page']
+
+    # Validate: need at least a query or filter
+    has_query = any(k in api_params for k in ('q', 'qInTitle', 'qInMeta'))
+    has_filter = any(k in api_params for k in ('country', 'language', 'category', 'domain'))
+    if not has_query and not has_filter and 'page' not in api_params:
+        return jsonify({"success": False, "error": "الرجاء إدخال كلمة البحث", "results": []}), 400
+
+    # --- Call NewsData.io /latest ---
+    try:
+        resp = _req.get('https://newsdata.io/api/1/latest', params=api_params, timeout=15)
+        data = resp.json()
+
+        if data.get('status') != 'success':
+            msg = data.get('results', {}).get('message', '') if isinstance(data.get('results'), dict) else ''
+            if not msg:
+                msg = data.get('message', 'خطأ من NewsData.io')
+            return jsonify({"success": False, "error": msg, "results": []}), 400
+
+        articles = data.get('results') or []
+        results = []
+        for art in articles:
+            title = (art.get('title') or '').strip()
+            url = art.get('link', '')
+            if not title or not url:
+                continue
+            results.append({
+                "title_ar": title,
+                "title_original": title,
+                "summary_ar": (art.get('description') or '').strip(),
+                "summary_original": (art.get('description') or '').strip(),
+                "url": url,
+                "source_name": art.get('source_name') or art.get('source_id', ''),
+                "country": art.get('country'),
+                "language_detected": art.get('language'),
+                "published_at": art.get('pubDate'),
+                "image_url": art.get('image_url'),
+                "category": art.get('category'),
+                "creator": art.get('creator'),
+                "source_icon": art.get('source_icon'),
+                "sentiment": "محايد",
+                "is_newsdata": True,
+            })
+
         return jsonify({
-            "success": False,
-            "error": "الرجاء إدخال كلمة البحث",
-            "results": [],
-            "nextPage": None,
-            "query_preview": ""
-        }), 400
-    
-    # Build search params
-    search_params = {
-        'q': q if not params.get('qInTitle') else None,
-        'q_in_title': params.get('qInTitle', '').strip() or None,
-        'country': params.get('country', '').strip() or None,
-        'exclude_country': params.get('excludeCountry', '').strip() or None,
-        'language': params.get('language', '').strip() or None,
-        'exclude_language': params.get('excludeLanguage', '').strip() or None,
-        'category': params.get('category', '').strip() or None,
-        'exclude_category': params.get('excludeCategory', '').strip() or None,
-        'domain': params.get('domain', '').strip() or None,
-        'exclude_domain': params.get('excludeDomain', '').strip() or None,
-        'timeframe': params.get('timeframe', '').strip() or None,
-        'timezone': params.get('timezone', '').strip() or None,
-        'full_content': params.get('fullContent', '').lower() == 'true' if params.get('fullContent') else None,
-        'image': params.get('image', '').lower() == 'true' if params.get('image') else None,
-        'video': params.get('video', '').lower() == 'true' if params.get('video') else None,
-        'remove_duplicate': params.get('removeDuplicate', '').lower() == 'true' if params.get('removeDuplicate') else None,
-        # NOTE: sentiment, tag, region require Professional/Corporate plan - removed
-        'page': page or None,
-    }
-    
-    # Endpoint-specific params
-    if endpoint == 'crypto':
-        search_params['coin'] = params.get('coin', '').strip() or None
-    elif endpoint == 'archive':
-        search_params['from_date'] = params.get('fromDate', '').strip() or None
-        search_params['to_date'] = params.get('toDate', '').strip() or None
-    elif endpoint == 'market':
-        search_params['symbol'] = params.get('symbol', '').strip() or None
-        search_params['exchange'] = params.get('exchange', '').strip() or None
-    
-    # Remove None values
-    search_params = {k: v for k, v in search_params.items() if v is not None}
-    
-    # Execute search
-    result = newsdata_client.search(endpoint=endpoint, **search_params)
-    
-    # Add query preview to response
-    result['query_preview'] = q
-    result['endpoint'] = endpoint
-    result['filters_applied'] = {k: v for k, v in search_params.items() if k not in ['q', 'page']}
-    
-    return jsonify(result), 200 if result.get('success') else 400
+            "success": True,
+            "results": results,
+            "totalResults": data.get('totalResults', len(results)),
+            "nextPage": data.get('nextPage'),
+        })
 
-
-@app.route('/api/newsdata/count', methods=['GET', 'POST'])
-@login_required
-def newsdata_count():
-    """
-    Get estimated article count for a query (credit-saving preview).
-    Uses minimal API call to get totalResults without fetching all articles.
-    """
-    if request.method == 'POST':
-        params = request.get_json() or {}
-    else:
-        params = request.args.to_dict()
-    
-    # Build query from params
-    raw_q = params.get('q', '').strip()
-    q_in_title = params.get('qInTitle', '').strip()
-    q_in_meta = params.get('qInMeta', '').strip()
-    
-    # Get filters
-    search_params = {
-        'q': raw_q if raw_q and not q_in_title and not q_in_meta else None,
-        'q_in_title': q_in_title or None,
-        'q_in_meta': q_in_meta or None,
-        'country': params.get('country', '').strip() or None,
-        'language': params.get('language', '').strip() or None,
-        'category': params.get('category', '').strip() or None,
-        'domain': params.get('domain', '').strip() or None,
-        'timeframe': params.get('timeframe', '').strip() or None,
-        'from_date': params.get('fromDate', '').strip() or None,
-        'to_date': params.get('toDate', '').strip() or None,
-    }
-    
-    # Remove None values
-    search_params = {k: v for k, v in search_params.items() if v is not None}
-    
-    result = newsdata_client.get_count(**search_params)
-    
-    # Determine query health
-    count = result.get('count', 0)
-    if count == 0:
-        health = 'empty'
-        health_ar = 'لا توجد نتائج'
-    elif count <= 50:
-        health = 'narrow'
-        health_ar = 'بحث محدد'
-    elif count <= 500:
-        health = 'moderate'
-        health_ar = 'بحث متوسط'
-    else:
-        health = 'broad'
-        health_ar = 'بحث واسع'
-    
-    return jsonify({
-        'success': result.get('success', False),
-        'count': count,
-        'health': health,
-        'health_ar': health_ar,
-        'message': result.get('message')
-    }), 200 if result.get('success') else 400
+    except _req.Timeout:
+        return jsonify({"success": False, "error": "انتهت مهلة الاتصال", "results": []}), 504
+    except Exception as e:
+        return jsonify({"success": False, "error": f"خطأ: {str(e)[:200]}", "results": []}), 500
 
 
 @app.route('/api/newsdata/build-query', methods=['POST'])

@@ -7,10 +7,19 @@ import os
 import requests
 from datetime import datetime
 from typing import Optional, Dict, Any, List
-from dotenv import load_dotenv
+from pathlib import Path
 
-# Load environment variables from .env file
-load_dotenv()
+def _read_env_key(key_name):
+    """Read a key directly from .env file — no dotenv dependency."""
+    env_path = Path(__file__).resolve().parent / '.env'
+    try:
+        for line in env_path.read_text(encoding='utf-8').splitlines():
+            line = line.strip()
+            if line.startswith(f'{key_name}='):
+                return line.split('=', 1)[1].strip()
+    except Exception:
+        pass
+    return os.getenv(key_name, '').strip()
 
 class NewsDataClient:
     """
@@ -29,7 +38,18 @@ class NewsDataClient:
     }
     
     def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or os.getenv('NEWSDATA_API_KEY', '').strip()
+        self._api_key = api_key or ''
+    
+    @property
+    def api_key(self):
+        """Lazy-load API key directly from .env file."""
+        if not self._api_key:
+            self._api_key = _read_env_key('NEWSDATA_API_KEY')
+        return self._api_key
+    
+    @api_key.setter
+    def api_key(self, value):
+        self._api_key = value
         
     def _make_request(self, endpoint: str, params: Dict[str, Any]) -> Dict[str, Any]:
         """Make API request to NewsData.io"""

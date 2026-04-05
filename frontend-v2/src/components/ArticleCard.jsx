@@ -1,12 +1,41 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { ExternalLink, ThumbsUp, ThumbsDown, Minus, ChevronDown, ChevronUp, Bookmark, Loader2, BarChart3 } from 'lucide-react'
+import { ExternalLink, ThumbsUp, ThumbsDown, Minus, ChevronDown, ChevronUp, Bookmark, Loader2, BarChart3, Languages } from 'lucide-react'
 import { apiFetch } from '../apiClient'
 
-export default function ArticleCard({ article, isBookmarked, onBookmark, onUnbookmark, bookmarkLoading }) {
+export default function ArticleCard({ article, isBookmarked, onBookmark, onUnbookmark, bookmarkLoading, showTranslate, onTranslated }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [sentimentExplanation, setSentimentExplanation] = useState(null)
   const [explainLoading, setExplainLoading] = useState(false)
+  const [translating, setTranslating] = useState(false)
+  const [translated, setTranslated] = useState(false)
+
+  const handleTranslate = async () => {
+    if (translated || translating) return
+    setTranslating(true)
+    try {
+      const res = await apiFetch('/api/translate-text', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: article.title_original || article.title_ar || '',
+          summary: article.summary_original || article.summary_ar || '',
+        }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.translated) {
+          article.title_ar = data.title_ar
+          article.summary_ar = data.summary_ar
+          setTranslated(true)
+          onTranslated?.(article)
+        } else {
+          setTranslated(true) // already Arabic
+        }
+      }
+    } catch (e) { console.error('Translate error:', e) }
+    finally { setTranslating(false) }
+  }
 
   const explainSentiment = async () => {
     if (sentimentExplanation) { setSentimentExplanation(null); return }
@@ -174,6 +203,18 @@ export default function ArticleCard({ article, isBookmarked, onBookmark, onUnboo
               {explainLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <BarChart3 className="w-3 h-3" />}
               حلل المشاعر
             </button>
+            {showTranslate && (
+              <button
+                onClick={handleTranslate}
+                disabled={translating || translated}
+                className="btn-ghost !px-1.5 !py-0.5 !text-[10px] !gap-0.5"
+                style={{ color: translated ? '#0f766e' : '#6366f1' }}
+                title="ترجمة إلى العربية"
+              >
+                {translating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Languages className="w-3 h-3" />}
+                {translated ? 'تُرجم' : 'ترجم'}
+              </button>
+            )}
             <span className="text-[11px] text-slate-400">
               {article.published_at ? new Date(article.published_at).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: 'numeric' }) : ''}
             </span>

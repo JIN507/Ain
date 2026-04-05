@@ -101,9 +101,11 @@ export default function TopHeadlines() {
       const allArticles = headlines.flatMap(source =>
         (source.articles || []).map(a => ({ ...a, source_name: source.source_name, country: selectedCountry }))
       )
-      const pdfBlob = await generatePDFBlob(allArticles, apiFetch, { title: `تقرير أهم العناوين - ${selectedCountry}` })
+      // Max 50 per file enforced in generatePDFBlob
+      const pdfBlob = await generatePDFBlob(allArticles, apiFetch, { title: `عين — أهم العناوين — ${selectedCountry}` })
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-      const filename = `تقرير_أهم_العناوين_${selectedCountry}_${timestamp}.pdf`
+      const count = Math.min(allArticles.length, 50)
+      const filename = `أهم_العناوين_${selectedCountry}_${count}خبر_${timestamp}.pdf`
 
       const url = URL.createObjectURL(pdfBlob)
       const a = document.createElement('a')
@@ -112,7 +114,7 @@ export default function TopHeadlines() {
       URL.revokeObjectURL(url)
 
       await uploadExport(apiFetch, pdfBlob, filename, {
-        articleCount: allArticles.length, filters: { country: selectedCountry, type: 'top_headlines' }, sourceType: 'top_headlines',
+        articleCount: count, filters: { country: selectedCountry, type: 'top_headlines' }, sourceType: 'top_headlines',
       })
     } catch (error) {
       console.error('Error exporting headlines PDF:', error)

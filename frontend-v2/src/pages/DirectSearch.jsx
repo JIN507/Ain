@@ -1,9 +1,8 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { 
   Search, ChevronDown, ChevronUp, Loader as LoaderIcon, Download, Loader2, 
-  Filter, Calendar, Globe, Languages, Tag, Clock, AlertCircle, RefreshCw,
-  FileText, Image, Video, ArrowUpDown, Zap, BarChart3, CheckCircle2,
-  XCircle, Info, Sparkles, BookOpen, ExternalLink, Bookmark, FileSpreadsheet
+  Filter, Globe, Languages, Tag, Clock, AlertCircle, RefreshCw,
+  Image, Video, XCircle, FileSpreadsheet
 } from 'lucide-react'
 import ArticleCard from '../components/ArticleCard'
 import Loader from '../components/Loader'
@@ -22,14 +21,6 @@ const ERROR_MESSAGES = {
   429: 'تم تجاوز حد الطلبات، حاول بعد قليل',
   500: 'حدث خلل مؤقت. حاول مرة أخرى'
 }
-
-// Sort options
-const SORT_OPTIONS = [
-  { value: '', label: 'الأحدث أولاً (افتراضي)' },
-  { value: 'relevancy', label: 'الأكثر صلة' },
-  { value: 'pubdateasc', label: 'الأقدم أولاً' },
-  { value: 'source', label: 'حسب المصدر' }
-]
 
 // Search mode options (mutually exclusive q types)
 const SEARCH_MODES = [
@@ -51,26 +42,16 @@ export default function DirectSearch() {
   const [selectedLanguages, setSelectedLanguages] = useState([])
   const [selectedCategories, setSelectedCategories] = useState([])
   const [showFilters, setShowFilters] = useState(false)
-  const [showAdvanced, setShowAdvanced] = useState(false)
   
   // Time range
-  const [timeMode, setTimeMode] = useState('latest') // 'latest' or 'archive'
   const [timeframe, setTimeframe] = useState('')
-  const [fromDate, setFromDate] = useState('')
-  const [toDate, setToDate] = useState('')
   
-  // Advanced filters
-  const [sortBy, setSortBy] = useState('')
+  // Options
   const [removeDuplicate, setRemoveDuplicate] = useState(true)
-  const [fullContent, setFullContent] = useState(false)
   const [imageOnly, setImageOnly] = useState(false)
   const [videoOnly, setVideoOnly] = useState(false)
-  const [priorityDomain, setPriorityDomain] = useState('')
-  
-  // Credit-aware state
-  const [countPreview, setCountPreview] = useState(null)
-  const [countLoading, setCountLoading] = useState(false)
-  const [skipCount, setSkipCount] = useState(false)
+  const [domainFilter, setDomainFilter] = useState('')
+  const [excludeDomain, setExcludeDomain] = useState('')
   
   // Results state
   const [results, setResults] = useState([])
@@ -82,6 +63,7 @@ export default function DirectSearch() {
   const [exporting, setExporting] = useState(false)
   const [totalResults, setTotalResults] = useState(0)
   const [lastUpdated, setLastUpdated] = useState(null)
+  const [, forceUpdate] = useState(0)
   
   // Auto-refresh
   const [autoRefresh, setAutoRefresh] = useState(false)
@@ -101,13 +83,33 @@ export default function DirectSearch() {
     { code: 'om', name: 'عمان' },
     { code: 'jo', name: 'الأردن' },
     { code: 'lb', name: 'لبنان' },
+    { code: 'iq', name: 'العراق' },
+    { code: 'sy', name: 'سوريا' },
+    { code: 'ps', name: 'فلسطين' },
+    { code: 'ye', name: 'اليمن' },
+    { code: 'ma', name: 'المغرب' },
+    { code: 'tn', name: 'تونس' },
+    { code: 'dz', name: 'الجزائر' },
+    { code: 'ly', name: 'ليبيا' },
+    { code: 'sd', name: 'السودان' },
     { code: 'us', name: 'أمريكا' },
     { code: 'gb', name: 'بريطانيا' },
     { code: 'fr', name: 'فرنسا' },
     { code: 'de', name: 'ألمانيا' },
     { code: 'ru', name: 'روسيا' },
     { code: 'cn', name: 'الصين' },
-    { code: 'tr', name: 'تركيا' }
+    { code: 'tr', name: 'تركيا' },
+    { code: 'in', name: 'الهند' },
+    { code: 'pk', name: 'باكستان' },
+    { code: 'jp', name: 'اليابان' },
+    { code: 'kr', name: 'كوريا' },
+    { code: 'au', name: 'أستراليا' },
+    { code: 'ca', name: 'كندا' },
+    { code: 'it', name: 'إيطاليا' },
+    { code: 'es', name: 'إسبانيا' },
+    { code: 'br', name: 'البرازيل' },
+    { code: 'il', name: 'إسرائيل' },
+    { code: 'ir', name: 'إيران' }
   ]
   
   const availableLanguages = [
@@ -117,7 +119,16 @@ export default function DirectSearch() {
     { code: 'de', name: 'الألمانية' },
     { code: 'es', name: 'الإسبانية' },
     { code: 'ru', name: 'الروسية' },
-    { code: 'tr', name: 'التركية' }
+    { code: 'tr', name: 'التركية' },
+    { code: 'ur', name: 'الأردية' },
+    { code: 'zh', name: 'الصينية' },
+    { code: 'ja', name: 'اليابانية' },
+    { code: 'ko', name: 'الكورية' },
+    { code: 'pt', name: 'البرتغالية' },
+    { code: 'it', name: 'الإيطالية' },
+    { code: 'hi', name: 'الهندية' },
+    { code: 'he', name: 'العبرية' },
+    { code: 'fa', name: 'الفارسية' }
   ]
   
   const availableCategories = [
@@ -129,9 +140,17 @@ export default function DirectSearch() {
     { code: 'science', name: 'علوم' },
     { code: 'sports', name: 'رياضة' },
     { code: 'world', name: 'عالمي' },
-    { code: 'entertainment', name: 'ترفيه' }
+    { code: 'entertainment', name: 'ترفيه' },
+    { code: 'environment', name: 'بيئة' },
+    { code: 'food', name: 'غذاء' },
+    { code: 'tourism', name: 'سياحة' },
+    { code: 'crime', name: 'جريمة' },
+    { code: 'domestic', name: 'محلي' },
+    { code: 'education', name: 'تعليم' },
+    { code: 'lifestyle', name: 'أسلوب حياة' },
+    { code: 'other', name: 'أخرى' }
   ]
-  
+
   // Compile query from builder
   const compiledQuery = useMemo(() => {
     const builderQuery = compileToQ(builder)
@@ -156,22 +175,9 @@ export default function DirectSearch() {
     return (hasQuery || hasFilters) && queryValidation.valid && !isOverLimit
   }, [compiledQuery, selectedCountries, selectedLanguages, selectedCategories, queryValidation, isOverLimit])
   
-  // Auto-detect endpoint based on time settings
-  const endpoint = useMemo(() => {
-    if (timeMode === 'archive') return 'archive'
-    if (fromDate) {
-      const from = new Date(fromDate)
-      const now = new Date()
-      const hoursDiff = (now - from) / (1000 * 60 * 60)
-      return hoursDiff > 48 ? 'archive' : 'latest'
-    }
-    return 'latest'
-  }, [timeMode, fromDate])
-  
   // Build search params
-  const buildSearchParams = useCallback((forCount = false) => {
+  const buildSearchParams = useCallback(() => {
     const params = new URLSearchParams()
-    params.append('endpoint', endpoint)
     
     // Query (mutually exclusive)
     if (compiledQuery) {
@@ -195,54 +201,20 @@ export default function DirectSearch() {
       params.append('category', selectedCategories.slice(0, 5).join(','))
     }
     
-    // Time
-    if (endpoint === 'latest' && timeframe) {
+    // Time (hours, max 48)
+    if (timeframe) {
       params.append('timeframe', timeframe)
     }
-    if (endpoint === 'archive') {
-      if (fromDate) params.append('fromDate', fromDate)
-      if (toDate) params.append('toDate', toDate)
-    }
     
-    // Advanced (skip for count)
-    if (!forCount) {
-      if (sortBy) params.append('sort', sortBy)
-      if (removeDuplicate) params.append('removeDuplicate', 'true')
-      if (fullContent) params.append('fullContent', 'true')
-      if (imageOnly) params.append('image', 'true')
-      if (videoOnly) params.append('video', 'true')
-      if (priorityDomain) params.append('prioritydomain', priorityDomain)
-      params.append('size', '50')
-    }
+    // Options
+    if (removeDuplicate) params.append('removeDuplicate', 'true')
+    if (imageOnly) params.append('image', 'true')
+    if (videoOnly) params.append('video', 'true')
+    if (domainFilter.trim()) params.append('domain', domainFilter.trim())
+    if (excludeDomain.trim()) params.append('excludeDomain', excludeDomain.trim())
     
     return params
-  }, [compiledQuery, searchMode, selectedCountries, selectedLanguages, selectedCategories, endpoint, timeframe, fromDate, toDate, sortBy, removeDuplicate, fullContent, imageOnly, videoOnly, priorityDomain])
-  
-  // Get count preview
-  const getCountPreview = async () => {
-    if (!canSearch) return
-    
-    setCountLoading(true)
-    setCountPreview(null)
-    
-    try {
-      const params = buildSearchParams(true)
-      const response = await apiFetch(`/api/newsdata/count?${params}`)
-      const data = await response.json()
-      
-      if (response.ok && data.success) {
-        setCountPreview({
-          count: data.count,
-          health: data.health,
-          health_ar: data.health_ar
-        })
-      }
-    } catch (err) {
-      console.error('Count preview error:', err)
-    } finally {
-      setCountLoading(false)
-    }
-  }
+  }, [compiledQuery, searchMode, selectedCountries, selectedLanguages, selectedCategories, timeframe, removeDuplicate, imageOnly, videoOnly, domainFilter, excludeDomain])
   
   // Perform search
   const handleSearch = async (isLoadMore = false) => {
@@ -264,20 +236,27 @@ export default function DirectSearch() {
     pendingRequestRef.current = requestId
     
     try {
-      const params = buildSearchParams(false)
+      const params = buildSearchParams()
       
       if (isLoadMore && nextPage) {
         params.append('page', nextPage)
       }
       
       const response = await apiFetch(`/api/newsdata/search?${params}`)
+      
+      // Handle 401 — redirect to login
+      if (response.status === 401) {
+        window.location.href = '/login'
+        return
+      }
+      
       const data = await response.json()
       
       // Check if this request is still valid
       if (pendingRequestRef.current !== requestId) return
       
       if (!response.ok || !data.success) {
-        const errorMsg = ERROR_MESSAGES[response.status] || data.error || 'فشل البحث'
+        const errorMsg = data.error || ERROR_MESSAGES[response.status] || 'فشل البحث'
         throw new Error(errorMsg)
       }
       
@@ -307,23 +286,6 @@ export default function DirectSearch() {
     }
   }
   
-  // Credit-aware search flow
-  const handleSmartSearch = async () => {
-    if (skipCount) {
-      handleSearch(false)
-      return
-    }
-    
-    // Get count first
-    await getCountPreview()
-  }
-  
-  // Confirm search after count
-  const confirmSearch = () => {
-    setCountPreview(null)
-    handleSearch(false)
-  }
-  
   // Toggle handlers
   const toggleCountry = (code) => {
     setSelectedCountries(prev =>
@@ -351,7 +313,7 @@ export default function DirectSearch() {
   
   // Auto-refresh effect
   useEffect(() => {
-    if (autoRefresh && searchPerformed && endpoint === 'latest') {
+    if (autoRefresh && searchPerformed) {
       autoRefreshRef.current = setInterval(() => {
         handleSearch(false)
       }, 5 * 60 * 1000) // 5 minutes
@@ -362,16 +324,18 @@ export default function DirectSearch() {
         clearInterval(autoRefreshRef.current)
       }
     }
-  }, [autoRefresh, searchPerformed, endpoint])
+  }, [autoRefresh, searchPerformed])
   
   // Export to PDF
   const exportToPDF = async () => {
     if (!results.length) return
     setExporting(true)
     try {
-      const pdfBlob = await generatePDFBlob(results, apiFetch, { title: 'عين - نتائج البحث' })
+      // Max 50 per file enforced in generatePDFBlob
+      const pdfBlob = await generatePDFBlob(results, apiFetch, { title: 'عين — نتائج البحث المباشر' })
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-      const filename = `نتائج_البحث_عين_${timestamp}.pdf`
+      const count = Math.min(results.length, 50)
+      const filename = `نتائج_البحث_عين_${count}خبر_${timestamp}.pdf`
 
       const url = URL.createObjectURL(pdfBlob)
       const a = document.createElement('a')
@@ -380,7 +344,7 @@ export default function DirectSearch() {
       URL.revokeObjectURL(url)
 
       await uploadExport(apiFetch, pdfBlob, filename, {
-        articleCount: results.length, filters: { type: 'direct_search', query: compiledQuery }, sourceType: 'direct_search',
+        articleCount: count, filters: { type: 'direct_search', query: compiledQuery }, sourceType: 'direct_search',
       })
     } catch (err) { console.error('Export error:', err); alert('خطأ في تصدير PDF: ' + err.message) }
     finally { setExporting(false) }
@@ -410,7 +374,7 @@ export default function DirectSearch() {
   }
   
   // Active filters count
-  const activeFiltersCount = selectedCountries.length + selectedLanguages.length + selectedCategories.length + (fromDate ? 1 : 0) + (timeframe ? 1 : 0)
+  const activeFiltersCount = selectedCountries.length + selectedLanguages.length + selectedCategories.length + (timeframe ? 1 : 0) + (domainFilter ? 1 : 0)
   
   // Time since last update
   const timeSinceUpdate = useMemo(() => {
@@ -483,64 +447,21 @@ export default function DirectSearch() {
           </div>
         )}
         
-        {/* Time Mode Toggle */}
-        <div className="flex items-center gap-3 py-3" style={{ borderTop: '1px solid rgba(0,0,0,0.04)' }}>
-          <span className="text-xs text-slate-500">الفترة:</span>
-          <div className="flex gap-1">
-            <button
-              onClick={() => { setTimeMode('latest'); setFromDate(''); setToDate(''); }}
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all flex items-center gap-1.5 ${
-                timeMode === 'latest' ? 'text-white' : 'text-slate-600 hover:bg-slate-100'
-              }`}
-              style={timeMode === 'latest' ? { background: 'linear-gradient(135deg, #0f766e, #14b8a6)' } : { background: 'rgba(0,0,0,0.03)' }}
-            >
-              <Zap className="w-3.5 h-3.5" />
-              آخر 48 ساعة
-            </button>
-            <button
-              onClick={() => setTimeMode('archive')}
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all flex items-center gap-1.5 ${
-                timeMode === 'archive' ? 'text-white' : 'text-slate-600 hover:bg-slate-100'
-              }`}
-              style={timeMode === 'archive' ? { background: 'linear-gradient(135deg, #7c3aed, #a78bfa)' } : { background: 'rgba(0,0,0,0.03)' }}
-            >
-              <BookOpen className="w-3.5 h-3.5" />
-              أرشيف (6 أشهر)
-            </button>
-          </div>
+        {/* Timeframe */}
+        <div className="flex items-center gap-3" style={{ borderTop: '1px solid rgba(0,0,0,0.04)', paddingTop: '12px' }}>
+          <Clock className="w-4 h-4 text-gray-400" />
+          <select
+            value={timeframe}
+            onChange={(e) => setTimeframe(e.target.value)}
+            className="input text-sm flex-1"
+          >
+            <option value="">كل آخر 48 ساعة</option>
+            <option value="1">ساعة واحدة</option>
+            <option value="6">6 ساعات</option>
+            <option value="12">12 ساعة</option>
+            <option value="24">24 ساعة</option>
+          </select>
         </div>
-        
-        {/* Archive Date Range */}
-        {timeMode === 'archive' && (
-          <div className="grid grid-cols-2 gap-3 p-3 rounded-xl" style={{ background: 'rgba(139,92,246,0.04)' }}>
-            <div>
-              <label className="block text-[11px] font-medium text-slate-500 mb-1">من تاريخ</label>
-              <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="input w-full" />
-            </div>
-            <div>
-              <label className="block text-[11px] font-medium text-slate-500 mb-1">إلى تاريخ</label>
-              <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="input w-full" />
-            </div>
-          </div>
-        )}
-        
-        {/* Latest Timeframe */}
-        {timeMode === 'latest' && (
-          <div className="flex items-center gap-3">
-            <Clock className="w-4 h-4 text-gray-400" />
-            <select
-              value={timeframe}
-              onChange={(e) => setTimeframe(e.target.value)}
-              className="input text-sm flex-1"
-            >
-              <option value="">كل آخر 48 ساعة</option>
-              <option value="1">ساعة واحدة</option>
-              <option value="6">6 ساعات</option>
-              <option value="12">12 ساعة</option>
-              <option value="24">24 ساعة</option>
-            </select>
-          </div>
-        )}
         
         {/* Filters Toggle */}
         <button
@@ -650,182 +571,60 @@ export default function DirectSearch() {
           </div>
         )}
         
-        {/* Advanced Filters Toggle */}
-        <button
-          onClick={() => setShowAdvanced(!showAdvanced)}
-          className={`flex items-center gap-2 text-sm font-medium transition-colors ${
-            showAdvanced ? 'text-purple-600' : 'text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          <Sparkles className="w-4 h-4" />
-          {showAdvanced ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          <span>خيارات متقدمة</span>
-        </button>
-        
-        {/* Advanced Filters */}
-        {showAdvanced && (
-          <div className="space-y-4 p-4 bg-purple-50 rounded-xl border border-purple-200">
-            {/* Sort */}
-            <div className="flex items-center gap-3">
-              <ArrowUpDown className="w-4 h-4 text-purple-500" />
-              <label className="text-sm font-medium text-gray-700 w-24">الترتيب</label>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="input text-sm flex-1"
-              >
-                {SORT_OPTIONS.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
-            </div>
-            
-            {/* Priority Domain */}
-            <div className="flex items-center gap-3">
-              <BarChart3 className="w-4 h-4 text-purple-500" />
-              <label className="text-sm font-medium text-gray-700 w-24">أولوية المصادر</label>
-              <select
-                value={priorityDomain}
-                onChange={(e) => setPriorityDomain(e.target.value)}
-                className="input text-sm flex-1"
-              >
-                <option value="">الكل</option>
-                <option value="top">كبرى فقط (10%)</option>
-                <option value="medium">متوسطة وكبرى (30%)</option>
-                <option value="low">موثوقة (50%)</option>
-              </select>
-            </div>
-            
-            {/* Boolean toggles */}
-            <div className="grid grid-cols-2 gap-3">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={removeDuplicate}
-                  onChange={(e) => setRemoveDuplicate(e.target.checked)}
-                  className="w-4 h-4 text-purple-600 rounded"
-                />
-                <span className="text-sm text-gray-700">إزالة المكرر</span>
-              </label>
-              
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={fullContent}
-                  onChange={(e) => setFullContent(e.target.checked)}
-                  className="w-4 h-4 text-purple-600 rounded"
-                />
-                <span className="text-sm text-gray-700">المحتوى الكامل</span>
-              </label>
-              
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={imageOnly}
-                  onChange={(e) => setImageOnly(e.target.checked)}
-                  className="w-4 h-4 text-purple-600 rounded"
-                />
-                <Image className="w-4 h-4 text-gray-500" />
-                <span className="text-sm text-gray-700">مع صور</span>
-              </label>
-              
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={videoOnly}
-                  onChange={(e) => setVideoOnly(e.target.checked)}
-                  className="w-4 h-4 text-purple-600 rounded"
-                />
-                <Video className="w-4 h-4 text-gray-500" />
-                <span className="text-sm text-gray-700">مع فيديو</span>
-              </label>
-            </div>
-          </div>
-        )}
-        
-        {/* Search Actions */}
-        <div className="flex gap-2 pt-2">
-          <button
-            onClick={handleSmartSearch}
-            disabled={loading || !canSearch}
-            className="btn flex-1 py-3 text-base disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? (
-              <>
-                <LoaderIcon className="w-5 h-5 animate-spin" />
-                جاري البحث...
-              </>
-            ) : countLoading ? (
-              <>
-                <LoaderIcon className="w-5 h-5 animate-spin" />
-                جاري التحقق...
-              </>
-            ) : (
-              <>
-                <Search className="w-5 h-5" />
-                ابحث
-              </>
-            )}
-          </button>
-          
-          <label className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-lg cursor-pointer hover:bg-gray-200 transition-colors">
-            <input
-              type="checkbox"
-              checked={skipCount}
-              onChange={(e) => setSkipCount(e.target.checked)}
-              className="w-4 h-4 text-emerald-600 rounded"
-            />
-            <Zap className="w-4 h-4 text-amber-500" />
-            <span className="text-sm text-gray-700">بحث سريع</span>
+        {/* Options row */}
+        <div className="flex flex-wrap items-center gap-3 text-sm" style={{ borderTop: '1px solid rgba(0,0,0,0.04)', paddingTop: '12px' }}>
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <input type="checkbox" checked={removeDuplicate} onChange={(e) => setRemoveDuplicate(e.target.checked)} className="w-3.5 h-3.5 text-emerald-600 rounded" />
+            <span className="text-gray-600">إزالة المكرر</span>
           </label>
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <input type="checkbox" checked={imageOnly} onChange={(e) => setImageOnly(e.target.checked)} className="w-3.5 h-3.5 text-emerald-600 rounded" />
+            <Image className="w-3.5 h-3.5 text-gray-500" />
+            <span className="text-gray-600">مع صور</span>
+          </label>
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <input type="checkbox" checked={videoOnly} onChange={(e) => setVideoOnly(e.target.checked)} className="w-3.5 h-3.5 text-emerald-600 rounded" />
+            <Video className="w-3.5 h-3.5 text-gray-500" />
+            <span className="text-gray-600">مع فيديو</span>
+          </label>
+          <div className="flex-1" />
+          <input
+            type="text"
+            value={domainFilter}
+            onChange={(e) => setDomainFilter(e.target.value)}
+            placeholder="نطاق: bbc.com"
+            className="input text-xs w-36"
+            dir="ltr"
+          />
+          <input
+            type="text"
+            value={excludeDomain}
+            onChange={(e) => setExcludeDomain(e.target.value)}
+            placeholder="استثناء: example.com"
+            className="input text-xs w-36"
+            dir="ltr"
+          />
         </div>
+        
+        {/* Search Button */}
+        <button
+          onClick={() => handleSearch(false)}
+          disabled={loading || !canSearch}
+          className="btn w-full py-3 text-base disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {loading ? (
+            <>
+              <LoaderIcon className="w-5 h-5 animate-spin" />
+              جاري البحث...
+            </>
+          ) : (
+            <>
+              <Search className="w-5 h-5" />
+              ابحث
+            </>
+          )}
+        </button>
       </div>
-      
-      {/* Count Preview Modal */}
-      {countPreview && (
-        <div className="card p-5 bg-gradient-to-r from-emerald-50 to-blue-50 border-emerald-200">
-          <div className="flex items-start gap-4">
-            <div className={`p-3 rounded-full ${
-              countPreview.health === 'narrow' ? 'bg-emerald-100' :
-              countPreview.health === 'moderate' ? 'bg-blue-100' :
-              countPreview.health === 'broad' ? 'bg-amber-100' : 'bg-gray-100'
-            }`}>
-              {countPreview.health === 'narrow' ? <CheckCircle2 className="w-6 h-6 text-emerald-600" /> :
-               countPreview.health === 'moderate' ? <Info className="w-6 h-6 text-blue-600" /> :
-               countPreview.health === 'broad' ? <AlertCircle className="w-6 h-6 text-amber-600" /> :
-               <XCircle className="w-6 h-6 text-gray-600" />}
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-2xl font-bold text-gray-900">{countPreview.count.toLocaleString()}</span>
-                <span className="text-gray-600">نتيجة متوقعة</span>
-              </div>
-              <p className={`text-sm ${
-                countPreview.health === 'narrow' ? 'text-emerald-700' :
-                countPreview.health === 'moderate' ? 'text-blue-700' :
-                countPreview.health === 'broad' ? 'text-amber-700' : 'text-gray-700'
-              }`}>
-                {countPreview.health_ar}
-                {countPreview.health === 'broad' && ' - يُنصح بتضييق البحث لنتائج أدق'}
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setCountPreview(null)}
-                className="btn-outline text-sm"
-              >
-                إلغاء
-              </button>
-              <button
-                onClick={confirmSearch}
-                className="btn text-sm"
-              >
-                متابعة البحث
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       
       {/* Error Message */}
       {error && (
@@ -854,59 +653,65 @@ export default function DirectSearch() {
       ) : results.length > 0 ? (
         <>
           {/* Results Header */}
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <div className="flex items-center gap-4">
-              <div className="text-sm text-gray-600">
-                <span className="font-semibold text-gray-900">{results.length}</span> نتيجة
-                {totalResults > results.length && (
-                  <span className="text-gray-400"> من {totalResults.toLocaleString()}</span>
-                )}
+          <div className="card p-4">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl font-bold" style={{ color: '#0f766e' }}>{results.length}</span>
+                  <span className="text-sm text-gray-600">نتيجة</span>
+                  {totalResults > results.length && (
+                    <span className="text-xs text-gray-400 px-2 py-0.5 bg-gray-100 rounded-full">من {totalResults.toLocaleString()}</span>
+                  )}
+                </div>
+                
+                <label className="flex items-center gap-2 cursor-pointer px-3 py-1.5 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={autoRefresh}
+                      onChange={(e) => setAutoRefresh(e.target.checked)}
+                      className="w-3.5 h-3.5 text-emerald-600 rounded"
+                    />
+                    <RefreshCw className={`w-3.5 h-3.5 ${autoRefresh ? 'text-emerald-600 animate-spin' : 'text-gray-400'}`} />
+                    <span className="text-xs text-gray-600">تحديث تلقائي</span>
+                  </label>
               </div>
               
-              {endpoint === 'latest' && (
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={autoRefresh}
-                    onChange={(e) => setAutoRefresh(e.target.checked)}
-                    className="w-4 h-4 text-emerald-600 rounded"
-                  />
-                  <RefreshCw className={`w-4 h-4 ${autoRefresh ? 'text-emerald-600 animate-spin' : 'text-gray-400'}`} />
-                  <span className="text-sm text-gray-600">تحديث تلقائي</span>
-                </label>
-              )}
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <button
-                onClick={exportToPDF}
-                disabled={exporting}
-                className="btn-outline text-sm disabled:opacity-50"
-              >
-                {exporting ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> PDF...</>
-                ) : (
-                  <><Download className="w-4 h-4" /> PDF</>
-                )}
-              </button>
-              <button
-                onClick={exportToXLSX}
-                disabled={exportingXlsx}
-                className="btn-outline text-sm disabled:opacity-50"
-              >
-                {exportingXlsx ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> Excel...</>
-                ) : (
-                  <><FileSpreadsheet className="w-4 h-4" /> Excel</>
-                )}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={exportToPDF}
+                  disabled={exporting}
+                  className="btn-outline text-sm disabled:opacity-50"
+                >
+                  {exporting ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> PDF...</>
+                  ) : (
+                    <><Download className="w-4 h-4" /> PDF ({Math.min(results.length, 50)})</>
+                  )}
+                </button>
+                <button
+                  onClick={exportToXLSX}
+                  disabled={exportingXlsx}
+                  className="btn-outline text-sm disabled:opacity-50"
+                >
+                  {exportingXlsx ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Excel...</>
+                  ) : (
+                    <><FileSpreadsheet className="w-4 h-4" /> Excel</>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
           
           {/* Results Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {results.map((article, index) => (
-              <ArticleCard key={`${article.article_id || article.link || article.url}-${index}`} article={article} />
+              <ArticleCard
+                key={`${article.article_id || article.link || article.url}-${index}`}
+                article={article}
+                showTranslate={true}
+                onTranslated={() => forceUpdate(n => n + 1)}
+              />
             ))}
           </div>
           

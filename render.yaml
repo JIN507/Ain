@@ -9,6 +9,8 @@ services:
     envVars:
       - key: SECRET_KEY
         generateValue: true
+      - key: JWT_SECRET
+        generateValue: true
       - key: SESSION_COOKIE_SECURE
         value: "true"
       - key: NEWSDATA_API_KEY

@@ -316,11 +316,32 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
     if (!articles.length) return
     setExporting(true)
     try {
+      // Fetch AI brief in background for the report
+      let briefText = dailyBrief?.content || null
+      if (!briefText) {
+        try {
+          const payload = {}
+          if (filters.keyword) payload.keyword = filters.keyword
+          const briefRes = await apiFetch('/api/ai/daily-brief', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          })
+          if (briefRes.ok) {
+            const briefData = await briefRes.json()
+            briefText = briefData.content || null
+            setDailyBrief(briefData)
+          }
+        } catch (e) {
+          console.error('Brief for PDF failed:', e)
+        }
+      }
+
       // Export current page articles (max 50 per file)
       const pageArticles = articles
       const pdfBlob = await generatePDFBlob(pageArticles, apiFetch, {
         title: `تقرير أخبار عين — صفحة ${currentPage}`,
-        stats,
+        brief: briefText,
       })
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
       const filename = `تقرير_أخبار_عين_صفحة${currentPage}_${timestamp}.pdf`
@@ -520,7 +541,7 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
             <span>عرض {articles.length} من {totalArticles} خبر</span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {articles.map((article) => (
               <ArticleCard
                 key={article.id}

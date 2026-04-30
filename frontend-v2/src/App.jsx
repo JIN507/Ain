@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { Menu, X } from 'lucide-react'
 import Sidebar from './components/Sidebar'
@@ -12,13 +12,16 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import Admin from './pages/Admin'
 import MyFiles from './pages/MyFiles'
+import HomePage from './pages/HomePage'
 import Bookmarks from './pages/Bookmarks'
 import Profile from './pages/Profile'
 import { AuthProvider, useAuth } from './context/AuthContext'
 
 function AppContent() {
-  const [currentPage, setCurrentPage] = useState('dashboard')
+  const [currentPage, setCurrentPage] = useState('home')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarHovered, setSidebarHovered] = useState(false)
+  const hoverTimeout = useRef(null)
   const [showRegister, setShowRegister] = useState(false)
   const [dashboardKeywordFilter, setDashboardKeywordFilter] = useState('')
   const { currentUser, authLoading, logout, login, register } = useAuth()
@@ -30,6 +33,7 @@ function AppContent() {
   }
 
   const pages = {
+    home: <HomePage />,
     dashboard: <Dashboard initialKeywordFilter={dashboardKeywordFilter} onFilterApplied={() => setDashboardKeywordFilter('')} />,
     directsearch: <DirectSearch />,
     topheadlines: <TopHeadlines />,
@@ -93,14 +97,41 @@ function AppContent() {
       </button>
 
       <div className="flex flex-col md:flex-row min-h-screen">
-        {/* Sidebar */}
-        <Sidebar 
-          currentPage={currentPage}
-          setCurrentPage={setCurrentPage}
-          sidebarOpen={sidebarOpen}
-          setSidebarOpen={setSidebarOpen}
-          isAdmin={currentUser?.role === 'ADMIN'}
-        />
+        {/* Sidebar — hover overlay on all pages */}
+        <div className="hidden md:block w-[60px] flex-shrink-0" />
+        <div
+          className="hidden md:block fixed top-0 right-0 h-screen z-50"
+          style={{ width: sidebarHovered ? '256px' : '60px', transition: 'width 0.25s cubic-bezier(0.4,0,0.2,1)' }}
+          onMouseEnter={() => {
+            if (hoverTimeout.current) clearTimeout(hoverTimeout.current)
+            hoverTimeout.current = setTimeout(() => setSidebarHovered(true), 80)
+          }}
+          onMouseLeave={() => {
+            if (hoverTimeout.current) clearTimeout(hoverTimeout.current)
+            hoverTimeout.current = null
+            setSidebarHovered(false)
+          }}
+        >
+          <Sidebar 
+            currentPage={currentPage}
+            setCurrentPage={(p) => { setCurrentPage(p); setSidebarHovered(false) }}
+            sidebarOpen={sidebarOpen}
+            setSidebarOpen={setSidebarOpen}
+            isAdmin={currentUser?.role === 'ADMIN'}
+            collapsed={!sidebarHovered}
+          />
+        </div>
+        {/* Mobile sidebar */}
+        <div className="md:hidden">
+          <Sidebar 
+            currentPage={currentPage}
+            setCurrentPage={setCurrentPage}
+            sidebarOpen={sidebarOpen}
+            setSidebarOpen={setSidebarOpen}
+            isAdmin={currentUser?.role === 'ADMIN'}
+            collapsed={false}
+          />
+        </div>
         
         {/* Main Content */}
         <main className="flex-1 overflow-auto">
@@ -147,7 +178,7 @@ function AppContent() {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
-            className="p-4 md:p-8"
+            className={currentPage === 'home' ? 'p-3 md:p-4' : 'p-4 md:p-6'}
           >
             {pages[currentPage]}
           </motion.div>

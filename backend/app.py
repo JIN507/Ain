@@ -1,8 +1,8 @@
 
 import sys
-# Force unbuffered output for Windows CMD
-sys.stdout.reconfigure(line_buffering=True)
-sys.stderr.reconfigure(line_buffering=True)
+# Force unbuffered output for Windows CMD with UTF-8
+sys.stdout.reconfigure(line_buffering=True, encoding='utf-8', errors='replace')
+sys.stderr.reconfigure(line_buffering=True, encoding='utf-8', errors='replace')
 
 # Load .env FIRST before anything else reads env vars
 from pathlib import Path as _Path
@@ -37,6 +37,7 @@ from functools import wraps
 import json
 import os
 import re
+import threading as _threading
 
 app = Flask(__name__, static_folder='static', static_url_path='')
 
@@ -338,13 +339,14 @@ def generate_pdf():
     articles = data.get('articles', [])
     title = data.get('title', 'تقرير أخبار عين')
     stats = data.get('stats', None)
+    brief = data.get('brief', None)
 
     if not articles:
         return jsonify({'error': 'No articles provided'}), 400
 
     try:
         from pdf_generator import generate_report_pdf
-        pdf_bytes = generate_report_pdf(articles, title=title, stats=stats)
+        pdf_bytes = generate_report_pdf(articles, title=title, stats=stats, brief=brief)
         return Response(
             pdf_bytes,
             mimetype='application/pdf',
@@ -988,6 +990,253 @@ def admin_stats():
             'total_articles': total_articles,
             'total_exports': total_exports,
         })
+    finally:
+        db.close()
+
+
+@app.route('/api/home/stats', methods=['GET'])
+@login_required
+def home_stats():
+    """Aggregated dashboard stats for the home page (current user only)."""
+    db = get_db()
+    try:
+        from sqlalchemy import func, or_, desc
+        uid = current_user.id
+
+        base = db.query(Article).filter(Article.user_id == uid)
+
+        # Total articles
+        total_articles = base.count()
+
+        # Sentiment breakdown
+        positive = base.filter(or_(Article.sentiment_label == 'إيجابي', Article.sentiment == 'إيجابي')).count()
+        negative = base.filter(or_(Article.sentiment_label == 'سلبي', Article.sentiment == 'سلبي')).count()
+        neutral = base.filter(or_(Article.sentiment_label == 'محايد', Article.sentiment == 'محايد')).count()
+
+        # Articles per country
+        countries_q = db.query(
+            Article.country, func.count(Article.id).label('cnt')
+        ).filter(Article.user_id == uid, Article.country.isnot(None), Article.country != '').group_by(Article.country).order_by(desc('cnt')).all()
+        countries_data = [{'name': c, 'count': n} for c, n in countries_q]
+
+        # Top keywords by frequency (keyword_original field)
+        kw_q = db.query(
+            Article.keyword_original, func.count(Article.id).label('cnt')
+        ).filter(Article.user_id == uid, Article.keyword_original.isnot(None), Article.keyword_original != '').group_by(Article.keyword_original).order_by(desc('cnt')).limit(10).all()
+        top_keywords = [{'keyword': k, 'count': n} for k, n in kw_q]
+
+        # User keyword count
+        kw_count = db.query(Keyword).filter(Keyword.user_id == uid).count()
+
+        # Unique countries with results
+        unique_countries = db.query(Article.country).filter(Article.user_id == uid).distinct().count()
+
+        # Bookmarks count
+        bookmark_count = 0
+        try:
+            from models import Bookmark as BM
+            bookmark_count = db.query(BM).filter(BM.user_id == uid).count()
+        except Exception:
+            pass
+
+        return jsonify({
+            'total_articles': total_articles,
+            'positive': positive,
+            'negative': negative,
+            'neutral': neutral,
+            'unique_countries': unique_countries,
+            'keyword_count': kw_count,
+            'bookmark_count': bookmark_count,
+            'countries': countries_data,
+            'top_keywords': top_keywords,
+        })
+    finally:
+        db.close()
+
+
+# ── System-wide map data (all users aggregated, cached 30 min) ──────
+_map_cache = {'data': None, 'ts': None, 'lock': _threading.Lock()}
+_MAP_CACHE_TTL = 1800  # 30 minutes in seconds
+
+
+def _build_map_cache():
+    """Build aggregated map data from ALL users' articles."""
+    db = get_db()
+    try:
+        from sqlalchemy import func, or_, desc
+
+        # ---------- Deduplicate: count each unique URL only once ----------
+        # Total system articles (unique URLs)
+        total_articles = db.query(func.count(func.distinct(Article.url))).scalar() or 0
+
+        # Sentiment — deduplicate by URL via subquery (pick one row per URL)
+        dedup_sub = db.query(
+            func.min(Article.id).label('id')
+        ).group_by(Article.url).subquery()
+        dedup_base = db.query(Article).join(dedup_sub, Article.id == dedup_sub.c.id)
+        positive = dedup_base.filter(
+            or_(Article.sentiment_label == 'إيجابي', Article.sentiment == 'إيجابي')).count()
+        negative = dedup_base.filter(
+            or_(Article.sentiment_label == 'سلبي', Article.sentiment == 'سلبي')).count()
+        neutral = dedup_base.filter(
+            or_(Article.sentiment_label == 'محايد', Article.sentiment == 'محايد')).count()
+
+        # Articles per country (distinct URLs)
+        countries_q = db.query(
+            Article.country, func.count(func.distinct(Article.url)).label('cnt')
+        ).filter(
+            Article.country.isnot(None), Article.country != ''
+        ).group_by(Article.country).order_by(desc('cnt')).all()
+        countries_data = [{'name': c, 'count': n} for c, n in countries_q]
+
+        # Top keywords system-wide (distinct URLs)
+        kw_q = db.query(
+            Article.keyword_original, func.count(func.distinct(Article.url)).label('cnt')
+        ).filter(
+            Article.keyword_original.isnot(None), Article.keyword_original != ''
+        ).group_by(Article.keyword_original).order_by(desc('cnt')).limit(15).all()
+        top_keywords = [{'keyword': k, 'count': n} for k, n in kw_q]
+
+        # Unique countries
+        unique_countries = db.query(Article.country).filter(
+            Article.country.isnot(None), Article.country != '').distinct().count()
+
+        # Total active users with articles
+        active_users = db.query(Article.user_id).distinct().count()
+
+        # Top news sources (distinct URLs)
+        src_q = db.query(
+            Article.source_name, func.count(func.distinct(Article.url)).label('cnt')
+        ).filter(
+            Article.source_name.isnot(None), Article.source_name != ''
+        ).group_by(Article.source_name).order_by(desc('cnt')).limit(10).all()
+        top_sources = [{'name': s, 'count': n} for s, n in src_q]
+
+        # Recent top articles per country (latest 8 unique per country for panels)
+        top_country_articles = {}
+        for c_name, _ in countries_q:
+            # Subquery: pick the newest row for each distinct URL in this country
+            url_dedup = db.query(
+                func.max(Article.id).label('id')
+            ).filter(
+                Article.country == c_name
+            ).group_by(Article.url).order_by(desc('id')).limit(8).subquery()
+            articles = db.query(Article).join(
+                url_dedup, Article.id == url_dedup.c.id
+            ).order_by(Article.created_at.desc()).all()
+            top_country_articles[c_name] = [{
+                'id': a.id,
+                'title_ar': a.title_ar,
+                'summary_ar': a.summary_ar,
+                'source_name': a.source_name,
+                'sentiment': a.sentiment_label or a.sentiment,
+                'url': a.url,
+                'image_url': a.image_url,
+                'keyword': a.keyword_original,
+                'published_at': a.published_at.isoformat() if a.published_at else None,
+            } for a in articles]
+
+        return {
+            'total_articles': total_articles,
+            'positive': positive,
+            'negative': negative,
+            'neutral': neutral,
+            'unique_countries': unique_countries,
+            'active_users': active_users,
+            'countries': countries_data,
+            'top_keywords': top_keywords,
+            'top_sources': top_sources,
+            'country_articles': top_country_articles,
+            'last_refresh': datetime.utcnow().isoformat(),
+        }
+    finally:
+        db.close()
+
+
+@app.route('/api/home/map-data', methods=['GET'])
+@login_required
+def home_map_data():
+    """System-wide aggregated map data. Cached for 30 minutes."""
+    now = datetime.utcnow()
+    force = request.args.get('force') == '1'
+
+    with _map_cache['lock']:
+        if (force or _map_cache['data'] is None or _map_cache['ts'] is None
+                or (now - _map_cache['ts']).total_seconds() > _MAP_CACHE_TTL):
+            _map_cache['data'] = _build_map_cache()
+            _map_cache['ts'] = now
+
+    return jsonify(_map_cache['data'])
+
+
+@app.route('/api/home/map-timeline', methods=['GET'])
+@login_required
+def home_map_timeline():
+    """Return article counts per country per day for the last N days (default 30).
+    Response: { days: ['2026-04-01', ...], data: { 'السعودية': [0, 3, 5, ...], ... } }
+    """
+    from sqlalchemy import func, cast, Date as SADate
+    days = min(int(request.args.get('days', 30)), 90)
+    db = get_db()
+    try:
+        cutoff = datetime.utcnow() - timedelta(days=days)
+        rows = db.query(
+            cast(Article.created_at, SADate).label('day'),
+            Article.country,
+            func.count(func.distinct(Article.url)).label('cnt'),
+        ).filter(
+            Article.created_at >= cutoff,
+            Article.country.isnot(None),
+            Article.country != '',
+        ).group_by('day', Article.country).all()
+
+        # Build date range
+        from datetime import date as _date
+        start = (datetime.utcnow() - timedelta(days=days - 1)).date()
+        all_days = [str(start + timedelta(days=i)) for i in range(days)]
+
+        day_idx = {d: i for i, d in enumerate(all_days)}
+        data = {}
+        for day_val, country, cnt in rows:
+            d_str = str(day_val) if not isinstance(day_val, str) else day_val
+            if d_str not in day_idx:
+                continue
+            if country not in data:
+                data[country] = [0] * len(all_days)
+            data[country][day_idx[d_str]] = cnt
+
+        return jsonify({'days': all_days, 'data': data})
+    finally:
+        db.close()
+
+
+@app.route('/api/articles/countries/<path:country_name>/articles', methods=['GET'])
+@login_required
+def get_country_articles_system(country_name):
+    """Get latest articles for a specific country (system-wide, deduplicated by URL)."""
+    from sqlalchemy import func, desc
+    db = get_db()
+    try:
+        # Pick the newest row for each distinct URL
+        url_dedup = db.query(
+            func.max(Article.id).label('id')
+        ).filter(
+            Article.country == country_name
+        ).group_by(Article.url).order_by(desc('id')).limit(10).subquery()
+        articles = db.query(Article).join(
+            url_dedup, Article.id == url_dedup.c.id
+        ).order_by(Article.created_at.desc()).all()
+        return jsonify([{
+            'id': a.id,
+            'title_ar': a.title_ar,
+            'summary_ar': a.summary_ar,
+            'source_name': a.source_name,
+            'sentiment': a.sentiment_label or a.sentiment,
+            'url': a.url,
+            'image_url': a.image_url,
+            'keyword': a.keyword_original,
+            'published_at': a.published_at.isoformat() if a.published_at else None,
+        } for a in articles])
     finally:
         db.close()
 
@@ -3484,6 +3733,51 @@ def get_daily_brief():
         })
     except Exception as e:
         print(f"[AI] ❌ Daily brief error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        db.close()
+
+
+@app.route('/api/ai/country-brief', methods=['POST'])
+@login_required
+def country_brief():
+    """Generate AI summary for a specific country's recent news (all users)."""
+    from ai_service import generate_daily_brief
+
+    body = request.get_json() or {}
+    country = (body.get('country') or '').strip()
+    if not country:
+        return jsonify({'error': 'country is required'}), 400
+
+    db = get_db()
+    try:
+        articles = db.query(Article).filter(
+            Article.country == country
+        ).order_by(Article.created_at.desc()).limit(30).all()
+
+        if not articles:
+            return jsonify({
+                'content': f'لا توجد أخبار مرصودة من {country} حالياً.',
+                'article_count': 0,
+            })
+
+        article_dicts = [{
+            'title_ar': a.title_ar or a.title_original or '',
+            'sentiment': a.sentiment_label or a.sentiment or '',
+            'source_name': a.source_name or '',
+            'keyword_original': a.keyword_original or '',
+            'country': a.country or '',
+        } for a in articles]
+
+        content = generate_daily_brief(article_dicts)
+        return jsonify({
+            'content': content,
+            'article_count': len(articles),
+        })
+    except Exception as e:
+        print(f"[AI] Country brief error: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500

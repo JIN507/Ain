@@ -133,7 +133,6 @@ export default function Bookmarks() {
             المفضلة
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            المقالات المحفوظة — لا تُحذف عند إعادة التعيين الشهرية
           </p>
         </div>
         <div className="flex items-center gap-2">

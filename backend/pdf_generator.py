@@ -127,7 +127,7 @@ SENT_NEU_FG = colors.HexColor('#374151')
 
 # ─── PDF generation ──────────────────────────────────────────────
 
-def generate_report_pdf(articles, title='تقرير أخبار عين', stats=None):
+def generate_report_pdf(articles, title='تقرير أخبار عين', stats=None, brief=None):
     """
     Generate a professional PDF report matching the Ain app UI theme.
     Returns PDF bytes.
@@ -166,10 +166,6 @@ def generate_report_pdf(articles, title='تقرير أخبار عين', stats=No
     s_section = ParagraphStyle(
         'Section', fontName=fb, fontSize=13, alignment=TA_CENTER,
         textColor=WHITE, leading=20,
-    )
-    s_stat_label = ParagraphStyle(
-        'StatLabel', fontName=fn, fontSize=9, alignment=TA_CENTER,
-        textColor=WHITE, leading=14,
     )
     s_page_footer = ParagraphStyle(
         'PageFooter', fontName=fn, fontSize=9, alignment=TA_CENTER,
@@ -221,45 +217,50 @@ def generate_report_pdf(articles, title='تقرير أخبار عين', stats=No
     elements.append(Spacer(1, 8 * mm))
 
     # ══════════════════════════════════════════════════════════════
-    # STATS SUMMARY
+    # AI BRIEF (ملخص ذكي)
     # ══════════════════════════════════════════════════════════════
-    if stats and isinstance(stats, dict):
-        total    = stats.get('total', len(articles))
-        positive = stats.get('positive', 0)
-        negative = stats.get('negative', 0)
-        neutral  = stats.get('neutral', 0)
-
-        s_sv = ParagraphStyle('sv', fontName=fb, fontSize=24, alignment=TA_CENTER,
-                              textColor=SLATE_900, leading=30)
-
-        stat_header = [
-            Paragraph(ar('إجمالي'), s_stat_label),
-            Paragraph(ar('إيجابي'), s_stat_label),
-            Paragraph(ar('سلبي'),   s_stat_label),
-            Paragraph(ar('محايد'),  s_stat_label),
-        ]
-        stat_values = [
-            Paragraph(str(total),    ParagraphStyle('sv0', parent=s_sv, textColor=TEAL_PRIMARY)),
-            Paragraph(str(positive), ParagraphStyle('sv1', parent=s_sv, textColor=GREEN_PRIMARY)),
-            Paragraph(str(negative), ParagraphStyle('sv2', parent=s_sv, textColor=colors.HexColor('#ef4444'))),
-            Paragraph(str(neutral),  ParagraphStyle('sv3', parent=s_sv, textColor=SLATE_500)),
-        ]
-
-        col_w = pw / 4
-        stats_t = Table([stat_header, stat_values], colWidths=[col_w] * 4)
-        stats_t.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), TEAL_PRIMARY),
-            ('TEXTCOLOR',  (0, 0), (-1, 0), WHITE),
-            ('BACKGROUND', (0, 1), (-1, 1), SLATE_100),
-            ('GRID',       (0, 0), (-1, -1), 0.5, SLATE_200),
-            ('ALIGN',      (0, 0), (-1, -1), 'CENTER'),
-            ('VALIGN',     (0, 0), (-1, -1), 'MIDDLE'),
-            ('TOPPADDING',    (0, 0), (-1, 0), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-            ('TOPPADDING',    (0, 1), (-1, 1), 10),
-            ('BOTTOMPADDING', (0, 1), (-1, 1), 10),
+    if brief and isinstance(brief, str) and brief.strip():
+        s_brief_title = ParagraphStyle(
+            'BriefTitle', fontName=fb, fontSize=13, alignment=TA_RIGHT,
+            textColor=WHITE, leading=20,
+        )
+        s_brief_body = ParagraphStyle(
+            'BriefBody', fontName=fn, fontSize=11, alignment=TA_RIGHT,
+            textColor=SLATE_700, leading=20, spaceBefore=2 * mm,
+        )
+        # Section header
+        brief_header = Table(
+            [[Paragraph(ar('ملخص ذكي'), s_brief_title)]],
+            colWidths=[pw],
+        )
+        brief_header.setStyle(TableStyle([
+            ('BACKGROUND',    (0, 0), (-1, -1), TEAL_PRIMARY),
+            ('ALIGN',         (0, 0), (-1, -1), 'CENTER'),
+            ('TOPPADDING',    (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
         ]))
-        elements.append(stats_t)
+        elements.append(brief_header)
+        # Brief content box
+        brief_paragraphs = []
+        for line in brief.strip().split('\n'):
+            line = line.strip()
+            if line:
+                brief_paragraphs.append(Paragraph(ar(line), s_brief_body))
+        if not brief_paragraphs:
+            brief_paragraphs.append(Paragraph(ar(brief.strip()), s_brief_body))
+        brief_box = Table(
+            [[p] for p in brief_paragraphs],
+            colWidths=[pw],
+        )
+        brief_box.setStyle(TableStyle([
+            ('BACKGROUND',    (0, 0), (-1, -1), colors.HexColor('#f0fdfa')),
+            ('BOX',           (0, 0), (-1, -1), 1, TEAL_LIGHT),
+            ('LEFTPADDING',   (0, 0), (-1, -1), 12),
+            ('RIGHTPADDING',  (0, 0), (-1, -1), 12),
+            ('TOPPADDING',    (0, 0), (0, 0), 10),
+            ('BOTTOMPADDING', (0, -1), (0, -1), 10),
+        ]))
+        elements.append(brief_box)
         elements.append(Spacer(1, 8 * mm))
 
     # ══════════════════════════════════════════════════════════════

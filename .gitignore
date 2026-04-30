@@ -16,6 +16,9 @@ venv/
 # Logs
 *.log
 
+# Runtime data
+feed_health.json
+
 # Node / frontend
 frontend-v2/node_modules/
 frontend-v2/dist/

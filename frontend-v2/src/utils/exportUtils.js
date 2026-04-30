@@ -175,14 +175,14 @@ export function buildReportHTML(articles, { title, stats, filters, keywords, cou
 // Max articles per PDF file
 export const PDF_MAX_ARTICLES = 50
 
-export async function generatePDFBlob(articles, apiFetch, { title, stats } = {}) {
+export async function generatePDFBlob(articles, apiFetch, { title, stats, brief } = {}) {
   // Enforce 50-article limit per PDF file
   const limited = articles.slice(0, PDF_MAX_ARTICLES)
   // Server-side PDF generation using reportlab (pure Python, guaranteed to work)
   const res = await apiFetch('/api/exports/generate-pdf', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ articles: limited, title, stats }),
+    body: JSON.stringify({ articles: limited, title, stats, brief }),
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))

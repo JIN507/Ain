@@ -170,7 +170,6 @@ body {
   }
   .sidebar-link.active {
     color: #5eead4;
-    background: var(--sidebar-active);
     font-weight: 600;
   }
 }
@@ -216,4 +215,75 @@ select.input {
   background-repeat: no-repeat;
   background-position: left 12px center;
   padding-left: 32px;
+}
+
+/* ── Map popups (dark theme) ─────────────────────────── */
+.map-hover-popup .maplibregl-popup-content {
+  background: rgba(15,23,42,0.92) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-radius: 10px !important;
+  padding: 10px 14px !important;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.06) !important;
+  border: none !important;
+}
+.map-hover-popup .maplibregl-popup-tip {
+  border-top-color: rgba(15,23,42,0.92) !important;
+  border-bottom-color: rgba(15,23,42,0.92) !important;
+}
+.maplibregl-ctrl-group {
+  background: rgba(15,23,42,0.85) !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  border-radius: 10px !important;
+  overflow: hidden;
+}
+.maplibregl-ctrl-group button {
+  border-color: rgba(255,255,255,0.06) !important;
+}
+.maplibregl-ctrl-group button span {
+  filter: invert(1) !important;
+}
+.maplibregl-ctrl-group button:hover {
+  background: rgba(255,255,255,0.08) !important;
+}
+
+/* Timeline slider */
+.timeline-slider {
+  background: transparent;
+}
+.timeline-slider::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.12);
+}
+.timeline-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #14b8a6;
+  border: 2px solid rgba(255,255,255,0.7);
+  margin-top: -5px;
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(20,184,166,0.5);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.timeline-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.25);
+  box-shadow: 0 0 14px rgba(20,184,166,0.7);
+}
+.timeline-slider::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.12);
+  border: none;
+}
+.timeline-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #14b8a6;
+  border: 2px solid rgba(255,255,255,0.7);
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(20,184,166,0.5);
 }

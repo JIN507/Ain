@@ -135,13 +135,14 @@ export default function HomePage() {
     return () => clearInterval(interval)
   }, [fetchData])
 
-  // Fetch timeline data
+  // Fetch timeline data — deferred until map is ready to avoid blocking initial render
   useEffect(() => {
+    if (!mapReady) return
     apiFetch('/api/home/map-timeline?days=30')
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) setTimeline(d) })
       .catch(() => {})
-  }, [])
+  }, [mapReady])
 
   // Play/pause auto-scrub
   useEffect(() => {

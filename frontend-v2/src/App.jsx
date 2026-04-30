@@ -1,21 +1,38 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, lazy, Suspense } from 'react'
 import { motion } from 'framer-motion'
 import { Menu, X } from 'lucide-react'
 import Sidebar from './components/Sidebar'
-import Dashboard from './pages/Dashboard'
-import DirectSearch from './pages/DirectSearch'
-import TopHeadlines from './pages/TopHeadlines'
-import Countries from './pages/Countries'
-import Keywords from './pages/Keywords'
-import Settings from './pages/Settings'
 import Login from './pages/Login'
 import Register from './pages/Register'
-import Admin from './pages/Admin'
-import MyFiles from './pages/MyFiles'
-import HomePage from './pages/HomePage'
-import Bookmarks from './pages/Bookmarks'
-import Profile from './pages/Profile'
 import { AuthProvider, useAuth } from './context/AuthContext'
+
+// Lazy-loaded pages — each becomes a separate JS chunk
+const HomePage = lazy(() => import('./pages/HomePage'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const DirectSearch = lazy(() => import('./pages/DirectSearch'))
+const TopHeadlines = lazy(() => import('./pages/TopHeadlines'))
+const Countries = lazy(() => import('./pages/Countries'))
+const Keywords = lazy(() => import('./pages/Keywords'))
+const Settings = lazy(() => import('./pages/Settings'))
+const Admin = lazy(() => import('./pages/Admin'))
+const MyFiles = lazy(() => import('./pages/MyFiles'))
+const Bookmarks = lazy(() => import('./pages/Bookmarks'))
+const Profile = lazy(() => import('./pages/Profile'))
+
+const PageLoader = () => (
+  <div className="flex items-center justify-center min-h-[40vh]">
+    <div className="flex flex-col items-center gap-3">
+      <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+        style={{ background: 'linear-gradient(135deg, #0f766e 0%, #14b8a6 100%)' }}>
+        <svg className="w-5 h-5 text-white animate-spin" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+        </svg>
+      </div>
+      <span className="text-xs text-slate-400 font-medium">جاري التحميل...</span>
+    </div>
+  </div>
+)
 
 function AppContent() {
   const [currentPage, setCurrentPage] = useState('home')
@@ -180,7 +197,9 @@ function AppContent() {
             transition={{ duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
             className={currentPage === 'home' ? 'p-3 md:p-4' : 'p-4 md:p-6'}
           >
-            {pages[currentPage]}
+            <Suspense fallback={<PageLoader />}>
+              {pages[currentPage]}
+            </Suspense>
           </motion.div>
         </main>
       </div>

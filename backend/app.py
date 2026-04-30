@@ -1060,28 +1060,33 @@ _MAP_CACHE_TTL = 1800  # 30 minutes in seconds
 
 
 def _build_map_cache():
-    """Build aggregated map data from ALL users' articles."""
+    """Build aggregated map data from ALL users' articles.
+    
+    Optimised: ~6 queries total instead of 30+ (eliminated N+1 country loop).
+    """
     db = get_db()
     try:
-        from sqlalchemy import func, or_, desc
+        from sqlalchemy import func, or_, desc, case, text as sa_text
 
-        # ---------- Deduplicate: count each unique URL only once ----------
-        # Total system articles (unique URLs)
-        total_articles = db.query(func.count(func.distinct(Article.url))).scalar() or 0
-
-        # Sentiment — deduplicate by URL via subquery (pick one row per URL)
+        # ── 1. Dedup base: one row per unique URL ───────────────────────
         dedup_sub = db.query(
             func.min(Article.id).label('id')
         ).group_by(Article.url).subquery()
-        dedup_base = db.query(Article).join(dedup_sub, Article.id == dedup_sub.c.id)
-        positive = dedup_base.filter(
-            or_(Article.sentiment_label == 'إيجابي', Article.sentiment == 'إيجابي')).count()
-        negative = dedup_base.filter(
-            or_(Article.sentiment_label == 'سلبي', Article.sentiment == 'سلبي')).count()
-        neutral = dedup_base.filter(
-            or_(Article.sentiment_label == 'محايد', Article.sentiment == 'محايد')).count()
 
-        # Articles per country (distinct URLs)
+        # ── 2. Total + sentiment counts in ONE query ────────────────────
+        sent_col = func.coalesce(Article.sentiment_label, Article.sentiment)
+        totals = db.query(
+            func.count(Article.id),
+            func.sum(case((sent_col == 'إيجابي', 1), else_=0)),
+            func.sum(case((sent_col == 'سلبي', 1), else_=0)),
+            func.sum(case((sent_col == 'محايد', 1), else_=0)),
+        ).join(dedup_sub, Article.id == dedup_sub.c.id).first()
+        total_articles = totals[0] or 0
+        positive = int(totals[1] or 0)
+        negative = int(totals[2] or 0)
+        neutral  = int(totals[3] or 0)
+
+        # ── 3. Articles per country (distinct URLs) ─────────────────────
         countries_q = db.query(
             Article.country, func.count(func.distinct(Article.url)).label('cnt')
         ).filter(
@@ -1089,7 +1094,7 @@ def _build_map_cache():
         ).group_by(Article.country).order_by(desc('cnt')).all()
         countries_data = [{'name': c, 'count': n} for c, n in countries_q]
 
-        # Top keywords system-wide (distinct URLs)
+        # ── 4. Top keywords (distinct URLs) ─────────────────────────────
         kw_q = db.query(
             Article.keyword_original, func.count(func.distinct(Article.url)).label('cnt')
         ).filter(
@@ -1097,14 +1102,11 @@ def _build_map_cache():
         ).group_by(Article.keyword_original).order_by(desc('cnt')).limit(15).all()
         top_keywords = [{'keyword': k, 'count': n} for k, n in kw_q]
 
-        # Unique countries
-        unique_countries = db.query(Article.country).filter(
-            Article.country.isnot(None), Article.country != '').distinct().count()
-
-        # Total active users with articles
+        # ── 5. Unique countries + active users ──────────────────────────
+        unique_countries = len(countries_data)
         active_users = db.query(Article.user_id).distinct().count()
 
-        # Top news sources (distinct URLs)
+        # ── 6. Top sources (distinct URLs) ──────────────────────────────
         src_q = db.query(
             Article.source_name, func.count(func.distinct(Article.url)).label('cnt')
         ).filter(
@@ -1112,29 +1114,39 @@ def _build_map_cache():
         ).group_by(Article.source_name).order_by(desc('cnt')).limit(10).all()
         top_sources = [{'name': s, 'count': n} for s, n in src_q]
 
-        # Recent top articles per country (latest 8 unique per country for panels)
-        top_country_articles = {}
-        for c_name, _ in countries_q:
-            # Subquery: pick the newest row for each distinct URL in this country
-            url_dedup = db.query(
-                func.max(Article.id).label('id')
-            ).filter(
-                Article.country == c_name
-            ).group_by(Article.url).order_by(desc('id')).limit(8).subquery()
-            articles = db.query(Article).join(
-                url_dedup, Article.id == url_dedup.c.id
-            ).order_by(Article.created_at.desc()).all()
-            top_country_articles[c_name] = [{
-                'id': a.id,
-                'title_ar': a.title_ar,
-                'summary_ar': a.summary_ar,
-                'source_name': a.source_name,
-                'sentiment': a.sentiment_label or a.sentiment,
-                'url': a.url,
-                'image_url': a.image_url,
-                'keyword': a.keyword_original,
-                'published_at': a.published_at.isoformat() if a.published_at else None,
-            } for a in articles]
+        # ── 7. Top articles per country — SINGLE query (no N+1 loop) ───
+        # Pick newest row per URL, then rank by country, take top 8 each
+        newest_per_url = db.query(
+            func.max(Article.id).label('id'),
+            Article.country.label('country'),
+        ).filter(
+            Article.country.isnot(None), Article.country != ''
+        ).group_by(Article.url, Article.country).subquery()
+
+        ranked = db.query(
+            Article,
+            newest_per_url.c.country.label('c_name'),
+        ).join(
+            newest_per_url, Article.id == newest_per_url.c.id
+        ).order_by(newest_per_url.c.country, Article.created_at.desc()).all()
+
+        # Group in Python — fast since data is already fetched
+        from collections import defaultdict
+        top_country_articles = defaultdict(list)
+        for art, c_name in ranked:
+            if len(top_country_articles[c_name]) >= 8:
+                continue
+            top_country_articles[c_name].append({
+                'id': art.id,
+                'title_ar': art.title_ar,
+                'summary_ar': art.summary_ar,
+                'source_name': art.source_name,
+                'sentiment': art.sentiment_label or art.sentiment,
+                'url': art.url,
+                'image_url': art.image_url,
+                'keyword': art.keyword_original,
+                'published_at': art.published_at.isoformat() if art.published_at else None,
+            })
 
         return {
             'total_articles': total_articles,
@@ -1146,7 +1158,7 @@ def _build_map_cache():
             'countries': countries_data,
             'top_keywords': top_keywords,
             'top_sources': top_sources,
-            'country_articles': top_country_articles,
+            'country_articles': dict(top_country_articles),
             'last_refresh': datetime.utcnow().isoformat(),
         }
     finally:
@@ -4151,7 +4163,34 @@ def auto_initialize():
                     print("[INIT] ✅ SQLite articles composite index created")
     except Exception as e:
         print(f"[INIT] ⚠️ Column migration note: {str(e)[:100]}")
-    
+
+    # ── Performance indexes for aggregation queries ──────────────────
+    try:
+        from sqlalchemy import text as _idx_text
+        with engine.connect() as conn:
+            _perf_indexes = [
+                ("ix_articles_country",         "articles", "country"),
+                ("ix_articles_url",             "articles", "url"),
+                ("ix_articles_source_name",     "articles", "source_name"),
+                ("ix_articles_keyword_original", "articles", "keyword_original"),
+                ("ix_articles_sentiment_label", "articles", "sentiment_label"),
+                ("ix_articles_created_at",      "articles", "created_at"),
+                ("ix_articles_country_url",     "articles", "country, url"),
+                ("ix_articles_country_created",  "articles", "country, created_at DESC"),
+            ]
+            created = 0
+            for idx_name, table, cols in _perf_indexes:
+                try:
+                    conn.execute(_idx_text(f"CREATE INDEX IF NOT EXISTS {idx_name} ON {table} ({cols})"))
+                    created += 1
+                except Exception:
+                    pass  # Index already exists or DB doesn't support IF NOT EXISTS
+            conn.commit()
+            if created:
+                print(f"[INIT] ✅ Ensured {created} performance indexes on articles table")
+    except Exception as e:
+        print(f"[INIT] ⚠️ Index creation note: {str(e)[:120]}")
+
     db = get_db()
     try:
         # Ensure system user exists (user_id=0 for global scheduler jobs)
@@ -4244,6 +4283,16 @@ def auto_initialize():
         print(f"[INIT] ⚠️ Could not auto-start scheduler: {e}")
     finally:
         db2.close()
+
+    # Pre-warm map cache in background so first user doesn't wait
+    def _warm_map_cache():
+        try:
+            _map_cache['data'] = _build_map_cache()
+            _map_cache['ts'] = datetime.utcnow()
+            print(f"[INIT] ✅ Map cache pre-warmed")
+        except Exception as e:
+            print(f"[INIT] ⚠️ Map cache warm-up failed: {e}")
+    _threading.Thread(target=_warm_map_cache, daemon=True).start()
 
 
 # Run auto-initialization when module loads (for Gunicorn)

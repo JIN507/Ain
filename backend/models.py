@@ -84,9 +84,9 @@ class Article(Base):
     id = Column(Integer, primary_key=True)
     
     # Source info
-    country = Column(String(100), nullable=False)
-    source_name = Column(String(200), nullable=False)
-    url = Column(String(2000), nullable=False)
+    country = Column(String(100), nullable=False, index=True)
+    source_name = Column(String(200), nullable=False, index=True)
+    url = Column(String(2000), nullable=False, index=True)
     
     # Original content
     title_original = Column(Text, nullable=False)
@@ -101,12 +101,12 @@ class Article(Base):
     
     # Keywords
     keyword = Column(String(200), nullable=True)  # OLD - deprecated but kept for compatibility
-    keyword_original = Column(String(200), nullable=True)  # NEW - Arabic keyword that matched
+    keyword_original = Column(String(200), nullable=True, index=True)  # NEW - Arabic keyword that matched
     keywords_translations = Column(Text, nullable=True)  # JSON of all translations
     
     # Sentiment
     sentiment = Column(String(50), nullable=True)  # OLD - deprecated but kept for compatibility
-    sentiment_label = Column(String(50), nullable=True)  # NEW - إيجابي / سلبي / محايد
+    sentiment_label = Column(String(50), nullable=True, index=True)  # NEW - إيجابي / سلبي / محايد
     sentiment_score = Column(String(20), nullable=True)  # Optional confidence score
     
     # Language (old column for compatibility)
@@ -115,7 +115,7 @@ class Article(Base):
     # Timestamps
     published_at = Column(DateTime, nullable=True)  # Article publish time
     fetched_at = Column(DateTime, default=datetime.utcnow)  # When we fetched it
-    created_at = Column(DateTime, default=datetime.utcnow)  # DB insert time
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)  # DB insert time
     user_id = Column(Integer, ForeignKey('users.id'), nullable=True, index=True)
 
 class AuditLog(Base):

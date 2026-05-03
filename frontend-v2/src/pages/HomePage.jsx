@@ -7,6 +7,18 @@ import { apiFetch } from '../apiClient'
 
 const REFRESH_INTERVAL = 30 * 60 * 1000 // 30 minutes
 
+// Normalize Arabic text: strip hamza variants, diacritics, tatweel
+const normalizeAr = (s) => {
+  if (!s) return ''
+  return s.normalize('NFC')
+    .replace(/[\u064B-\u065F\u0670]/g, '')  // diacritics
+    .replace(/[\u0640]/g, '')                 // tatweel
+    .replace(/[أإآٱ]/g, 'ا')                  // alef variants → plain alef
+    .replace(/ى/g, 'ي')                       // alef maksura → ya
+    .replace(/ة/g, 'ه')                       // ta marbuta → ha
+    .trim()
+}
+
 // Country metadata: coords, capital, flag
 const COUNTRY_META = {
   'السعودية':                   { coords: [45.0, 24.7],   capital: 'الرياض',     flag: '🇸🇦' },
@@ -65,6 +77,16 @@ const COUNTRY_META = {
   'المكسيك':                    { coords: [-102.5, 23.6], capital: 'مكسيكو',     flag: '🇲🇽' },
   'إندونيسيا':                  { coords: [113.9, -0.8],  capital: 'جاكرتا',     flag: '🇮🇩' },
   'ماليزيا':                    { coords: [101.7, 4.2],   capital: 'كوالالمبور', flag: '🇲🇾' },
+}
+
+// Build normalized lookup map for robust matching
+const _normalizedMetaMap = new Map()
+Object.keys(COUNTRY_META).forEach(k => {
+  _normalizedMetaMap.set(normalizeAr(k), COUNTRY_META[k])
+})
+const getCountryMeta = (name) => {
+  if (!name) return undefined
+  return COUNTRY_META[name] || _normalizedMetaMap.get(normalizeAr(name))
 }
 
 // Glossy iOS 26 card wrapper
@@ -162,9 +184,8 @@ export default function HomePage() {
     return () => { if (playInterval.current) clearInterval(playInterval.current) }
   }, [isPlaying, timeline])
 
-  // Initialize map
+  // Initialize map — start immediately (don't wait for API data)
   useEffect(() => {
-    if (loading) return
     if (!mapContainer.current || mapInstance.current) return
 
     const timer = setTimeout(() => {
@@ -187,11 +208,11 @@ export default function HomePage() {
       clearTimeout(timer)
       if (mapInstance.current) { mapInstance.current.remove(); mapInstance.current = null }
     }
-  }, [loading])
+  }, [])
 
   // Open country panel — use cache first, fallback to API
   const openCountryPanel = useCallback(async (countryName, articleCount) => {
-    setSelectedCountry({ name: countryName, count: articleCount, meta: COUNTRY_META[countryName] })
+    setSelectedCountry({ name: countryName, count: articleCount, meta: getCountryMeta(countryName) })
     setCountryBrief(null)
     const cached = stats?.country_articles?.[countryName]
     if (cached && cached.length > 0) {
@@ -255,10 +276,10 @@ export default function HomePage() {
 
     const maxCount = Math.max(...countriesForMap.map(c => c.count), 1)
     const features = countriesForMap
-      .filter(c => COUNTRY_META[c.name])
+      .filter(c => getCountryMeta(c.name))
       .map(c => ({
         type: 'Feature',
-        geometry: { type: 'Point', coordinates: COUNTRY_META[c.name].coords },
+        geometry: { type: 'Point', coordinates: getCountryMeta(c.name).coords },
         properties: { name: c.name, count: c.count, intensity: c.count / maxCount },
       }))
     const geojson = { type: 'FeatureCollection', features }
@@ -311,7 +332,7 @@ export default function HomePage() {
     const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 14, className: 'map-hover-popup' })
     map.on('mousemove', 'country-core', (e) => {
       const f = e.features[0]; if (!f) return
-      const meta = COUNTRY_META[f.properties.name]
+      const meta = getCountryMeta(f.properties.name)
       popup.setLngLat(e.lngLat).setHTML(`
         <div style="direction:rtl;text-align:right;font-family:Cairo,sans-serif;padding:2px 0;">
           <div style="font-size:13px;font-weight:700;color:#f1f5f9;">${meta?.flag || ''} ${f.properties.name}</div>
@@ -336,21 +357,6 @@ export default function HomePage() {
     { label: 'أخباري', value: userStats?.total_articles ?? 0, subtitle: `${userStats?.keyword_count ?? 0} كلمة مراقبة`, icon: TrendingUp, color: '#0f766e', bg: 'rgba(15,118,110,0.1)' },
   ]
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #0f766e 0%, #14b8a6 100%)' }}>
-            <svg className="w-5 h-5 text-white animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-            </svg>
-          </div>
-          <span className="text-sm text-slate-400">جاري التحميل...</span>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="space-y-4">
@@ -360,6 +366,16 @@ export default function HomePage() {
         style={{ border: '1px solid rgba(0,0,0,0.08)', boxShadow: '0 4px 24px rgba(0,0,0,0.1)' }}>
 
         <div ref={mapContainer} style={{ width: '100%', height: 'calc(100vh - 220px)', minHeight: '500px' }} />
+
+        {/* Data loading overlay — shown while API is still responding */}
+        {loading && (
+          <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+            <div className="flex flex-col items-center gap-2 px-5 py-4 rounded-2xl" style={{ background: 'rgba(15,23,42,0.8)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <Loader2 className="w-5 h-5 text-teal-400 animate-spin" />
+              <span className="text-xs text-slate-300 font-medium">جاري تحميل البيانات...</span>
+            </div>
+          </div>
+        )}
 
         {/* Legend */}
         <div className="absolute bottom-16 left-4 flex items-center gap-4 px-4 py-2.5 rounded-xl" style={{ background: 'rgba(15,23,42,0.85)', backdropFilter: 'blur(8px)' }}>
@@ -682,7 +698,7 @@ export default function HomePage() {
           <h2 className="text-sm font-bold text-slate-800 mb-4">توزيع الأخبار حسب الدولة</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
             {(showAllCountries ? stats.countries : stats.countries.slice(0, 18)).map((c, i) => {
-              const meta = COUNTRY_META[c.name]
+              const meta = getCountryMeta(c.name)
               return (
                 <button key={i} onClick={() => openCountryPanel(c.name, c.count)}
                   className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-right transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer"

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Newspaper, Key, Globe, TrendingUp, X, ExternalLink, Loader2, Users, Sparkles, Rss, Play, Pause, Calendar, ChevronDown } from 'lucide-react'
+import { Newspaper, Key, Globe, TrendingUp, X, ExternalLink, Loader2, Users, Sparkles, Rss, ChevronDown } from 'lucide-react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { apiFetch } from '../apiClient'
@@ -131,11 +131,6 @@ export default function HomePage() {
   const [showAllKeywords, setShowAllKeywords] = useState(false)
   const [showAllCountries, setShowAllCountries] = useState(false)
 
-  // Timeline state
-  const [timeline, setTimeline] = useState(null)     // { days: [...], data: { country: [...counts] } }
-  const [timelineIdx, setTimelineIdx] = useState(-1)  // -1 = "all time" (default view)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const playInterval = useRef(null)
 
   const fetchData = useCallback(async () => {
     try {
@@ -158,31 +153,6 @@ export default function HomePage() {
     const interval = setInterval(fetchData, REFRESH_INTERVAL)
     return () => clearInterval(interval)
   }, [fetchData])
-
-  // Fetch timeline data — deferred until map is ready to avoid blocking initial render
-  useEffect(() => {
-    if (!mapReady) return
-    apiFetch('/api/home/map-timeline?days=30')
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d) setTimeline(d) })
-      .catch(() => {})
-  }, [mapReady])
-
-  // Play/pause auto-scrub
-  useEffect(() => {
-    if (isPlaying && timeline) {
-      playInterval.current = setInterval(() => {
-        setTimelineIdx(prev => {
-          const next = prev + 1
-          if (next >= timeline.days.length) { setIsPlaying(false); return -1 }
-          return next
-        })
-      }, 600)
-    } else {
-      if (playInterval.current) clearInterval(playInterval.current)
-    }
-    return () => { if (playInterval.current) clearInterval(playInterval.current) }
-  }, [isPlaying, timeline])
 
   // Initialize map — start immediately (don't wait for API data)
   useEffect(() => {
@@ -257,23 +227,12 @@ export default function HomePage() {
     }
   }, [])
 
-  // Build / update WebGL layers (reactive to timeline slider)
+  // Build / update WebGL layers
   useEffect(() => {
     if (!mapReady || !mapInstance.current || !stats?.countries?.length) return
     const map = mapInstance.current
 
-    // Compute countries data based on timeline position
-    let countriesForMap
-    if (timelineIdx >= 0 && timeline) {
-      // Specific day from timeline
-      countriesForMap = Object.entries(timeline.data)
-        .map(([name, counts]) => ({ name, count: counts[timelineIdx] || 0 }))
-        .filter(c => c.count > 0)
-    } else {
-      // All-time view (default)
-      countriesForMap = stats.countries
-    }
-
+    const countriesForMap = stats.countries
     const maxCount = Math.max(...countriesForMap.map(c => c.count), 1)
     const features = countriesForMap
       .filter(c => getCountryMeta(c.name))
@@ -347,7 +306,7 @@ export default function HomePage() {
       map.flyTo({ center: e.lngLat, zoom: Math.max(map.getZoom(), 4.5), duration: 800 })
     })
     layersAdded.current = true
-  }, [stats, mapReady, openCountryPanel, timelineIdx, timeline])
+  }, [stats, mapReady, openCountryPanel])
 
   // Derived data
   const statCards = [
@@ -388,57 +347,6 @@ export default function HomePage() {
           ))}
         </div>
 
-        {/* Timeline Slider */}
-        {timeline && timeline.days.length > 0 && (
-          <div className="absolute bottom-0 inset-x-0 px-4 py-3 flex items-center gap-3" dir="ltr"
-            style={{ background: 'linear-gradient(0deg, rgba(15,23,42,0.92) 0%, rgba(15,23,42,0.6) 70%, transparent 100%)', backdropFilter: 'blur(6px)' }}>
-            {/* Play / Pause */}
-            <button
-              onClick={() => {
-                if (!isPlaying && timelineIdx === -1) setTimelineIdx(0)
-                setIsPlaying(p => !p)
-              }}
-              className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-colors hover:bg-white/10"
-              style={{ background: 'rgba(20,184,166,0.25)', border: '1px solid rgba(20,184,166,0.4)' }}
-            >
-              {isPlaying
-                ? <Pause className="w-3.5 h-3.5 text-teal-300" />
-                : <Play className="w-3.5 h-3.5 text-teal-300 ml-0.5" />
-              }
-            </button>
-            {/* Date label */}
-            <div className="flex items-center gap-1.5 min-w-[110px] flex-shrink-0">
-              <Calendar className="w-3 h-3 text-slate-500" />
-              <span className="text-[11px] font-semibold text-slate-300 tabular-nums">
-                {timelineIdx >= 0
-                  ? new Date(timeline.days[timelineIdx]).toLocaleDateString('ar-EG', { month: 'short', day: 'numeric' })
-                  : 'الكل'
-                }
-              </span>
-            </div>
-            {/* Range slider */}
-            <input
-              type="range"
-              min={0}
-              max={timeline.days.length - 1}
-              value={timelineIdx >= 0 ? timelineIdx : timeline.days.length - 1}
-              onChange={e => { setTimelineIdx(parseInt(e.target.value)); setIsPlaying(false) }}
-              className="flex-1 h-1.5 rounded-full appearance-none cursor-pointer timeline-slider"
-              style={{ accentColor: '#14b8a6' }}
-            />
-            {/* Reset to all */}
-            <button
-              onClick={() => { setTimelineIdx(-1); setIsPlaying(false) }}
-              className={`text-[10px] px-2.5 py-1 rounded-full font-semibold transition-all ${
-                timelineIdx === -1
-                  ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30'
-                  : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
-              }`}
-            >
-              الكل
-            </button>
-          </div>
-        )}
 
         {/* ── Country Detail Panel (iOS 26 Glass) ── */}
         <AnimatePresence>

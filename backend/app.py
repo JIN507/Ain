@@ -1056,21 +1056,27 @@ def home_stats():
 
 # ── System-wide map data (all users aggregated, cached 30 min) ──────
 _map_cache = {'data': None, 'ts': None, 'lock': _threading.Lock()}
-_MAP_CACHE_TTL = 1800  # 30 minutes in seconds
+_MAP_CACHE_TTL = 300  # 5 minutes — shorter TTL since data is daily-scoped
 
 
 def _build_map_cache():
-    """Build aggregated map data from ALL users' articles.
+    """Build aggregated map data from ALL users' articles — TODAY only.
     
+    Resets at midnight UTC each day. Only shows articles created today.
     Optimised: ~6 queries total instead of 30+ (eliminated N+1 country loop).
     """
     db = get_db()
     try:
         from sqlalchemy import func, or_, desc, case, text as sa_text
 
-        # ── 1. Dedup base: one row per unique URL ───────────────────────
+        # ── 0. Today boundary (midnight UTC) ─────────────────────────────
+        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+
+        # ── 1. Dedup base: one row per unique URL (today only) ───────────
         dedup_sub = db.query(
             func.min(Article.id).label('id')
+        ).filter(
+            Article.created_at >= today_start
         ).group_by(Article.url).subquery()
 
         # ── 2. Total + sentiment counts in ONE query ────────────────────
@@ -1086,41 +1092,47 @@ def _build_map_cache():
         negative = int(totals[2] or 0)
         neutral  = int(totals[3] or 0)
 
-        # ── 3. Articles per country (distinct URLs) ─────────────────────
+        # ── 3. Articles per country (distinct URLs, today only) ────────
         countries_q = db.query(
             Article.country, func.count(func.distinct(Article.url)).label('cnt')
         ).filter(
-            Article.country.isnot(None), Article.country != ''
+            Article.country.isnot(None), Article.country != '',
+            Article.created_at >= today_start
         ).group_by(Article.country).order_by(desc('cnt')).all()
         countries_data = [{'name': c, 'count': n} for c, n in countries_q]
 
-        # ── 4. Top keywords (distinct URLs) ─────────────────────────────
+        # ── 4. Top keywords (distinct URLs, today only) ──────────────
         kw_q = db.query(
             Article.keyword_original, func.count(func.distinct(Article.url)).label('cnt')
         ).filter(
-            Article.keyword_original.isnot(None), Article.keyword_original != ''
+            Article.keyword_original.isnot(None), Article.keyword_original != '',
+            Article.created_at >= today_start
         ).group_by(Article.keyword_original).order_by(desc('cnt')).limit(15).all()
         top_keywords = [{'keyword': k, 'count': n} for k, n in kw_q]
 
-        # ── 5. Unique countries + active users ──────────────────────────
+        # ── 5. Unique countries + active users (today only) ──────────
         unique_countries = len(countries_data)
-        active_users = db.query(Article.user_id).distinct().count()
+        active_users = db.query(Article.user_id).filter(
+            Article.created_at >= today_start
+        ).distinct().count()
 
-        # ── 6. Top sources (distinct URLs) ──────────────────────────────
+        # ── 6. Top sources (distinct URLs, today only) ───────────────
         src_q = db.query(
             Article.source_name, func.count(func.distinct(Article.url)).label('cnt')
         ).filter(
-            Article.source_name.isnot(None), Article.source_name != ''
+            Article.source_name.isnot(None), Article.source_name != '',
+            Article.created_at >= today_start
         ).group_by(Article.source_name).order_by(desc('cnt')).limit(10).all()
         top_sources = [{'name': s, 'count': n} for s, n in src_q]
 
-        # ── 7. Top articles per country — SINGLE query (no N+1 loop) ───
+        # ── 7. Top articles per country — today only, SINGLE query ────
         # Pick newest row per URL, then rank by country, take top 8 each
         newest_per_url = db.query(
             func.max(Article.id).label('id'),
             Article.country.label('country'),
         ).filter(
-            Article.country.isnot(None), Article.country != ''
+            Article.country.isnot(None), Article.country != '',
+            Article.created_at >= today_start
         ).group_by(Article.url, Article.country).subquery()
 
         ranked = db.query(
@@ -1160,6 +1172,7 @@ def _build_map_cache():
             'top_sources': top_sources,
             'country_articles': dict(top_country_articles),
             'last_refresh': datetime.utcnow().isoformat(),
+            'date': today_start.strftime('%Y-%m-%d'),
         }
     finally:
         db.close()
@@ -1168,12 +1181,16 @@ def _build_map_cache():
 @app.route('/api/home/map-data', methods=['GET'])
 @login_required
 def home_map_data():
-    """System-wide aggregated map data. Cached for 30 minutes."""
+    """System-wide aggregated map data — today only. Cached 5 min, auto-resets at midnight."""
     now = datetime.utcnow()
     force = request.args.get('force') == '1'
 
     with _map_cache['lock']:
+        # Invalidate if: forced, no cache, TTL expired, OR day changed
+        day_changed = (_map_cache['ts'] is not None
+                       and _map_cache['ts'].date() != now.date())
         if (force or _map_cache['data'] is None or _map_cache['ts'] is None
+                or day_changed
                 or (now - _map_cache['ts']).total_seconds() > _MAP_CACHE_TTL):
             _map_cache['data'] = _build_map_cache()
             _map_cache['ts'] = now

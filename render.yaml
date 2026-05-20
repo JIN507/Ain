@@ -3,7 +3,21 @@ services:
     name: ain-news-monitor
     runtime: python
     buildCommand: |
-      cd frontend-v2 && npm ci && npm run build && mkdir -p ../backend/static && cp -r dist/* ../backend/static/
+      set -e
+      echo "=== Building frontend ==="
+      cd frontend-v2
+      npm ci
+      npm run build
+      echo "=== Frontend build output: ==="
+      ls -lh dist/ dist/assets/ | head -20
+      echo "=== Replacing backend/static (clean copy) ==="
+      rm -rf ../backend/static
+      mkdir -p ../backend/static
+      cp -r dist/. ../backend/static/
+      echo "=== Verifying static folder ==="
+      ls -lh ../backend/static/ ../backend/static/assets/ | head -20
+      test -f ../backend/static/index.html || (echo "FATAL: index.html missing after build!" && exit 1)
+      echo "=== Installing Python deps ==="
       cd ../backend && pip install -r requirements.txt
     startCommand: cd backend && gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 120
     envVars:

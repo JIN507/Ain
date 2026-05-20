@@ -2873,7 +2873,7 @@ def diagnose_feeds():
         db.close()
 
 @app.route('/api/feeds/quicktest', methods=['GET'])
-@admin_required
+@login_required
 def feeds_quicktest():
     """Run the SAME async fetcher the scheduler uses, but report per-source results.
 

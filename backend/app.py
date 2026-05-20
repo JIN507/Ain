@@ -2872,6 +2872,108 @@ def diagnose_feeds():
     finally:
         db.close()
 
+@app.route('/api/feeds/quicktest', methods=['GET'])
+@admin_required
+def feeds_quicktest():
+    """Run the SAME async fetcher the scheduler uses, but report per-source results.
+
+    Use this when the heatmap shows fewer countries than expected. It tells us
+    exactly which feeds Render's network can reach and which fail/timeout.
+
+    Query params:
+      country (optional) - test only sources whose country_name matches (Arabic).
+                           If omitted, tests 1 enabled source per country.
+      limit   (optional) - if country specified, max sources to test (default: all
+                           for that country). If country omitted, capped at 60.
+    """
+    from async_monitor_wrapper import fetch_feeds_sync
+    from collections import defaultdict
+    import time as _time
+
+    country_filter = (request.args.get('country') or '').strip()
+    try:
+        limit = int(request.args.get('limit', '0'))
+    except ValueError:
+        limit = 0
+
+    db = get_db()
+    try:
+        q = db.query(Source).filter(Source.enabled == True)
+        if country_filter:
+            q = q.filter(Source.country_name == country_filter)
+        all_sources = q.all()
+
+        if country_filter:
+            picked = all_sources[:limit] if limit > 0 else all_sources
+        else:
+            # One source per country, capped at 60 to keep runtime bounded
+            by_country = {}
+            for s in all_sources:
+                by_country.setdefault(s.country_name, s)
+            picked = list(by_country.values())
+            if limit <= 0:
+                limit = 60
+            picked = picked[:limit]
+
+        if not picked:
+            return jsonify({"error": "No matching enabled sources found", "country": country_filter}), 404
+
+        sources_payload = [{
+            'id': s.id,
+            'country_name': s.country_name,
+            'name': s.name,
+            'url': s.url,
+            'enabled': s.enabled,
+        } for s in picked]
+
+        t0 = _time.time()
+        results, articles = fetch_feeds_sync(sources_payload, max_concurrent=50)
+        elapsed = round(_time.time() - t0, 2)
+
+        # Aggregate per-country status
+        by_country_stats = defaultdict(lambda: {'tested': 0, 'ok': 0, 'timeout': 0, 'failed': 0, 'articles': 0})
+        per_source = []
+        for r in results:
+            country = r.get('country', '?')
+            status = r.get('status', 'unknown')
+            articles_count = r.get('articles', 0)
+            by_country_stats[country]['tested'] += 1
+            if status == 'success':
+                by_country_stats[country]['ok'] += 1
+            elif status == 'timeout':
+                by_country_stats[country]['timeout'] += 1
+            else:
+                by_country_stats[country]['failed'] += 1
+            by_country_stats[country]['articles'] += articles_count
+            per_source.append({
+                'country': country,
+                'source': r.get('source'),
+                'status': status,
+                'articles': articles_count,
+                'error': r.get('error'),
+            })
+
+        summary = {
+            'total_sources_tested': len(picked),
+            'total_articles_fetched': len(articles),
+            'elapsed_seconds': elapsed,
+            'countries_with_any_articles': sum(1 for c, s in by_country_stats.items() if s['articles'] > 0),
+            'success_count': sum(1 for r in results if r.get('status') == 'success'),
+            'timeout_count': sum(1 for r in results if r.get('status') == 'timeout'),
+            'failed_count': sum(1 for r in results if r.get('status') not in ('success', 'timeout')),
+        }
+
+        return jsonify({
+            'success': True,
+            'country_filter': country_filter or None,
+            'summary': summary,
+            'by_country': dict(by_country_stats),
+            'per_source': per_source,
+        })
+    finally:
+        db.close()
+
+
 @app.route('/api/feeds/selftest', methods=['GET'])
 @admin_required
 def selftest_feeds():

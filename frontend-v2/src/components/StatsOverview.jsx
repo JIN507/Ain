@@ -66,9 +66,15 @@ export default function StatsOverview({ stats, keywordCount = 0 }) {
         return
       }
       
-      const minutes = Math.floor(diff / 60000)
-      const seconds = Math.floor((diff % 60000) / 1000)
-      setCountdown(`${minutes}:${seconds.toString().padStart(2, '0')}`)
+      const totalSeconds = Math.floor(diff / 1000)
+      const hours = Math.floor(totalSeconds / 3600)
+      const minutes = Math.floor((totalSeconds % 3600) / 60)
+      const seconds = totalSeconds % 60
+      const mm = minutes.toString().padStart(2, '0')
+      const ss = seconds.toString().padStart(2, '0')
+      // Show H:MM:SS if more than an hour away (defensive — shouldn't normally happen
+      // since monitoring runs every 30 minutes).
+      setCountdown(hours > 0 ? `${hours}:${mm}:${ss}` : `${minutes}:${ss}`)
     }
 
     updateCountdown()

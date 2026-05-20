@@ -1,9 +1,16 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Newspaper, Key, Globe, TrendingUp, X, ExternalLink, Loader2, Users, Sparkles, Rss, ChevronDown } from 'lucide-react'
-import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { apiFetch } from '../apiClient'
+
+// MapLibre GL is heavy (~700KB). Load it dynamically so the rest of the page
+// (stat cards, country list) renders before the bundle finishes downloading.
+let _maplibrePromise = null
+const loadMaplibre = () => {
+  if (!_maplibrePromise) _maplibrePromise = import('maplibre-gl').then(m => m.default || m)
+  return _maplibrePromise
+}
 
 const REFRESH_INTERVAL = 30 * 60 * 1000 // 30 minutes
 
@@ -19,14 +26,13 @@ const normalizeAr = (s) => {
     .trim()
 }
 
-// Country metadata: coords, capital, flag
+// Country metadata: coords, capital, flag.
+// Note: variants like 'الامارات' (no hamza) or 'المملكة العربية السعودية' (full name)
+// are resolved automatically by the normalizer in getCountryMeta() — no need to list them here.
 const COUNTRY_META = {
-  'السعودية':                   { coords: [45.0, 24.7],   capital: 'الرياض',     flag: '🇸🇦' },
-  'المملكة العربية السعودية':   { coords: [45.0, 24.7],   capital: 'الرياض',     flag: '🇸🇦' },
+  // ── Arab world (الدول العربية) ─────────────────────────────────────
+  'السعودية':                   { coords: [45.0, 24.7],   capital: 'الرياض',     flag: '��' },
   'الإمارات':                   { coords: [54.0, 24.0],   capital: 'أبو ظبي',    flag: '🇦🇪' },
-  'الامارات':                   { coords: [54.0, 24.0],   capital: 'أبو ظبي',    flag: '🇦🇪' },
-  'الإمارات العربية المتحدة':   { coords: [54.0, 24.0],   capital: 'أبو ظبي',    flag: '🇦🇪' },
-  'الامارات العربية المتحدة':   { coords: [54.0, 24.0],   capital: 'أبو ظبي',    flag: '🇦🇪' },
   'مصر':                        { coords: [31.2, 30.0],   capital: 'القاهرة',    flag: '🇪🇬' },
   'العراق':                     { coords: [44.4, 33.3],   capital: 'بغداد',      flag: '🇮🇶' },
   'الأردن':                     { coords: [36.2, 31.9],   capital: 'عمّان',      flag: '🇯🇴' },
@@ -35,7 +41,6 @@ const COUNTRY_META = {
   'سوريا':                      { coords: [38.0, 35.0],   capital: 'دمشق',       flag: '🇸🇾' },
   'اليمن':                      { coords: [44.2, 15.5],   capital: 'صنعاء',      flag: '🇾🇪' },
   'عُمان':                      { coords: [57.5, 21.5],   capital: 'مسقط',       flag: '🇴🇲' },
-  'عمان':                       { coords: [57.5, 21.5],   capital: 'مسقط',       flag: '🇴🇲' },
   'الكويت':                     { coords: [47.5, 29.3],   capital: 'الكويت',     flag: '🇰🇼' },
   'قطر':                        { coords: [51.2, 25.3],   capital: 'الدوحة',     flag: '🇶🇦' },
   'البحرين':                    { coords: [50.5, 26.0],   capital: 'المنامة',    flag: '🇧🇭' },
@@ -48,35 +53,45 @@ const COUNTRY_META = {
   'الصومال':                    { coords: [46.2, 5.2],    capital: 'مقديشو',     flag: '🇸🇴' },
   'جيبوتي':                     { coords: [43.1, 11.6],   capital: 'جيبوتي',     flag: '🇩🇯' },
   'جزر القمر':                  { coords: [44.3, -12.2],  capital: 'موروني',     flag: '🇰🇲' },
+  // ── Middle East / Asia ────────────────────────────────────────────
   'تركيا':                      { coords: [35.2, 39.9],   capital: 'أنقرة',      flag: '🇹🇷' },
   'إيران':                      { coords: [53.7, 32.4],   capital: 'طهران',      flag: '🇮🇷' },
   'باكستان':                    { coords: [69.3, 30.4],   capital: 'إسلام آباد', flag: '🇵🇰' },
   'أفغانستان':                  { coords: [67.7, 33.9],   capital: 'كابول',      flag: '🇦🇫' },
   'الهند':                      { coords: [78.9, 20.6],   capital: 'نيودلهي',    flag: '🇮🇳' },
   'الصين':                      { coords: [104.2, 35.9],  capital: 'بكين',       flag: '🇨🇳' },
+  'اليابان':                    { coords: [138.3, 36.2],  capital: 'طوكيو',      flag: '��' },
+  'كوريا الجنوبية':             { coords: [127.8, 35.9],  capital: 'سيول',       flag: '��' },
+  'إندونيسيا':                  { coords: [113.9, -0.8],  capital: 'جاكرتا',     flag: '��' },
+  'ماليزيا':                    { coords: [101.7, 4.2],   capital: 'كوالالمبور', flag: '🇲🇾' },
+  'الفلبين':                    { coords: [121.8, 12.9],  capital: 'مانيلا',     flag: '��' },
+  'تايلاند':                    { coords: [100.9, 15.9],  capital: 'بانكوك',     flag: '��' },
+  'فيتنام':                     { coords: [108.3, 14.1],  capital: 'هانوي',      flag: '��' },
+  'سنغافورة':                   { coords: [103.8, 1.35],  capital: 'سنغافورة',   flag: '🇸🇬' },
+  'إسرائيل':                    { coords: [34.9, 31.0],   capital: 'تل أبيب',    flag: '��' },
+  // ── Europe & North America ────────────────────────────────────────
   'روسيا':                      { coords: [105.3, 61.5],  capital: 'موسكو',      flag: '🇷🇺' },
-  'الولايات المتحدة':           { coords: [-95.7, 37.1],  capital: 'واشنطن',     flag: '🇺🇸' },
-  'أمريكا':                     { coords: [-95.7, 37.1],  capital: 'واشنطن',     flag: '🇺🇸' },
-  'بريطانيا':                   { coords: [-3.4, 55.4],   capital: 'لندن',       flag: '🇬🇧' },
-  'المملكة المتحدة':            { coords: [-3.4, 55.4],   capital: 'لندن',       flag: '🇬🇧' },
-  'فرنسا':                      { coords: [2.2, 46.6],    capital: 'باريس',      flag: '🇫🇷' },
-  'ألمانيا':                    { coords: [10.4, 51.2],   capital: 'برلين',      flag: '🇩🇪' },
-  'إسبانيا':                    { coords: [-3.7, 40.5],   capital: 'مدريد',      flag: '🇪🇸' },
-  'إيطاليا':                    { coords: [12.6, 41.9],   capital: 'روما',       flag: '🇮🇹' },
-  'كندا':                       { coords: [-106.3, 56.1], capital: 'أوتاوا',     flag: '🇨🇦' },
-  'أستراليا':                   { coords: [133.8, -25.3], capital: 'كانبرا',     flag: '🇦🇺' },
-  'اليابان':                    { coords: [138.3, 36.2],  capital: 'طوكيو',      flag: '🇯🇵' },
-  'كوريا الجنوبية':             { coords: [127.8, 35.9],  capital: 'سيول',       flag: '🇰🇷' },
-  'إسرائيل':                    { coords: [34.9, 31.0],   capital: 'تل أبيب',    flag: '🇮🇱' },
+  'أمريكا':                     { coords: [-95.7, 37.1],  capital: 'واشنطن',     flag: '�🇸' },
+  'بريطانيا':                   { coords: [-3.4, 55.4],   capital: 'لندن',       flag: '��' },
+  'فرنسا':                      { coords: [2.2, 46.6],    capital: 'باريس',      flag: '��' },
+  'ألمانيا':                    { coords: [10.4, 51.2],   capital: 'برلين',      flag: '��' },
+  'إسبانيا':                    { coords: [-3.7, 40.5],   capital: 'مدريد',      flag: '��' },
+  'إيطاليا':                    { coords: [12.6, 41.9],   capital: 'روما',       flag: '��' },
+  'هولندا':                     { coords: [5.3, 52.1],    capital: 'أمستردام',   flag: '🇳🇱' },
+  'كندا':                       { coords: [-106.3, 56.1], capital: 'أوتاوا',     flag: '��' },
+  // ── Africa ────────────────────────────────────────────────────────
   'إثيوبيا':                    { coords: [40.5, 9.1],    capital: 'أديس أبابا', flag: '🇪🇹' },
   'كينيا':                      { coords: [37.9, -0.02],  capital: 'نيروبي',     flag: '🇰🇪' },
   'نيجيريا':                    { coords: [8.7, 9.1],     capital: 'أبوجا',      flag: '🇳🇬' },
   'جنوب أفريقيا':               { coords: [22.9, -30.6],  capital: 'بريتوريا',   flag: '🇿🇦' },
+  // ── Oceania & Latin America ───────────────────────────────────────
+  'أستراليا':                   { coords: [133.8, -25.3], capital: 'كانبرا',     flag: '🇦🇺' },
   'البرازيل':                   { coords: [-51.9, -14.2], capital: 'برازيليا',   flag: '🇧🇷' },
-  'الأرجنتين':                  { coords: [-63.6, -38.4], capital: 'بوينس آيرس',flag: '🇦🇷' },
+  'الأرجنتين':                  { coords: [-63.6, -38.4], capital: 'بوينس آيرس', flag: '🇦🇷' },
   'المكسيك':                    { coords: [-102.5, 23.6], capital: 'مكسيكو',     flag: '🇲🇽' },
-  'إندونيسيا':                  { coords: [113.9, -0.8],  capital: 'جاكرتا',     flag: '🇮🇩' },
-  'ماليزيا':                    { coords: [101.7, 4.2],   capital: 'كوالالمبور', flag: '🇲🇾' },
+  'تشيلي':                      { coords: [-71.5, -35.7], capital: 'سانتياغو',   flag: '��' },
+  'كولومبيا':                   { coords: [-74.3, 4.6],   capital: 'بوغوتا',     flag: '🇨🇴' },
+  'بيرو':                       { coords: [-75.0, -9.2],  capital: 'ليما',       flag: '��' },
 }
 
 // Build normalized lookup map for robust matching
@@ -113,6 +128,7 @@ const GlassCard = ({ children, className = '', style = {}, ...props }) => (
 export default function HomePage() {
   const mapContainer = useRef(null)
   const mapInstance = useRef(null)
+  const maplibreRef = useRef(null)
   const [stats, setStats] = useState(null)
   const [userStats, setUserStats] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -154,12 +170,14 @@ export default function HomePage() {
     return () => clearInterval(interval)
   }, [fetchData])
 
-  // Initialize map — start immediately (don't wait for API data)
+  // Initialize map — dynamically import maplibre so the rest of the page can paint first
   useEffect(() => {
     if (!mapContainer.current || mapInstance.current) return
+    let cancelled = false
 
-    const timer = setTimeout(() => {
-      if (!mapContainer.current || mapInstance.current) return
+    loadMaplibre().then((maplibregl) => {
+      if (cancelled || !mapContainer.current || mapInstance.current) return
+      maplibreRef.current = maplibregl
       const map = new maplibregl.Map({
         container: mapContainer.current,
         style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
@@ -172,10 +190,10 @@ export default function HomePage() {
       mapInstance.current = map
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left')
       map.on('load', () => setMapReady(true))
-    }, 80)
+    })
 
     return () => {
-      clearTimeout(timer)
+      cancelled = true
       if (mapInstance.current) { mapInstance.current.remove(); mapInstance.current = null }
     }
   }, [])
@@ -288,6 +306,7 @@ export default function HomePage() {
     // Hover
     map.on('mouseenter', 'country-core', () => { map.getCanvas().style.cursor = 'pointer' })
     map.on('mouseleave', 'country-core', () => { map.getCanvas().style.cursor = '' })
+    const maplibregl = maplibreRef.current
     const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 14, className: 'map-hover-popup' })
     map.on('mousemove', 'country-core', (e) => {
       const f = e.features[0]; if (!f) return

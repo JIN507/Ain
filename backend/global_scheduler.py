@@ -102,7 +102,10 @@ class GlobalMonitoringScheduler:
     def _calculate_next_run(self) -> Optional[str]:
         if not self._running or not self._last_run:
             return None
-        next_run = datetime.utcfromtimestamp(self._last_run.timestamp() + self._interval)
+        # `_last_run` is a naive UTC datetime (from datetime.utcnow()).
+        # Do NOT use .timestamp() here — it interprets naive datetimes as LOCAL
+        # time, which introduces a timezone-offset bug on non-UTC servers.
+        next_run = self._last_run + timedelta(seconds=self._interval)
         return next_run.isoformat() + 'Z'
     
     # ── Lifecycle ─────────────────────────────────────────────────────

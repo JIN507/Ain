@@ -59,7 +59,7 @@ if not _secret:
         raise RuntimeError('SECRET_KEY environment variable is required in production')
     import secrets as _sec
     _secret = _sec.token_urlsafe(32)
-    print('[APP] ⚠️ SECRET_KEY not set — using ephemeral dev secret')
+    print('[APP] WARNING: SECRET_KEY not set - using ephemeral dev secret')
 app.secret_key = _secret
 
 app.config.setdefault('SESSION_COOKIE_HTTPONLY', True)
@@ -1054,9 +1054,52 @@ def home_stats():
         db.close()
 
 
+# ── Country name canonicalization ───────────────────────────────────
+# Articles in DB may have variant spellings ('الإمارات' vs 'الامارات' vs full name).
+# This map merges them so the heatmap doesn't show the same country twice.
+# Keep keys in their NORMALIZED form (after _normalize_country_name).
+_COUNTRY_CANONICAL = {
+    # UAE
+    'الامارات': 'الإمارات',
+    'الامارات العربيه المتحده': 'الإمارات',
+    'الامارات العربيه المتحدة': 'الإمارات',
+    # Saudi Arabia
+    'المملكه العربيه السعوديه': 'السعودية',
+    'المملكة العربية السعودية': 'السعودية',
+    # USA
+    'الولايات المتحده': 'أمريكا',
+    'الولايات المتحدة': 'أمريكا',
+    'الولايات المتحده الامريكيه': 'أمريكا',
+    # UK
+    'المملكه المتحده': 'بريطانيا',
+    'المملكة المتحدة': 'بريطانيا',
+    # Oman (with/without diacritic)
+    'عمان': 'عُمان',
+}
+
+def _normalize_country_name(name):
+    """Normalize Arabic country name: strip diacritics, unify hamza/ya/ta-marbuta variants."""
+    if not name:
+        return name
+    import unicodedata, re as _re
+    s = unicodedata.normalize('NFC', name)
+    s = _re.sub(r'[\u064B-\u065F\u0670\u0640]', '', s)  # diacritics + tatweel
+    s = s.replace('أ', 'ا').replace('إ', 'ا').replace('آ', 'ا').replace('ٱ', 'ا')
+    s = s.replace('ى', 'ي').replace('ة', 'ه')
+    return s.strip()
+
+
+def _canonical_country(name):
+    """Return canonical name for a country, merging variant spellings."""
+    if not name:
+        return name
+    norm = _normalize_country_name(name)
+    return _COUNTRY_CANONICAL.get(norm, name)
+
+
 # ── System-wide map data (all users aggregated, cached 30 min) ──────
 _map_cache = {'data': None, 'ts': None, 'lock': _threading.Lock()}
-_MAP_CACHE_TTL = 300  # 5 minutes — shorter TTL since data is daily-scoped
+_MAP_CACHE_TTL = 900  # 15 minutes — data is daily-scoped and aggregated, browser also caches
 
 
 def _build_map_cache():
@@ -1093,13 +1136,23 @@ def _build_map_cache():
         neutral  = int(totals[3] or 0)
 
         # ── 3. Articles per country (distinct URLs, today only) ────────
+        # Exclude the 'دولي' (international) pseudo-country since it has no geo-location.
         countries_q = db.query(
             Article.country, func.count(func.distinct(Article.url)).label('cnt')
         ).filter(
             Article.country.isnot(None), Article.country != '',
+            Article.country != 'دولي',
             Article.created_at >= today_start
         ).group_by(Article.country).order_by(desc('cnt')).all()
-        countries_data = [{'name': c, 'count': n} for c, n in countries_q]
+        # Merge variant spellings into canonical names (e.g. الامارات → الإمارات).
+        _country_totals = {}
+        for c, n in countries_q:
+            canon = _canonical_country(c)
+            _country_totals[canon] = _country_totals.get(canon, 0) + n
+        countries_data = sorted(
+            [{'name': c, 'count': n} for c, n in _country_totals.items()],
+            key=lambda x: x['count'], reverse=True,
+        )
 
         # ── 4. Top keywords (distinct URLs, today only) ──────────────
         kw_q = db.query(
@@ -1132,6 +1185,7 @@ def _build_map_cache():
             Article.country.label('country'),
         ).filter(
             Article.country.isnot(None), Article.country != '',
+            Article.country != 'دولي',
             Article.created_at >= today_start
         ).group_by(Article.url, Article.country).subquery()
 
@@ -1142,13 +1196,15 @@ def _build_map_cache():
             newest_per_url, Article.id == newest_per_url.c.id
         ).order_by(newest_per_url.c.country, Article.created_at.desc()).all()
 
-        # Group in Python — fast since data is already fetched
+        # Group in Python — fast since data is already fetched.
+        # Use canonical country name so panel matches heatmap label.
         from collections import defaultdict
         top_country_articles = defaultdict(list)
         for art, c_name in ranked:
-            if len(top_country_articles[c_name]) >= 8:
+            canon = _canonical_country(c_name)
+            if len(top_country_articles[canon]) >= 8:
                 continue
-            top_country_articles[c_name].append({
+            top_country_articles[canon].append({
                 'id': art.id,
                 'title_ar': art.title_ar,
                 'summary_ar': art.summary_ar,
@@ -1178,24 +1234,60 @@ def _build_map_cache():
         db.close()
 
 
+_map_refresh_inflight = {'running': False}
+
+def _refresh_map_cache_async():
+    """Rebuild the map cache in a background thread. Safe to call multiple times."""
+    if _map_refresh_inflight['running']:
+        return
+    _map_refresh_inflight['running'] = True
+    def _run():
+        try:
+            data = _build_map_cache()
+            with _map_cache['lock']:
+                _map_cache['data'] = data
+                _map_cache['ts'] = datetime.utcnow()
+        except Exception as e:
+            print(f"[MAP] background refresh failed: {e}")
+        finally:
+            _map_refresh_inflight['running'] = False
+    _threading.Thread(target=_run, daemon=True).start()
+
+
 @app.route('/api/home/map-data', methods=['GET'])
 @login_required
 def home_map_data():
-    """System-wide aggregated map data — today only. Cached 5 min, auto-resets at midnight."""
+    """System-wide aggregated map data — today only. Cached 15 min, auto-resets at midnight.
+
+    Uses stale-while-revalidate: if cache exists but is stale, return it immediately
+    and trigger a background refresh, so users never wait for the rebuild.
+    """
     now = datetime.utcnow()
     force = request.args.get('force') == '1'
 
+    rebuild_now = False
     with _map_cache['lock']:
-        # Invalidate if: forced, no cache, TTL expired, OR day changed
         day_changed = (_map_cache['ts'] is not None
                        and _map_cache['ts'].date() != now.date())
-        if (force or _map_cache['data'] is None or _map_cache['ts'] is None
-                or day_changed
-                or (now - _map_cache['ts']).total_seconds() > _MAP_CACHE_TTL):
-            _map_cache['data'] = _build_map_cache()
-            _map_cache['ts'] = now
+        cache_age = (now - _map_cache['ts']).total_seconds() if _map_cache['ts'] else 1e9
+        cache_missing = _map_cache['data'] is None or _map_cache['ts'] is None
 
-    return jsonify(_map_cache['data'])
+        if force or cache_missing or day_changed:
+            # Must rebuild synchronously: no usable data available.
+            rebuild_now = True
+        elif cache_age > _MAP_CACHE_TTL:
+            # Cache stale but usable — kick off background refresh and return stale.
+            _refresh_map_cache_async()
+
+    if rebuild_now:
+        with _map_cache['lock']:
+            _map_cache['data'] = _build_map_cache()
+            _map_cache['ts'] = datetime.utcnow()
+
+    # Browser-side caching: aggregated data is safe to cache for a few minutes.
+    resp = jsonify(_map_cache['data'])
+    resp.headers['Cache-Control'] = 'private, max-age=180'
+    return resp
 
 
 @app.route('/api/home/map-timeline', methods=['GET'])
@@ -2413,12 +2505,6 @@ def get_articles_countries():
                     'name_ar': country,
                     'article_count': count
                 })
-        
-        # Log for debugging
-        if result:
-            print(f"📊 Found {len(result)} countries with articles:")
-            for c in result:
-                print(f"   • {c['name_ar']}: {c['article_count']} articles")
         
         return jsonify(result)
     finally:
@@ -4194,6 +4280,14 @@ def auto_initialize():
                 ("ix_articles_created_at",      "articles", "created_at"),
                 ("ix_articles_country_url",     "articles", "country, url"),
                 ("ix_articles_country_created",  "articles", "country, created_at DESC"),
+                # PERF: hot endpoints (/api/articles, /api/articles/countries, /api/home/*)
+                ("ix_articles_user_created",     "articles", "user_id, created_at DESC"),
+                ("ix_articles_user_country",     "articles", "user_id, country"),
+                ("ix_articles_created_url",      "articles", "created_at, url"),
+                ("ix_articles_created_country",  "articles", "created_at, country"),
+                ("ix_articles_created_keyword",  "articles", "created_at, keyword_original"),
+                ("ix_articles_created_source",   "articles", "created_at, source_name"),
+                ("ix_articles_user_keyword",     "articles", "user_id, keyword_original"),
             ]
             created = 0
             for idx_name, table, cols in _perf_indexes:

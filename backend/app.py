@@ -1377,8 +1377,18 @@ def load_user(user_id):
 
 @app.route('/')
 def index():
-    """Serve built frontend from the static folder (backend/static)."""
-    return send_from_directory('static', 'index.html')
+    """Serve built frontend from the static folder (backend/static).
+
+    IMPORTANT: index.html must NOT be cached, otherwise users get stale JS
+    bundle references after a deploy (Vite emits hashed asset filenames, but
+    only index.html knows the new hashes). Hashed /assets/* files are still
+    cached normally via Flask's SEND_FILE_MAX_AGE_DEFAULT.
+    """
+    resp = send_from_directory('static', 'index.html')
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
 
 @app.route('/health')
 def health_check():

@@ -2872,6 +2872,76 @@ def diagnose_feeds():
     finally:
         db.close()
 
+@app.route('/api/feeds/db-country-stats', methods=['GET'])
+@login_required
+def feeds_db_country_stats():
+    """All-time per-country article counts in the DB.
+
+    Diagnostic for "why does the heatmap only show 5 countries?". Compares
+    enabled-source countries vs countries that have EVER produced an article
+    in the DB. If Vietnam has 0 articles all-time, matching/saving has never
+    worked for it. If Vietnam has 100 articles last week but 0 today, the
+    bug started recently.
+
+    Returns:
+      enabled_source_countries: list of country names with enabled sources
+      article_countries: list of {country, total, today, last_seen} from articles table
+      missing_countries: countries that have enabled sources but ZERO articles ever
+    """
+    from sqlalchemy import func
+    db = get_db()
+    try:
+        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+
+        # All enabled source countries
+        src_countries_q = db.query(Source.country_name).filter(Source.enabled == True).distinct().all()
+        enabled_source_countries = sorted([c[0] for c in src_countries_q if c[0]])
+
+        # All-time article counts per country
+        all_time_q = db.query(
+            Article.country,
+            func.count(func.distinct(Article.url)).label('total'),
+            func.max(Article.created_at).label('last_seen'),
+        ).filter(
+            Article.country.isnot(None), Article.country != ''
+        ).group_by(Article.country).all()
+
+        # Today-only counts per country
+        today_q = db.query(
+            Article.country,
+            func.count(func.distinct(Article.url)).label('today'),
+        ).filter(
+            Article.country.isnot(None), Article.country != '',
+            Article.created_at >= today_start
+        ).group_by(Article.country).all()
+        today_map = {c: t for c, t in today_q}
+
+        article_countries = []
+        for country, total, last_seen in all_time_q:
+            article_countries.append({
+                'country': country,
+                'total_all_time': int(total or 0),
+                'today': int(today_map.get(country, 0)),
+                'last_seen': last_seen.isoformat() if last_seen else None,
+            })
+        article_countries.sort(key=lambda x: x['total_all_time'], reverse=True)
+
+        article_country_set = {c['country'] for c in article_countries}
+        missing_countries = sorted([c for c in enabled_source_countries if c not in article_country_set])
+
+        return jsonify({
+            'today_start_utc': today_start.isoformat(),
+            'enabled_source_countries_count': len(enabled_source_countries),
+            'enabled_source_countries': enabled_source_countries,
+            'article_countries_count': len(article_countries),
+            'article_countries': article_countries,
+            'missing_countries_count': len(missing_countries),
+            'missing_countries': missing_countries,
+        })
+    finally:
+        db.close()
+
+
 @app.route('/api/feeds/quicktest', methods=['GET'])
 @login_required
 def feeds_quicktest():

@@ -1103,23 +1103,39 @@ _MAP_CACHE_TTL = 900  # 15 minutes — data is daily-scoped and aggregated, brow
 
 
 def _build_map_cache():
-    """Build aggregated map data from ALL users' articles — TODAY only.
-    
-    Resets at midnight UTC each day. Only shows articles created today.
-    Optimised: ~6 queries total instead of 30+ (eliminated N+1 country loop).
+    """Build aggregated map data from ALL users' articles.
+
+    Anchored to today (UTC). If today has no articles yet (e.g. local app just
+    started, or scheduler hasn't run), falls back to the MOST RECENT UTC day
+    within the past 7 days that has articles. This makes the heatmap usable
+    immediately on startup instead of being empty.
     """
     db = get_db()
     try:
         from sqlalchemy import func, or_, desc, case, text as sa_text
 
-        # ── 0. Today boundary (midnight UTC) ─────────────────────────────
+        # ── 0. Effective day boundary ────────────────────────────────────
         today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        has_today = db.query(Article.id).filter(Article.created_at >= today_start).first() is not None
 
-        # ── 1. Dedup base: one row per unique URL (today only) ───────────
+        if has_today:
+            start_ts = today_start
+        else:
+            # Fall back to the most recent UTC day within the last 7 days
+            seven_days_ago = today_start - timedelta(days=7)
+            most_recent = db.query(func.max(Article.created_at)).filter(
+                Article.created_at >= seven_days_ago
+            ).scalar()
+            if most_recent:
+                start_ts = most_recent.replace(hour=0, minute=0, second=0, microsecond=0)
+            else:
+                start_ts = today_start  # No data in 7 days — result will be empty
+
+        # ── 1. Dedup base: one row per unique URL (effective day onwards) ─
         dedup_sub = db.query(
             func.min(Article.id).label('id')
         ).filter(
-            Article.created_at >= today_start
+            Article.created_at >= start_ts
         ).group_by(Article.url).subquery()
 
         # ── 2. Total + sentiment counts in ONE query ────────────────────
@@ -1142,7 +1158,7 @@ def _build_map_cache():
         ).filter(
             Article.country.isnot(None), Article.country != '',
             Article.country != 'دولي',
-            Article.created_at >= today_start
+            Article.created_at >= start_ts
         ).group_by(Article.country).order_by(desc('cnt')).all()
         # Merge variant spellings into canonical names (e.g. الامارات → الإمارات).
         _country_totals = {}
@@ -1159,14 +1175,14 @@ def _build_map_cache():
             Article.keyword_original, func.count(func.distinct(Article.url)).label('cnt')
         ).filter(
             Article.keyword_original.isnot(None), Article.keyword_original != '',
-            Article.created_at >= today_start
+            Article.created_at >= start_ts
         ).group_by(Article.keyword_original).order_by(desc('cnt')).limit(15).all()
         top_keywords = [{'keyword': k, 'count': n} for k, n in kw_q]
 
         # ── 5. Unique countries + active users (today only) ──────────
         unique_countries = len(countries_data)
         active_users = db.query(Article.user_id).filter(
-            Article.created_at >= today_start
+            Article.created_at >= start_ts
         ).distinct().count()
 
         # ── 6. Top sources (distinct URLs, today only) ───────────────
@@ -1174,7 +1190,7 @@ def _build_map_cache():
             Article.source_name, func.count(func.distinct(Article.url)).label('cnt')
         ).filter(
             Article.source_name.isnot(None), Article.source_name != '',
-            Article.created_at >= today_start
+            Article.created_at >= start_ts
         ).group_by(Article.source_name).order_by(desc('cnt')).limit(10).all()
         top_sources = [{'name': s, 'count': n} for s, n in src_q]
 
@@ -1186,7 +1202,7 @@ def _build_map_cache():
         ).filter(
             Article.country.isnot(None), Article.country != '',
             Article.country != 'دولي',
-            Article.created_at >= today_start
+            Article.created_at >= start_ts
         ).group_by(Article.url, Article.country).subquery()
 
         ranked = db.query(
@@ -1228,7 +1244,7 @@ def _build_map_cache():
             'top_sources': top_sources,
             'country_articles': dict(top_country_articles),
             'last_refresh': datetime.utcnow().isoformat(),
-            'date': today_start.strftime('%Y-%m-%d'),
+            'date': start_ts.strftime('%Y-%m-%d'),
         }
     finally:
         db.close()

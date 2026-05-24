@@ -265,17 +265,38 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
     setResetting(true)
     setResetResult(null)
 
+    // Hard timeout safety net so the spinner can never run forever even
+    // if the network/proxy hangs. The backend itself completes in <30s for
+    // 30k rows, so 5 minutes is generous.
+    const controller = new AbortController()
+    const hardTimeout = setTimeout(() => controller.abort(), 5 * 60 * 1000)
+
     try {
-      const res = await apiFetch('/api/articles/export-and-reset', { method: 'POST' })
-      
+      const res = await apiFetch('/api/articles/export-and-reset', {
+        method: 'POST',
+        signal: controller.signal,
+      })
+
       if (!res.ok) {
-        const error = await res.json()
-        throw new Error(error.error || 'فشل التصدير')
+        // Render's worker timeout returns an HTML error page, not JSON.
+        // Read as text first so we always get *some* useful message.
+        let msg = `فشل التصدير (HTTP ${res.status})`
+        try {
+          const text = await res.text()
+          try {
+            const json = JSON.parse(text)
+            msg = json.error || msg
+          } catch {
+            // Non-JSON body — use a short snippet
+            if (text) msg = `${msg}: ${text.slice(0, 200)}`
+          }
+        } catch {}
+        throw new Error(msg)
       }
 
       const data = await res.json()
       setResetResult(data)
-      
+
       // Download the file via apiFetch (ensures auth cookies are sent)
       if (data.download_url) {
         try {
@@ -290,6 +311,10 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
             a.click()
             a.remove()
             URL.revokeObjectURL(url)
+          } else {
+            // The server-side reset already succeeded; the file is safely
+            // stored in ملفاتي / Exports. Inform the user instead of failing.
+            console.warn('Download failed but export saved; user can retrieve from Files page.')
           }
         } catch (dlErr) {
           console.error('Download failed:', dlErr)
@@ -302,8 +327,12 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
 
     } catch (error) {
       console.error('Error exporting and resetting:', error)
-      setResetResult({ error: error.message })
+      const msg = error.name === 'AbortError'
+        ? 'انتهت مهلة العملية. حاول مرة أخرى.'
+        : (error.message || 'فشل التصدير')
+      setResetResult({ error: msg })
     } finally {
+      clearTimeout(hardTimeout)
       setResetting(false)
     }
   }

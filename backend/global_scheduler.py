@@ -420,16 +420,28 @@ class GlobalMonitoringScheduler:
             # Step 7: Save results per-user
             total_saved = 0
             user_save_counts: Dict[int, int] = {}
+            matched_by_country: Dict[str, int] = {}
+            saved_by_country: Dict[str, int] = {}
             
             if monitoring_result.get('success') and monitoring_result.get('matches'):
                 matches = monitoring_result['matches']
                 print(f"\n[GLOBAL-SCHED] {len(matches)} matches found - distributing to users...")
                 
-                total_saved, user_save_counts = self._save_matches_for_all_users(
+                # Per-country breakdown of matched articles (BEFORE save)
+                for _article, _source, _mks in matches:
+                    cn = _source.get('country_name') or 'unknown'
+                    matched_by_country[cn] = matched_by_country.get(cn, 0) + 1
+                
+                total_saved, user_save_counts, saved_by_country = self._save_matches_for_all_users(
                     db, matches, keyword_user_map
                 )
             
-            # Step 8: Build result summary
+            # Step 8: Build result summary (with per-country breakdowns for diagnostics)
+            sources_by_country: Dict[str, int] = {}
+            for s in sources_list:
+                cn = s.get('country_name') or 'unknown'
+                sources_by_country[cn] = sources_by_country.get(cn, 0) + 1
+
             result = {
                 "success": True,
                 "total_fetched": monitoring_result.get('total_fetched', 0),
@@ -437,6 +449,12 @@ class GlobalMonitoringScheduler:
                 "total_saved": total_saved,
                 "users_served": len(user_save_counts),
                 "per_user_saves": {str(k): v for k, v in user_save_counts.items()},
+                "sources_by_country": sources_by_country,
+                "matched_by_country": matched_by_country,
+                "saved_by_country": saved_by_country,
+                "countries_with_sources": len(sources_by_country),
+                "countries_with_matches": len(matched_by_country),
+                "countries_with_saves": len(saved_by_country),
                 "timestamp": datetime.now().isoformat()
             }
             
@@ -454,6 +472,18 @@ class GlobalMonitoringScheduler:
             print(f"   Saved:   {total_saved} total across {len(user_save_counts)} users")
             for uid, count in user_save_counts.items():
                 print(f"      User {uid}: {count} articles")
+            # Per-country drop diagnostic: where do articles vanish?
+            print(f"\n   📊 Country pipeline (sources -> matched -> saved):")
+            print(f"      Countries with sources: {len(sources_by_country)}")
+            print(f"      Countries with matches: {len(matched_by_country)}")
+            print(f"      Countries with saves:   {len(saved_by_country)}")
+            all_cs = set(sources_by_country) | set(matched_by_country) | set(saved_by_country)
+            for cn in sorted(all_cs):
+                src = sources_by_country.get(cn, 0)
+                mat = matched_by_country.get(cn, 0)
+                sav = saved_by_country.get(cn, 0)
+                marker = ' ⚠️' if (src > 0 and mat == 0) else ('' if sav > 0 else ' ⛔')
+                print(f"      {cn:30s} sources={src:3d}  matched={mat:5d}  saved={sav:5d}{marker}")
             print(f"{'='*60}\n")
             
         except Exception as e:
@@ -487,7 +517,7 @@ class GlobalMonitoringScheduler:
         db,
         matches: list,
         keyword_user_map: Dict[str, Set[int]]
-    ) -> Tuple[int, Dict[int, int]]:
+    ) -> Tuple[int, Dict[int, int], Dict[str, int]]:
         """
         Save matched articles to ALL users who have the matching keyword.
         
@@ -495,7 +525,7 @@ class GlobalMonitoringScheduler:
         1. Translate/prepare the article ONCE (expensive)
         2. Save to each user who has that keyword (cheap DB insert)
         
-        Returns: (total_saved, {user_id: count})
+        Returns: (total_saved, {user_id: count}, {country: count})
         """
         from models import Article
         from multilingual_matcher import detect_article_language
@@ -507,6 +537,8 @@ class GlobalMonitoringScheduler:
         user_save_counts: Dict[int, int] = {}
         user_duplicate_counts: Dict[int, int] = {}
         user_eligible_counts: Dict[int, int] = {}
+        saved_by_country: Dict[str, int] = {}
+        save_errors_by_country: Dict[str, int] = {}
         duplicates = 0
         
         # Apply save limit
@@ -623,9 +655,13 @@ class GlobalMonitoringScheduler:
                     db.commit()
                     total_saved += 1
                     user_save_counts[user_id] = user_save_counts.get(user_id, 0) + 1
+                    cn = source.get('country_name') or 'unknown'
+                    saved_by_country[cn] = saved_by_country.get(cn, 0) + 1
                 except Exception as e:
                     db.rollback()
-                    print(f"[GLOBAL-SCHED] ⚠️ Save error for user {user_id}: {str(e)[:80]}")
+                    cn = source.get('country_name') or 'unknown'
+                    save_errors_by_country[cn] = save_errors_by_country.get(cn, 0) + 1
+                    print(f"[GLOBAL-SCHED] ⚠️ Save error for user {user_id} ({cn}): {str(e)[:120]}")
         
         # Diagnostic summary
         print(f"\n[GLOBAL-SCHED] 📊 Save diagnostics:")
@@ -641,7 +677,9 @@ class GlobalMonitoringScheduler:
                 print(f"      User {uid}: {eligible} eligible → {dupes} duplicates, {saved} NEW saved")
         
         print(f"[GLOBAL-SCHED] Saved {total_saved} articles, skipped {duplicates} duplicates")
-        return total_saved, user_save_counts
+        if save_errors_by_country:
+            print(f"   ⚠️  Save errors by country: {save_errors_by_country}")
+        return total_saved, user_save_counts, saved_by_country
     
     @staticmethod
     def _parse_published_date(date_val) -> Optional[datetime]:

@@ -532,6 +532,7 @@ class GlobalMonitoringScheduler:
         from translation_cache import translate_article_to_arabic
         from async_monitor_wrapper import extract_all_match_contexts, translate_snippet_preserve_keyword
         from config import get_effective_save_limit, BALANCING_STRATEGY
+        from article_balancer import balance_articles, get_balancing_stats
         
         total_saved = 0
         user_save_counts: Dict[int, int] = {}
@@ -541,11 +542,24 @@ class GlobalMonitoringScheduler:
         save_errors_by_country: Dict[str, int] = {}
         duplicates = 0
         
-        # Apply save limit
+        # Apply save limit with BALANCING (was: naive matches[:limit] which
+        # silently dropped 30+ countries because the matches list is ordered
+        # by source processing order, concentrating early countries).
         limit = get_effective_save_limit()
-        if limit and len(matches) > limit:
-            print(f"[GLOBAL-SCHED] Applying save limit: {limit} (from {len(matches)} matches)")
-            matches = matches[:limit]
+        original_count = len(matches)
+        if limit and original_count > limit:
+            print(f"[GLOBAL-SCHED] ⚖️  Applying save limit: {limit} (from {original_count} matches)")
+            print(f"   Strategy: {BALANCING_STRATEGY}")
+            matches = balance_articles(matches, limit)
+            try:
+                stats = get_balancing_stats(original_count, matches)
+                print(f"   Balanced into {stats.get('num_groups', '?')} groups")
+            except Exception:
+                pass
+        elif limit:
+            print(f"[GLOBAL-SCHED] Saving {original_count} matches (under limit {limit})")
+        else:
+            print(f"[GLOBAL-SCHED] Saving all {original_count} matches (no limit)")
         
         # Log the keyword→user distribution
         all_user_ids = set()

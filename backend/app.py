@@ -1749,6 +1749,101 @@ def toggle_source(source_id):
     finally:
         db.close()
 
+
+@app.route('/api/admin/sources/bulk-import', methods=['POST'])
+@admin_required
+def bulk_import_sources():
+    """
+    Bulk import RSS sources from a CSV file.
+
+    Expected: multipart/form-data with a 'file' field.
+    CSV columns: country_name, source_url, source_name (header optional).
+
+    Returns a per-row report. Quality > speed:
+      - Each row is committed individually so a single bad row never
+        rolls back the others.
+      - Country names are translated via curated dictionary + Google
+        Translate fallback, then passed through _canonical_country()
+        to merge spelling variants.
+      - URL uniqueness enforced both within the file and against DB.
+    """
+    if 'file' not in request.files:
+        return jsonify({'error': 'لم يتم تحديد ملف'}), 400
+
+    f = request.files['file']
+    if not f or not f.filename:
+        return jsonify({'error': 'لم يتم تحديد ملف'}), 400
+
+    if not f.filename.lower().endswith('.csv'):
+        return jsonify({'error': 'الملف يجب أن يكون بصيغة CSV'}), 400
+
+    try:
+        file_bytes = f.read()
+        # 5 MB guard — way more than enough for 400 rows
+        if len(file_bytes) > 5 * 1024 * 1024:
+            return jsonify({'error': 'حجم الملف كبير جداً (الحد الأقصى 5 ميجابايت)'}), 400
+    except Exception as e:
+        return jsonify({'error': f'تعذّر قراءة الملف: {str(e)[:120]}'}), 400
+
+    from source_bulk_import import parse_csv_rows, import_rows
+
+    valid_rows, invalid_rows = parse_csv_rows(file_bytes)
+
+    db = get_db()
+    try:
+        result = import_rows(
+            db,
+            valid_rows,
+            canonicalizer=_canonical_country,
+            admin_user_id=getattr(current_user, 'id', None),
+            default_enabled=True,
+        )
+
+        # Merge parse-time invalid rows into the report
+        result['summary']['invalid_row'] += len(invalid_rows)
+        for inv in invalid_rows:
+            result['details'].append({
+                'row_num': inv['row_num'],
+                'country_raw': '',
+                'country_ar': '',
+                'url': '',
+                'name': '',
+                'outcome': 'invalid_row',
+                'translation_source': 'asis',
+                'message': inv['reason'],
+            })
+
+        # Sort details by row number for predictable UI display
+        result['details'].sort(key=lambda r: r.get('row_num', 0))
+
+        # Audit log
+        try:
+            log_action(
+                admin_id=getattr(current_user, 'id', None),
+                user_id=getattr(current_user, 'id', None),
+                action='bulk_import_sources',
+                meta={
+                    'filename': f.filename,
+                    'summary': result['summary'],
+                },
+            )
+        except Exception:
+            pass
+
+        # Invalidate map cache so newly added countries appear
+        try:
+            _map_cache['data'] = None
+        except Exception:
+            pass
+
+        return jsonify({'success': True, **result})
+    except Exception as e:
+        db.rollback()
+        return jsonify({'error': f'فشل الاستيراد: {str(e)[:200]}'}), 500
+    finally:
+        db.close()
+
+
 # ==================== Keywords ====================
 
 @app.route('/api/keywords', methods=['GET'])

@@ -153,10 +153,14 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
     return () => clearInterval(interval)
   }, [keywordsLoaded, keywords.length, monitorStatus?.executing])
 
-  // Load countries dynamically whenever articles change
+  // Load countries on mount and whenever filters change.
+  // PERF: Previously this depended on `articles`, causing a refetch on every
+  // pagination click (the country list doesn't change between pages of the
+  // same filter set). Depending on `filters` is correct and saves one
+  // network round-trip per page click.
   useEffect(() => {
     loadCountriesFromArticles()
-  }, [articles])
+  }, [filters])
 
   const loadArticles = async (page = currentPage) => {
     setLoading(true)

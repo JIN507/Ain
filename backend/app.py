@@ -997,58 +997,41 @@ def admin_stats():
 @app.route('/api/home/stats', methods=['GET'])
 @login_required
 def home_stats():
-    """Aggregated dashboard stats for the home page (current user only)."""
+    """Lightweight per-user stats for the home page header card.
+
+    PERF: Previously this endpoint ran 7 separate queries (total + 3
+    sentiment counts + distinct-country count + 2 GROUP BYs + 2 FK
+    counts), scanning the user's articles table multiple times. For
+    accounts with 30k+ articles that cost 2-4 seconds and BLOCKED the
+    heatmap from rendering, because the frontend awaited both this
+    endpoint and /api/home/map-data via Promise.all.
+
+    The HomePage only consumes two fields from this response:
+    `total_articles` and `keyword_count`. Everything else was computed
+    and discarded. We now return exactly those two — at most a single
+    fast index-only scan plus one tiny FK lookup.
+
+    Other consumers can use /api/articles/stats (which is also
+    consolidated) or /api/articles/countries for richer per-user data.
+    """
     db = get_db()
     try:
-        from sqlalchemy import func, or_, desc
+        from sqlalchemy import func
         uid = current_user.id
 
-        base = db.query(Article).filter(Article.user_id == uid)
+        # 1. Article count — single covered scan of ix_articles_user_created
+        total_articles = db.query(func.count(Article.id)).filter(
+            Article.user_id == uid
+        ).scalar() or 0
 
-        # Total articles
-        total_articles = base.count()
-
-        # Sentiment breakdown
-        positive = base.filter(or_(Article.sentiment_label == 'إيجابي', Article.sentiment == 'إيجابي')).count()
-        negative = base.filter(or_(Article.sentiment_label == 'سلبي', Article.sentiment == 'سلبي')).count()
-        neutral = base.filter(or_(Article.sentiment_label == 'محايد', Article.sentiment == 'محايد')).count()
-
-        # Articles per country
-        countries_q = db.query(
-            Article.country, func.count(Article.id).label('cnt')
-        ).filter(Article.user_id == uid, Article.country.isnot(None), Article.country != '').group_by(Article.country).order_by(desc('cnt')).all()
-        countries_data = [{'name': c, 'count': n} for c, n in countries_q]
-
-        # Top keywords by frequency (keyword_original field)
-        kw_q = db.query(
-            Article.keyword_original, func.count(Article.id).label('cnt')
-        ).filter(Article.user_id == uid, Article.keyword_original.isnot(None), Article.keyword_original != '').group_by(Article.keyword_original).order_by(desc('cnt')).limit(10).all()
-        top_keywords = [{'keyword': k, 'count': n} for k, n in kw_q]
-
-        # User keyword count
-        kw_count = db.query(Keyword).filter(Keyword.user_id == uid).count()
-
-        # Unique countries with results
-        unique_countries = db.query(Article.country).filter(Article.user_id == uid).distinct().count()
-
-        # Bookmarks count
-        bookmark_count = 0
-        try:
-            from models import Bookmark as BM
-            bookmark_count = db.query(BM).filter(BM.user_id == uid).count()
-        except Exception:
-            pass
+        # 2. Keyword count — small, FK-indexed
+        kw_count = db.query(func.count(Keyword.id)).filter(
+            Keyword.user_id == uid
+        ).scalar() or 0
 
         return jsonify({
-            'total_articles': total_articles,
-            'positive': positive,
-            'negative': negative,
-            'neutral': neutral,
-            'unique_countries': unique_countries,
-            'keyword_count': kw_count,
-            'bookmark_count': bookmark_count,
-            'countries': countries_data,
-            'top_keywords': top_keywords,
+            'total_articles': int(total_articles),
+            'keyword_count': int(kw_count),
         })
     finally:
         db.close()

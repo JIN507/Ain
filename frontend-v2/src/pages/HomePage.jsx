@@ -148,19 +148,25 @@ export default function HomePage() {
   const [showAllCountries, setShowAllCountries] = useState(false)
 
 
-  const fetchData = useCallback(async () => {
-    try {
-      const [mapRes, userRes] = await Promise.all([
-        apiFetch('/api/home/map-data'),
-        apiFetch('/api/home/stats'),
-      ])
-      if (mapRes.ok) setStats(await mapRes.json())
-      if (userRes.ok) setUserStats(await userRes.json())
-    } catch (err) {
-      console.error('Error fetching data:', err)
-    } finally {
-      setLoading(false)
-    }
+  // PERF: Heatmap and per-user stats are fetched independently so a slow
+  // /api/home/stats response (e.g. for an account with 30k+ articles)
+  // never blocks the heatmap from rendering. The map data is globally
+  // cached server-side and arrives in tens of milliseconds; we lift the
+  // loading state as soon as it lands. The personal "أخباري" card
+  // populates a heartbeat later once /api/home/stats resolves.
+  const fetchData = useCallback(() => {
+    // 1. Map / heatmap — unblock the page as soon as this returns
+    apiFetch('/api/home/map-data')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (d) setStats(d) })
+      .catch(err => console.error('Error fetching map data:', err))
+      .finally(() => setLoading(false))
+
+    // 2. Per-user stats — populate independently, never blocks the heatmap
+    apiFetch('/api/home/stats')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (d) setUserStats(d) })
+      .catch(err => console.error('Error fetching user stats:', err))
   }, [])
 
   // Initial fetch + 30 min auto-refresh

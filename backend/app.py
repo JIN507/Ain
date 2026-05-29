@@ -236,37 +236,134 @@ def log_action(user_id=None, admin_id=None, action="", meta=None):
 @app.route('/api/admin/audit', methods=['GET'])
 @admin_required
 def admin_audit_logs():
-    """Return recent audit log entries for admins.
+    """Return recent audit log entries for the admin activity-log view.
 
-    Optional query params:
-      - user_id: filter by user
-      - limit: max number of rows (default 50)
+    Supports pagination, user search, and action-category filtering so a
+    busy panel stays responsive.
+
+    Query params:
+      - page          : 1-indexed page number (default 1)
+      - per_page      : entries per page (default 30, max 200)
+      - user_id       : filter by exact user_id
+      - q             : free-text search; matches user name or email
+                        (case-insensitive)
+      - category      : one of 'auth', 'keywords', 'exports', 'admin'
+                        (matches a curated set of action names)
+      - action        : exact action string (overrides category)
+
+    Response:
+      { logs: [...], total, page, per_page, total_pages }
+
+    Each log entry embeds the actor's name + email so the frontend can
+    render Arabic sentences without a second round-trip.
     """
-    user_id = request.args.get('user_id', type=int)
-    limit = request.args.get('limit', default=50, type=int)
-    limit = max(1, min(limit, 200))
-
     db = get_db()
     try:
-        query = db.query(AuditLog).order_by(AuditLog.created_at.desc())
+        # ── Pagination & filters ────────────────────────────────────
+        page = max(1, request.args.get('page', default=1, type=int))
+        per_page = request.args.get('per_page', default=30, type=int)
+        per_page = max(1, min(per_page, 200))
+
+        user_id = request.args.get('user_id', type=int)
+        q = (request.args.get('q') or '').strip()
+        category = (request.args.get('category') or '').strip().lower()
+        action = (request.args.get('action') or '').strip()
+
+        # Action categories — kept in sync with frontend filter pills.
+        CATEGORY_ACTIONS = {
+            'auth':     ['login', 'logout', 'change_password', 'update_name'],
+            'keywords': ['add_keyword', 'delete_keyword'],
+            'exports':  ['export_pdf', 'export_xlsx', 'export_and_reset',
+                         'bulk_import_sources'],
+            'admin':    ['admin_create_user', 'admin_update_user',
+                         'admin_delete_user'],
+        }
+
+        query = db.query(AuditLog)
+
         if user_id:
-            query = query.filter(AuditLog.user_id == user_id)
-        logs = query.limit(limit).all()
+            query = query.filter(
+                (AuditLog.user_id == user_id) | (AuditLog.admin_id == user_id)
+            )
+
+        if action:
+            query = query.filter(AuditLog.action == action)
+        elif category in CATEGORY_ACTIONS:
+            query = query.filter(AuditLog.action.in_(CATEGORY_ACTIONS[category]))
+
+        if q:
+            # Match by user name or email. Resolve to user IDs first so
+            # we can index-scan the audit_log table.
+            like = f"%{q.lower()}%"
+            matching_users = db.query(User.id).filter(
+                (User.email.ilike(like)) | (User.name.ilike(like))
+            ).all()
+            ids = [u[0] for u in matching_users]
+            if not ids:
+                # No user matched — short-circuit to an empty page.
+                return jsonify({
+                    'logs': [], 'total': 0, 'page': 1,
+                    'per_page': per_page, 'total_pages': 1,
+                })
+            query = query.filter(
+                (AuditLog.user_id.in_(ids)) | (AuditLog.admin_id.in_(ids))
+            )
+
+        # ── Count + page slice ──────────────────────────────────────
+        total = query.count()
+        total_pages = max(1, (total + per_page - 1) // per_page)
+        if page > total_pages:
+            page = total_pages
+        offset = (page - 1) * per_page
+
+        rows = (query.order_by(AuditLog.created_at.desc())
+                     .offset(offset).limit(per_page).all())
+
+        # ── Resolve actor user info for every row in one query ──────
+        actor_ids = set()
+        for r in rows:
+            if r.user_id:
+                actor_ids.add(r.user_id)
+            if r.admin_id:
+                actor_ids.add(r.admin_id)
+
+        users_lookup = {}
+        if actor_ids:
+            for u in db.query(User.id, User.name, User.email).filter(
+                User.id.in_(actor_ids)
+            ).all():
+                users_lookup[u.id] = {'name': u.name, 'email': u.email}
+
+        def _user_blob(uid):
+            if not uid:
+                return None
+            info = users_lookup.get(uid)
+            if not info:
+                return {'id': uid, 'name': None, 'email': None}
+            return {'id': uid, 'name': info['name'], 'email': info['email']}
+
         result = []
-        for row in logs:
+        for row in rows:
             try:
                 meta = json.loads(row.meta_json) if row.meta_json else None
             except Exception:
                 meta = row.meta_json
             result.append({
                 'id': row.id,
-                'user_id': row.user_id,
-                'admin_id': row.admin_id,
                 'action': row.action,
                 'meta': meta,
                 'created_at': row.created_at.isoformat() if row.created_at else None,
+                'user': _user_blob(row.user_id),
+                'admin': _user_blob(row.admin_id),
             })
-        return jsonify(result)
+
+        return jsonify({
+            'logs': result,
+            'total': total,
+            'page': page,
+            'per_page': per_page,
+            'total_pages': total_pages,
+        })
     finally:
         db.close()
 
@@ -409,9 +506,17 @@ def create_export_record():
         db.add(rec)
         db.commit()
         try:
-            log_action(user_id=current_user.id, action="export_pdf", meta={
+            # Distinguish PDF vs XLSX by filename extension so the activity
+            # log can render the right verb ("exported a PDF" vs "exported
+            # an Excel file"). source_type already names the page the
+            # export was triggered from (dashboard, top_headlines, etc.).
+            _ext = (rec.filename or '').lower().rsplit('.', 1)[-1] if rec.filename else ''
+            _action = 'export_xlsx' if _ext in ('xlsx', 'xls', 'csv') else 'export_pdf'
+            log_action(user_id=current_user.id, action=_action, meta={
                 'export_id': rec.id,
                 'article_count': article_count,
+                'filename': rec.filename,
+                'source_type': source_type,
             })
         except Exception:
             pass
@@ -745,21 +850,73 @@ def delete_search_history(history_id):
 @app.route('/api/admin/users', methods=['GET'])
 @admin_required
 def admin_list_users():
-    """List users with optional search by name/email (ADMIN only)."""
+    """List users (ADMIN only).
+
+    Backward-compatible response shape:
+      - When called WITHOUT pagination params, returns a bare list
+        (unchanged from before so older clients keep working).
+      - When called WITH page/per_page, returns
+        { users, total, page, per_page, total_pages } so the new
+        admin panel can render a paginated table.
+
+    Query params:
+      - q         : search by name or email (case-insensitive)
+      - page      : 1-indexed page number (triggers paginated response)
+      - per_page  : page size (default 20, max 200)
+
+    PERF: keyword_count and article_count used to be computed via a
+    per-user subquery inside a Python loop (N+1). We now compute them
+    in two GROUP BY queries and join in memory, which is dramatically
+    faster once the user count grows past a handful.
+    """
+    from sqlalchemy import func
+
     q = (request.args.get('q') or '').strip().lower()
+    page_arg = request.args.get('page', type=int)
+    paginated = page_arg is not None
+    page = max(1, page_arg or 1)
+    per_page = request.args.get('per_page', default=20, type=int)
+    per_page = max(1, min(per_page, 200))
+
     db = get_db()
     try:
-        query = db.query(User)
+        base = db.query(User)
         if q:
             like = f"%{q}%"
-            query = query.filter(
+            base = base.filter(
                 (User.email.ilike(like)) | (User.name.ilike(like))
             )
-        users = query.order_by(User.created_at.desc()).all()
+
+        if paginated:
+            total = base.count()
+            total_pages = max(1, (total + per_page - 1) // per_page)
+            if page > total_pages:
+                page = total_pages
+            users = (base.order_by(User.created_at.desc())
+                          .offset((page - 1) * per_page).limit(per_page).all())
+        else:
+            total = None
+            total_pages = None
+            users = base.order_by(User.created_at.desc()).all()
+
+        # ── Bulk-fetch counts in two queries instead of N+1 ──────────
+        user_ids = [u.id for u in users]
+        keyword_counts = {}
+        article_counts = {}
+        if user_ids:
+            for uid, cnt in db.query(
+                Keyword.user_id, func.count(Keyword.id)
+            ).filter(
+                Keyword.user_id.in_(user_ids), Keyword.enabled == True
+            ).group_by(Keyword.user_id).all():
+                keyword_counts[uid] = cnt
+            for uid, cnt in db.query(
+                Article.user_id, func.count(Article.id)
+            ).filter(Article.user_id.in_(user_ids)).group_by(Article.user_id).all():
+                article_counts[uid] = cnt
+
         result = []
         for u in users:
-            keyword_count = db.query(Keyword).filter(Keyword.user_id == u.id, Keyword.enabled == True).count()
-            article_count = db.query(Article).filter(Article.user_id == u.id).count()
             result.append({
                 'id': u.id,
                 'name': u.name,
@@ -767,8 +924,17 @@ def admin_list_users():
                 'role': u.role,
                 'is_active': u.is_active,
                 'created_at': u.created_at.isoformat() if u.created_at else None,
-                'keyword_count': keyword_count,
-                'article_count': article_count,
+                'keyword_count': int(keyword_counts.get(u.id, 0)),
+                'article_count': int(article_counts.get(u.id, 0)),
+            })
+
+        if paginated:
+            return jsonify({
+                'users': result,
+                'total': total,
+                'page': page,
+                'per_page': per_page,
+                'total_pages': total_pages,
             })
         return jsonify(result)
     finally:
@@ -1509,8 +1675,17 @@ def update_profile():
         user = db.query(User).filter(User.id == current_user.id).first()
         if not user:
             return jsonify({"error": "User not found"}), 404
+        old_name = user.name
         user.name = new_name
         db.commit()
+        try:
+            log_action(
+                user_id=user.id,
+                action='update_name',
+                meta={'old': old_name, 'new': new_name},
+            )
+        except Exception:
+            pass
         return jsonify({
             "success": True,
             "name": user.name,
@@ -1547,6 +1722,11 @@ def change_password():
         user.password_hash = hash_password(new_password)
         user.must_change_password = False
         db.commit()
+        try:
+            # Never log the password itself — only that the action happened.
+            log_action(user_id=user.id, action='change_password')
+        except Exception:
+            pass
         return jsonify({"success": True})
     finally:
         db.close()
@@ -2015,7 +2195,16 @@ def add_keyword():
             raise
         
         print(f"   ✅ Keyword saved to database (ID: {keyword.id})")
-        
+
+        try:
+            log_action(
+                user_id=user_id,
+                action='add_keyword',
+                meta={'keyword_id': keyword.id, 'text_ar': keyword_ar},
+            )
+        except Exception:
+            pass
+
         # Step 1.5: Check if other users have this keyword and copy their articles
         copied_count = copy_articles_from_shared_keyword(db, keyword_ar, user_id)
         if copied_count > 0:
@@ -2064,10 +2253,20 @@ def delete_keyword(keyword_id):
         
         if not keyword:
             return jsonify({"error": "Keyword not found"}), 404
-        
+
+        deleted_text_ar = keyword.text_ar
         db.delete(keyword)
         db.commit()
-        
+
+        try:
+            log_action(
+                user_id=getattr(current_user, 'id', None),
+                action='delete_keyword',
+                meta={'keyword_id': keyword_id, 'text_ar': deleted_text_ar},
+            )
+        except Exception:
+            pass
+
         # Check if there are any remaining enabled keywords for this user
         user_id = getattr(current_user, 'id', None)
         remaining_keywords = scoped(db.query(Keyword), Keyword, force_user_filter=True).filter(Keyword.enabled == True).count()

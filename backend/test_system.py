@@ -247,13 +247,8 @@ def test_external_headlines():
         warn(f"External headlines returned {r.status_code} (may need API key)")
 
 # ─── 14. Cleanup status ──────────────────────────────────────
-def test_cleanup_status():
-    r = session.get(f"{BASE}/api/system/cleanup-status")
-    if r.status_code == 200:
-        data = r.json()
-        ok(f"Cleanup status OK: days_remaining={data.get('days_remaining')}")
-    else:
-        fail(f"Cleanup status failed: {r.status_code}")
+# (Removed: /api/system/cleanup-status — the monthly auto-wipe was deleted;
+#  articles are now only ever reset via the per-user export-and-reset flow.)
 
 # ─── 15. Monitor start/stop ──────────────────────────────────
 def test_monitor_controls():
@@ -392,7 +387,6 @@ if __name__ == "__main__":
     test("11. Sources & Countries", test_sources_countries)
     test("12. Top Headlines", test_top_headlines)
     test("13. External Headlines", test_external_headlines)
-    test("14. Cleanup Status", test_cleanup_status)
     test("15. Monitor Controls (stop/start)", test_monitor_controls)
     test("16. Keyword Limit (max 5)", test_keyword_limit)
     test("17. User Profile", test_user_profile)

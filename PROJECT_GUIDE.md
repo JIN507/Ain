@@ -537,7 +537,6 @@ Uses `job_executor.py` (JobExecutor singleton):
 |---|---|---|---|
 | GET | `/health` | Public | Health check |
 | GET | `/api/health/translation` | Public | Test Google Translate |
-| GET | `/api/system/cleanup-status` | User | Monthly reset countdown |
 | GET | `/api/search-history` | User | Search history |
 | POST | `/api/search-history` | User | Record search |
 | DELETE | `/api/search-history/:id` | User | Delete search entry |
@@ -617,12 +616,14 @@ Uses `job_executor.py` (JobExecutor singleton):
 
 ## Data Lifecycle
 
-### Monthly Reset (1st of Every Month)
-- `check_and_run_cleanup()` runs on server startup
-- If today is the 1st: deletes **ALL articles** + old completed/failed monitor jobs
-- **Bookmarks survive** the reset (separate table)
-- Frontend shows warning banner 3 days before reset
-- Users can export before reset via `/api/articles/export-and-reset`
+### Data Retention Policy
+The server **never** deletes article data on its own. There is no
+monthly auto-wipe, no scheduled cleanup, and no startup-time reset.
+Article data is only ever removed when an authenticated user
+explicitly invokes the per-user export-and-reset flow on their own
+account (`/api/articles/export-and-reset`). Admin user deletion via
+`/api/admin/users/:id` also cascades to that user's articles — that
+is the only other path that removes article rows.
 
 ### Export & Reset Flow
 1. Generates Excel file in memory (no filesystem)

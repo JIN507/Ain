@@ -4623,77 +4623,18 @@ def check_bookmarks():
 
 
 # =============================================================================
-# DATA LIFECYCLE MANAGEMENT - Monthly reset on the 1st of every month
-# =============================================================================
-
-def _next_first_of_month():
-    """Return the datetime for the 1st of the next month (00:00 UTC)."""
-    now = datetime.utcnow()
-    if now.month == 12:
-        return datetime(now.year + 1, 1, 1)
-    return datetime(now.year, now.month + 1, 1)
-
-def check_and_run_cleanup():
-    """Delete ALL articles and old monitor jobs on the 1st of every month.
-    Runs on server startup — if today is the 1st, wipe everything."""
-    from models import Article, MonitorJob
-    now = datetime.utcnow()
-    
-    if now.day != 1:
-        next_reset = _next_first_of_month()
-        days_left = (next_reset - now).days
-        print(f"[CLEANUP] ℹ️ Not the 1st — next reset in {days_left} days ({next_reset.strftime('%Y-%m-%d')})")
-        return False
-    
-    db = get_db()
-    try:
-        article_count = db.query(Article).count()
-        if article_count == 0:
-            print(f"[CLEANUP] ℹ️ Monthly reset day but no articles to delete")
-            return False
-        
-        db.query(Article).delete()
-        
-        job_count = db.query(MonitorJob).filter(
-            MonitorJob.status.in_(['SUCCEEDED', 'FAILED'])
-        ).delete(synchronize_session=False)
-        
-        db.commit()
-        print(f"[CLEANUP] 🗑️ Monthly reset: deleted {article_count} articles, {job_count} old jobs")
-        return True
-    except Exception as e:
-        print(f"[CLEANUP] ❌ Error: {e}")
-        db.rollback()
-        return False
-    finally:
-        db.close()
-
-@app.route('/api/system/cleanup-status', methods=['GET'])
-@login_required
-def get_cleanup_status():
-    """Get monthly reset status — days until the 1st of next month."""
-    db = get_db()
-    try:
-        user_article_count = db.query(Article).filter(
-            Article.user_id == current_user.id
-        ).count()
-        
-        now = datetime.utcnow()
-        next_reset = _next_first_of_month()
-        days_remaining = (next_reset - now).days
-        
-        # Show warning when 3 days or less until reset
-        show_warning = days_remaining <= 3 and user_article_count > 0
-        
-        return jsonify({
-            'days_remaining': days_remaining,
-            'show_warning': show_warning,
-            'next_reset': next_reset.strftime('%Y-%m-%d'),
-            'article_count': user_article_count
-        })
-    finally:
-        db.close()
-
+# DATA LIFECYCLE MANAGEMENT
+# -----------------------------------------------------------------------------
+# Previously this section housed a "monthly reset" that wiped ALL articles
+# across ALL users on server startup if the current UTC day was the 1st.
+# It was removed because (a) it ran on every restart that happened to be on
+# the 1st, repeatedly nuking new data, and (b) mass deletion that the server
+# performs on its own — without an explicit user request — is the wrong
+# product behavior.
+#
+# The ONLY supported way to delete article data is the per-user
+# "export and reset" flow (see /api/articles/export-and-reset), which an
+# authenticated user explicitly triggers for their own account.
 # =============================================================================
 
 def auto_initialize():
@@ -4945,9 +4886,11 @@ def auto_initialize():
     finally:
         db.close()
     
-    # Check and run monthly data reset (1st of every month)
-    check_and_run_cleanup()
-    
+    # Mass article deletion was intentionally removed.
+    # Articles are only ever deleted via the per-user "export and reset"
+    # flow that a user explicitly triggers from their own account.
+    # The server itself must never wipe anyone's data on startup.
+
     # Auto-start global scheduler if any user has keywords
     from global_scheduler import global_scheduler
     db2 = get_db()

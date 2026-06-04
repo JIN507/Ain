@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { ExternalLink, ThumbsUp, ThumbsDown, Minus, ChevronDown, ChevronUp, Bookmark, Loader2, BarChart3, Languages } from 'lucide-react'
+import { ExternalLink, ChevronDown, ChevronUp, Bookmark, Loader2, BarChart3, Languages } from 'lucide-react'
 import { apiFetch } from '../apiClient'
 
 export default function ArticleCard({ article, isBookmarked, onBookmark, onUnbookmark, bookmarkLoading, showTranslate, onTranslated }) {
@@ -60,15 +60,6 @@ export default function ArticleCard({ article, isBookmarked, onBookmark, onUnboo
     } catch (e) { console.error('Explain error:', e) }
     finally { setExplainLoading(false) }
   }
-  
-  const sentimentConfig = {
-    'إيجابي': { class: 'badge-positive', icon: ThumbsUp },
-    'سلبي': { class: 'badge-negative', icon: ThumbsDown },
-    'محايد': { class: 'badge-neutral', icon: Minus }
-  }
-
-  const config = sentimentConfig[article.sentiment] || sentimentConfig['محايد']
-  const SentimentIcon = config.icon
   
   // Use match context if available, otherwise use full summary
   const hasMatchContext = article.match_context && article.match_context.full_snippet_ar
@@ -185,42 +176,43 @@ export default function ArticleCard({ article, isBookmarked, onBookmark, onUnboo
           </div>
         )}
 
-        {/* Footer */}
-        <div className="flex items-center justify-between pt-3 mt-auto" style={{ borderTop: '1px solid rgba(0,0,0,0.05)' }}>
-          <div className="flex items-center gap-2">
-            <span className={`badge ${config.class} flex items-center gap-1`}>
-              <SentimentIcon className="w-3 h-3" />
-              {article.sentiment}
-            </span>
-            {/* حلل المشاعر — AI sentiment analysis relative to keyword */}
-            <button
-              onClick={explainSentiment}
-              disabled={explainLoading}
-              className="btn-ghost !px-1.5 !py-0.5 !text-[10px] !gap-0.5"
-              style={{ color: sentimentExplanation ? '#0f766e' : '#94a3b8' }}
-              title="حلل المشاعر بالذكاء الاصطناعي"
-            >
-              {explainLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <BarChart3 className="w-3 h-3" />}
-              حلل المشاعر
-            </button>
-            {showTranslate && (
-              <button
-                onClick={handleTranslate}
-                disabled={translating || translated}
-                className="btn-ghost !px-1.5 !py-0.5 !text-[10px] !gap-0.5"
-                style={{ color: translated ? '#0f766e' : '#6366f1' }}
-                title="ترجمة إلى العربية"
-              >
-                {translating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Languages className="w-3 h-3" />}
-                {translated ? 'تُرجم' : 'ترجم'}
-              </button>
-            )}
-            <span className="text-[11px] text-slate-400">
+        {/* Footer — fixed two-row layout so all cards stay perfectly aligned
+            regardless of which optional buttons (ترجم / المزيد) are present. */}
+        <div className="pt-3 mt-auto" style={{ borderTop: '1px solid rgba(0,0,0,0.05)' }}>
+          {/* Row 1: date + AI actions */}
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <span className="text-[11px] text-slate-400 flex-shrink-0">
               {article.published_at ? new Date(article.published_at).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: 'numeric' }) : ''}
             </span>
+            <div className="flex items-center gap-1.5">
+              {/* حلل المشاعر — AI sentiment analysis relative to keyword */}
+              <button
+                onClick={explainSentiment}
+                disabled={explainLoading}
+                className="btn-ghost !px-1.5 !py-0.5 !text-[10px] !gap-0.5"
+                style={{ color: sentimentExplanation ? '#0f766e' : '#94a3b8' }}
+                title="حلل المشاعر بالذكاء الاصطناعي"
+              >
+                {explainLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <BarChart3 className="w-3 h-3" />}
+                حلل المشاعر
+              </button>
+              {showTranslate && (
+                <button
+                  onClick={handleTranslate}
+                  disabled={translating || translated}
+                  className="btn-ghost !px-1.5 !py-0.5 !text-[10px] !gap-0.5"
+                  style={{ color: translated ? '#0f766e' : '#6366f1' }}
+                  title="ترجمة إلى العربية"
+                >
+                  {translating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Languages className="w-3 h-3" />}
+                  {translated ? 'تُرجم' : 'ترجم'}
+                </button>
+              )}
+            </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          {/* Row 2: navigation actions — always right-aligned & consistent */}
+          <div className="flex items-center justify-end gap-1.5">
             {/* Bookmark button */}
             {onBookmark && (
               <button
@@ -251,7 +243,7 @@ export default function ArticleCard({ article, isBookmarked, onBookmark, onUnboo
                 )}
               </button>
             )}
-            
+
             {/* Original article link */}
             <a
               href={article.url}

@@ -1,8 +1,20 @@
 import { Search, RefreshCw } from 'lucide-react'
+import SearchableSelect from './SearchableSelect'
 
 export default function FilterBar({ filters, setFilters, onReset, countries, keywords }) {
+  // Build option lists for the searchable selects.
+  const countryOptions = (countries || []).map(c => ({
+    value: c.name_ar,
+    label: c.name_ar,
+    count: c.article_count,
+  }))
+  const keywordOptions = (keywords || []).map(k => ({
+    value: k.text_ar,
+    label: k.text_ar,
+  }))
+
   return (
-    <div className="card p-4">
+    <div className="card p-4 relative z-40">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
         {/* Search */}
         <div className="relative lg:col-span-1">
@@ -16,33 +28,25 @@ export default function FilterBar({ filters, setFilters, onReset, countries, key
           />
         </div>
 
-        {/* Country */}
-        <select
+        {/* Country — searchable */}
+        <SearchableSelect
           value={filters.country || ''}
-          onChange={(e) => setFilters({ ...filters, country: e.target.value })}
-          className="input"
-        >
-          <option value="">جميع الدول ({countries?.length || 0})</option>
-          {countries && countries.map((country) => (
-            <option key={country.name_ar} value={country.name_ar}>
-              {country.name_ar} {country.article_count ? `(${country.article_count})` : ''}
-            </option>
-          ))}
-        </select>
+          onChange={(v) => setFilters({ ...filters, country: v })}
+          options={countryOptions}
+          placeholder={`جميع الدول (${countries?.length || 0})`}
+          allLabel="جميع الدول"
+          searchPlaceholder="ابحث عن دولة..."
+        />
 
-        {/* Keyword */}
-        <select
+        {/* Keyword — searchable */}
+        <SearchableSelect
           value={filters.keyword || ''}
-          onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
-          className="input"
-        >
-          <option value="">جميع الكلمات</option>
-          {keywords && keywords.map((keyword) => (
-            <option key={keyword.id} value={keyword.text_ar}>
-              {keyword.text_ar}
-            </option>
-          ))}
-        </select>
+          onChange={(v) => setFilters({ ...filters, keyword: v })}
+          options={keywordOptions}
+          placeholder="جميع الكلمات"
+          allLabel="جميع الكلمات"
+          searchPlaceholder="ابحث عن كلمة..."
+        />
 
         {/* Sort Order */}
         <select

@@ -18,6 +18,7 @@ const Admin = lazy(() => import('./pages/Admin'))
 const MyFiles = lazy(() => import('./pages/MyFiles'))
 const Bookmarks = lazy(() => import('./pages/Bookmarks'))
 const Profile = lazy(() => import('./pages/Profile'))
+const AinAI = lazy(() => import('./pages/AinAI'))
 
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-[40vh]">
@@ -61,6 +62,7 @@ function AppContent() {
     settings: <Settings />,
     admin: <Admin />,
     profile: <Profile onBack={() => setCurrentPage('dashboard')} />,
+    ainai: <AinAI />,
   }
 
   if (authLoading) {

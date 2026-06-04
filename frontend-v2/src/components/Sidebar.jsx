@@ -1,9 +1,10 @@
 import { motion } from 'framer-motion'
-import { Home, Globe, Key, Newspaper, Search, Activity, Shield, Eye, Bookmark, Map } from 'lucide-react'
+import { Home, Globe, Key, Newspaper, Search, Activity, Shield, Eye, Bookmark, Map, Sparkles } from 'lucide-react'
 
 export default function Sidebar({ currentPage, setCurrentPage, sidebarOpen, setSidebarOpen, isAdmin, collapsed = false }) {
   const navItems = [
     { id: 'home', label: 'الرئيسية', icon: Map },
+    { id: 'ainai', label: 'عين AI', icon: Sparkles },
     { id: 'dashboard', label: 'النتائج', icon: Home },
     { id: 'keywords', label: 'الكلمات والمراقبة', icon: Key },
     { id: 'directsearch', label: 'إبحث الآن', icon: Search },

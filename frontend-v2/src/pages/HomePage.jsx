@@ -141,6 +141,7 @@ export default function HomePage() {
   const [panelLoading, setPanelLoading] = useState(false)
   const [countryBrief, setCountryBrief] = useState(null)
   const [briefLoading, setBriefLoading] = useState(false)
+  const [briefCollapsed, setBriefCollapsed] = useState(false)
 
   // Show-more toggles
   const [showAllSources, setShowAllSources] = useState(false)
@@ -233,6 +234,7 @@ export default function HomePage() {
   const generateCountryBrief = useCallback(async (countryName) => {
     setBriefLoading(true)
     setCountryBrief(null)
+    setBriefCollapsed(false)
     try {
       const res = await apiFetch('/api/ai/country-brief', {
         method: 'POST',
@@ -319,7 +321,7 @@ export default function HomePage() {
       const meta = getCountryMeta(f.properties.name)
       popup.setLngLat(e.lngLat).setHTML(`
         <div style="direction:rtl;text-align:right;font-family:Cairo,sans-serif;padding:2px 0;">
-          <div style="font-size:13px;font-weight:700;color:#f1f5f9;">${meta?.flag || ''} ${f.properties.name}</div>
+          <div style="font-size:13px;font-weight:700;color:#f1f5f9;">${f.properties.name}</div>
           <div style="font-size:11px;color:#94a3b8;margin-top:2px;">${f.properties.count} خبر — انقر للتفاصيل</div>
         </div>`).addTo(map)
     })
@@ -395,7 +397,6 @@ export default function HomePage() {
               <div className="sticky top-0 z-10 px-5 pt-5 pb-4" style={{ background: 'rgba(15,23,42,0.97)' }}>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <span className="text-3xl">{selectedCountry.meta?.flag || '🌍'}</span>
                     <div>
                       <h3 className="text-lg font-bold text-white leading-tight">{selectedCountry.name}</h3>
                       <p className="text-[11px] text-slate-400 mt-0.5">العاصمة: {selectedCountry.meta?.capital || '—'}</p>
@@ -431,29 +432,52 @@ export default function HomePage() {
                   </button>
                 </div>
 
-                {/* AI Brief result */}
+              </div>
+
+              {/* Articles */}
+              <div className="px-5 pb-6 pt-2">
+                {/* AI Brief result — lives in scroll area so it can scroll away */}
                 <AnimatePresence>
                   {countryBrief && (
                     <motion.div
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: 'auto' }}
                       exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.3 }}
-                      className="mt-3">
+                      transition={{ duration: 0.25 }}
+                      className="mb-4 overflow-hidden">
                       <GlassCard className="p-4" style={{ background: 'linear-gradient(135deg, rgba(15,118,110,0.1) 0%, rgba(20,184,166,0.05) 100%)', border: '1px solid rgba(20,184,166,0.12)' }}>
-                        <div className="flex items-center gap-1.5 mb-2">
-                          <Sparkles className="w-3.5 h-3.5 text-teal-400" />
-                          <span className="text-[11px] font-bold text-teal-400">ملخص ذكي — {selectedCountry.name}</span>
-                        </div>
-                        <p className="text-[12px] text-slate-300 leading-relaxed whitespace-pre-line">{countryBrief}</p>
+                        <button
+                          onClick={() => setBriefCollapsed(c => !c)}
+                          className="w-full flex items-center justify-between gap-2 text-right"
+                          title={briefCollapsed ? 'إظهار الملخص' : 'إخفاء الملخص'}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5 text-teal-400" />
+                            <span className="text-[11px] font-bold text-teal-400">ملخص ذكي — {selectedCountry.name}</span>
+                          </div>
+                          <ChevronDown
+                            className="w-4 h-4 text-teal-400/70 transition-transform duration-200"
+                            style={{ transform: briefCollapsed ? 'rotate(0deg)' : 'rotate(180deg)' }}
+                          />
+                        </button>
+                        <AnimatePresence initial={false}>
+                          {!briefCollapsed && (
+                            <motion.p
+                              key="brief-body"
+                              initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                              animate={{ opacity: 1, height: 'auto', marginTop: 8 }}
+                              exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                              transition={{ duration: 0.2 }}
+                              className="text-[12px] text-slate-300 leading-relaxed whitespace-pre-line overflow-hidden">
+                              {countryBrief}
+                            </motion.p>
+                          )}
+                        </AnimatePresence>
                       </GlassCard>
                     </motion.div>
                   )}
                 </AnimatePresence>
-              </div>
 
-              {/* Articles */}
-              <div className="px-5 pb-6 pt-2">
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="text-xs font-bold text-slate-400 tracking-wide">أحدث الأخبار</h4>
                   <span className="text-[10px] text-slate-600">{countryArticles.length} خبر</span>
@@ -636,7 +660,6 @@ export default function HomePage() {
                 <button key={i} onClick={() => openCountryPanel(c.name, c.count)}
                   className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-right transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
                   style={{ background: 'rgba(0,0,0,0.02)', border: '1px solid rgba(0,0,0,0.04)' }}>
-                  <span className="text-sm">{meta?.flag || '🌍'}</span>
                   <span className="text-xs font-semibold text-slate-700 truncate flex-1">{c.name}</span>
                   <span className="text-xs font-bold text-teal-600">{c.count}</span>
                 </button>

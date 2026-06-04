@@ -2641,7 +2641,8 @@ def get_articles():
         keyword = request.args.get('keyword')
         sentiment = request.args.get('sentiment')
         search = request.args.get('search')
-        
+        sort_by = (request.args.get('sortBy') or 'newest').strip().lower()
+
         # Pagination params (per_page=0 means return ALL — used by exports)
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 30, type=int)
@@ -2651,8 +2652,15 @@ def get_articles():
             per_page = max(1, min(per_page, 100))
         
         # SECURITY FIX: Force user filter to ensure isolation (even for admin)
-        query = scoped(db.query(Article), Article, force_user_filter=True).order_by(Article.created_at.desc())
-        
+        query = scoped(db.query(Article), Article, force_user_filter=True)
+
+        # Sort order — honour the frontend `sortBy` param (newest|oldest).
+        # Default is newest first.
+        if sort_by == 'oldest':
+            query = query.order_by(Article.created_at.asc())
+        else:
+            query = query.order_by(Article.created_at.desc())
+
         # Apply filters
         if country:
             query = query.filter(Article.country == country)
@@ -2664,9 +2672,13 @@ def get_articles():
             query = query.filter(Article.sentiment_label == sentiment)
         if search:
             search_term = f"%{search}%"
+            # Search across Arabic title/summary AND original-language fields,
+            # so users can find articles by their source-language text too.
             query = query.filter(
                 (Article.title_ar.like(search_term)) |
-                (Article.summary_ar.like(search_term))
+                (Article.summary_ar.like(search_term)) |
+                (Article.title_original.like(search_term)) |
+                (Article.summary_original.like(search_term))
             )
         
         # Get total count (lightweight — no data loaded)
@@ -4493,6 +4505,212 @@ def explain_sentiment_endpoint():
     except Exception as e:
         print(f"[AI] ❌ Sentiment explanation error: {e}")
         return jsonify({'error': str(e)}), 500
+
+
+# =============================================================================
+# عين AI — Live news analysis agent + Discovery panel
+# =============================================================================
+
+@app.route('/api/ain-ai/chat', methods=['POST'])
+@login_required
+def ain_ai_chat():
+    """
+    Stream the عين AI agent response as SSE.
+    Body: { "messages": [{"role": "user"|"assistant", "content": str}, ...] }
+    Stateless — client sends full history each call.
+    Streams events: tool_call, tool_result, delta, citations, done, error.
+    """
+    from ain_ai import run_agent
+
+    data = request.get_json(silent=True) or {}
+    messages = data.get('messages') or []
+    if not isinstance(messages, list):
+        return jsonify({'error': 'messages must be a list'}), 400
+
+    # Mode selector — 'personal' (corpus only) or 'web' (live news only).
+    # Defaults to 'web' for back-compat with older clients.
+    mode = (data.get('mode') or 'web').strip().lower()
+    if mode not in ('personal', 'web'):
+        mode = 'web'
+
+    user_id = current_user.id
+
+    def event_stream():
+        try:
+            for evt in run_agent(messages, user_id=user_id, mode=mode):
+                payload = json.dumps(evt, ensure_ascii=False)
+                yield f"data: {payload}\n\n"
+        except Exception as e:
+            print(f"[AIN-AI] ❌ stream exception: {e}")
+            err_payload = json.dumps(
+                {"type": "error", "message": "حدث خطأ غير متوقع. حاول مرة أخرى."},
+                ensure_ascii=False,
+            )
+            yield f"data: {err_payload}\n\n"
+
+    return Response(
+        event_stream(),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache, no-transform',
+            'X-Accel-Buffering': 'no',  # disable nginx/render buffering
+            'Connection': 'keep-alive',
+        },
+    )
+
+
+@app.route('/api/ain-ai/discover', methods=['GET'])
+@login_required
+def ain_ai_discover():
+    """Return cached trending topics. Lazily refreshes if stale (>4h)."""
+    from ain_ai_cache import get_discovery
+
+    language = (request.args.get('language') or 'ar').strip().lower()[:5]
+    force = request.args.get('force') in ('1', 'true', 'yes')
+    # Only admins may force a fresh build
+    if force and getattr(current_user, 'role', 'USER') != 'ADMIN':
+        force = False
+
+    try:
+        payload = get_discovery(language=language, force=force)
+        return jsonify({
+            'language': payload.get('language', language),
+            'topics': payload.get('topics') or [],
+            'generated_at_iso': payload.get('generated_at_iso'),
+            'source_article_count': payload.get('source_article_count', 0),
+            'fetch_error': payload.get('fetch_error'),
+            'cluster_error': payload.get('cluster_error'),
+        })
+    except Exception as e:
+        print(f"[AIN-AI] ❌ discover error: {e}")
+        return jsonify({'error': 'تعذّر جلب المواضيع الساخنة.'}), 500
+
+
+@app.route('/api/ain-ai/discover/refresh', methods=['POST'])
+@admin_required
+def ain_ai_discover_refresh():
+    """Admin-only: force a refresh of the discovery cache."""
+    from ain_ai_cache import refresh
+
+    data = request.get_json(silent=True) or {}
+    language = (data.get('language') or 'ar').strip().lower()[:5]
+    try:
+        payload = refresh(language=language)
+        return jsonify({
+            'language': payload.get('language', language),
+            'topics_count': len(payload.get('topics') or []),
+            'generated_at_iso': payload.get('generated_at_iso'),
+            'fetch_error': payload.get('fetch_error'),
+            'cluster_error': payload.get('cluster_error'),
+        })
+    except Exception as e:
+        print(f"[AIN-AI] ❌ refresh error: {e}")
+        return jsonify({'error': str(e)[:200]}), 500
+
+
+@app.route('/api/ain-ai/budget', methods=['GET'])
+@login_required
+def ain_ai_budget():
+    """Return the current user's daily عين AI budget snapshot."""
+    from ain_ai import get_budget_snapshot
+    try:
+        return jsonify(get_budget_snapshot(current_user.id))
+    except Exception as e:
+        print(f"[AIN-AI] ❌ budget error: {e}")
+        return jsonify({'error': 'budget unavailable'}), 500
+
+
+@app.route('/api/ain-ai/my-stats', methods=['GET'])
+@login_required
+def ain_ai_my_stats():
+    """Aggregate dashboard stats over the user's gathered articles.
+    Powers the 'خلاصتك بالأرقام' panel shown in personal mode.
+
+    Returns:
+        {
+            "total": int,
+            "count_24h": int,
+            "top_keywords":  [{"keyword": str, "count": int}, ...],
+            "top_sources":   [{"source": str,  "count": int}, ...],
+            "sentiment":     {"إيجابي": int, "سلبي": int, "محايد": int},
+        }
+    """
+    from sqlalchemy import func
+    from datetime import datetime, timedelta
+
+    db = get_db()
+    try:
+        uid = current_user.id
+        base = db.query(Article).filter(Article.user_id == uid)
+
+        total = base.count()
+
+        # last-24h count by created_at (when we ingested it — most useful signal)
+        since = datetime.utcnow() - timedelta(hours=24)
+        count_24h = base.filter(Article.created_at >= since).count()
+
+        # Top 5 keywords by frequency (prefer the new keyword_original column)
+        kw_rows = (
+            db.query(
+                Article.keyword_original.label('kw'),
+                func.count(Article.id).label('c'),
+            )
+            .filter(Article.user_id == uid)
+            .filter(Article.keyword_original.isnot(None))
+            .filter(Article.keyword_original != '')
+            .group_by(Article.keyword_original)
+            .order_by(func.count(Article.id).desc())
+            .limit(5)
+            .all()
+        )
+        top_keywords = [{'keyword': r.kw, 'count': int(r.c)} for r in kw_rows]
+
+        # Top 5 sources by frequency
+        src_rows = (
+            db.query(
+                Article.source_name.label('src'),
+                func.count(Article.id).label('c'),
+            )
+            .filter(Article.user_id == uid)
+            .filter(Article.source_name.isnot(None))
+            .filter(Article.source_name != '')
+            .group_by(Article.source_name)
+            .order_by(func.count(Article.id).desc())
+            .limit(5)
+            .all()
+        )
+        top_sources = [{'source': r.src, 'count': int(r.c)} for r in src_rows]
+
+        # Sentiment breakdown (NEW field preferred, fallback to legacy)
+        sent_rows = (
+            db.query(
+                Article.sentiment_label.label('s'),
+                func.count(Article.id).label('c'),
+            )
+            .filter(Article.user_id == uid)
+            .filter(Article.sentiment_label.isnot(None))
+            .filter(Article.sentiment_label != '')
+            .group_by(Article.sentiment_label)
+            .all()
+        )
+        sentiment = {'إيجابي': 0, 'سلبي': 0, 'محايد': 0}
+        for r in sent_rows:
+            label = (r.s or '').strip()
+            if label in sentiment:
+                sentiment[label] = int(r.c)
+
+        return jsonify({
+            'total': int(total),
+            'count_24h': int(count_24h),
+            'top_keywords': top_keywords,
+            'top_sources': top_sources,
+            'sentiment': sentiment,
+        })
+    except Exception as e:
+        print(f"[AIN-AI] ❌ my-stats error: {e}")
+        return jsonify({'error': 'تعذّر جلب إحصائيات بياناتك.'}), 500
+    finally:
+        db.close()
 
 
 # =============================================================================

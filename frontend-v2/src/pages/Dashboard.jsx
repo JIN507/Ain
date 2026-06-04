@@ -136,19 +136,19 @@ export default function Dashboard({ initialKeywordFilter, onFilterApplied }) {
     }
   }, [keywordsLoaded, keywords.length])
 
-  // Poll monitor status every 30 seconds (only if keywords exist)
+  // Poll monitor status every 30 seconds (only if keywords exist).
+  // NOTE: We intentionally do NOT auto-reload articles/stats here, because
+  // it interrupts the user mid-filter (resets pagination, scroll, results).
+  // The user picks up new articles naturally when they change a filter,
+  // paginate, or click manual refresh. Only the monitor-running indicator
+  // is kept live.
   useEffect(() => {
     // Wait until keywords are loaded, then check if any exist
     if (!keywordsLoaded) return
     if (keywords.length === 0) return // Don't poll if no keywords
-    
+
     const interval = setInterval(() => {
       loadMonitorStatus()
-      // If monitoring is executing, also refresh articles/stats
-      if (monitorStatus?.executing) {
-        loadArticles()
-        loadStats()
-      }
     }, 30000)
     return () => clearInterval(interval)
   }, [keywordsLoaded, keywords.length, monitorStatus?.executing])

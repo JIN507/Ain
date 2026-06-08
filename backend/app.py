@@ -2098,6 +2098,12 @@ def copy_articles_from_shared_keyword(db, keyword_ar: str, target_user_id: int) 
             sentiment_score=article.sentiment_score,
             published_at=article.published_at,
             fetched_at=article.fetched_at,
+            # HOTFIX: preserve the source article's original insert date.
+            # Without this, created_at defaults to utcnow() and every copied
+            # historical article is counted as "today" by the home heatmap
+            # (/api/home/map-timeline groups by created_at), inflating the
+            # daily numbers. Inheriting created_at keeps the timeline correct.
+            created_at=article.created_at,
             user_id=target_user_id  # Assign to new user
         )
         db.add(new_article)

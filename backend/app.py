@@ -1263,28 +1263,40 @@ def _build_map_cache():
     try:
         from sqlalchemy import func, or_, desc, case, text as sa_text
 
+        # ── Effective date: the article's OWN publish date, falling back to
+        # the ingest date only when published_at is missing. This makes the
+        # home dashboard reflect "today's NEWS" (by the article's date) instead
+        # of "articles cached today". Previously old articles that were merely
+        # fetched or copied today (created_at = now) inflated the numbers even
+        # though the news itself was weeks old.
+        eff_date = func.coalesce(Article.published_at, Article.created_at)
+
         # ── 0. Effective day boundary ────────────────────────────────────
         today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-        has_today = db.query(Article.id).filter(Article.created_at >= today_start).first() is not None
+        today_end = today_start + timedelta(days=1)
+        has_today = db.query(Article.id).filter(
+            eff_date >= today_start, eff_date < today_end
+        ).first() is not None
 
         if has_today:
             start_ts = today_start
         else:
-            # Fall back to the most recent UTC day within the last 7 days
+            # Fall back to the most recent day (by article date) within 7 days
             seven_days_ago = today_start - timedelta(days=7)
-            most_recent = db.query(func.max(Article.created_at)).filter(
-                Article.created_at >= seven_days_ago
+            most_recent = db.query(func.max(eff_date)).filter(
+                eff_date >= seven_days_ago, eff_date < today_end
             ).scalar()
             if most_recent:
                 start_ts = most_recent.replace(hour=0, minute=0, second=0, microsecond=0)
             else:
                 start_ts = today_start  # No data in 7 days — result will be empty
+        day_end = start_ts + timedelta(days=1)
 
-        # ── 1. Dedup base: one row per unique URL (effective day onwards) ─
+        # ── 1. Dedup base: one row per unique URL (effective day only) ─
         dedup_sub = db.query(
             func.min(Article.id).label('id')
         ).filter(
-            Article.created_at >= start_ts
+            eff_date >= start_ts, eff_date < day_end
         ).group_by(Article.url).subquery()
 
         # ── 2. Total + sentiment counts in ONE query ────────────────────
@@ -1307,7 +1319,7 @@ def _build_map_cache():
         ).filter(
             Article.country.isnot(None), Article.country != '',
             Article.country != 'دولي',
-            Article.created_at >= start_ts
+            eff_date >= start_ts, eff_date < day_end
         ).group_by(Article.country).order_by(desc('cnt')).all()
         # Merge variant spellings into canonical names (e.g. الامارات → الإمارات).
         _country_totals = {}
@@ -1324,14 +1336,14 @@ def _build_map_cache():
             Article.keyword_original, func.count(func.distinct(Article.url)).label('cnt')
         ).filter(
             Article.keyword_original.isnot(None), Article.keyword_original != '',
-            Article.created_at >= start_ts
+            eff_date >= start_ts, eff_date < day_end
         ).group_by(Article.keyword_original).order_by(desc('cnt')).limit(15).all()
         top_keywords = [{'keyword': k, 'count': n} for k, n in kw_q]
 
         # ── 5. Unique countries + active users (today only) ──────────
         unique_countries = len(countries_data)
         active_users = db.query(Article.user_id).filter(
-            Article.created_at >= start_ts
+            eff_date >= start_ts, eff_date < day_end
         ).distinct().count()
 
         # ── 6. Top sources (distinct URLs, today only) ───────────────
@@ -1339,7 +1351,7 @@ def _build_map_cache():
             Article.source_name, func.count(func.distinct(Article.url)).label('cnt')
         ).filter(
             Article.source_name.isnot(None), Article.source_name != '',
-            Article.created_at >= start_ts
+            eff_date >= start_ts, eff_date < day_end
         ).group_by(Article.source_name).order_by(desc('cnt')).limit(10).all()
         top_sources = [{'name': s, 'count': n} for s, n in src_q]
 
@@ -1351,7 +1363,7 @@ def _build_map_cache():
         ).filter(
             Article.country.isnot(None), Article.country != '',
             Article.country != 'دولي',
-            Article.created_at >= start_ts
+            eff_date >= start_ts, eff_date < day_end
         ).group_by(Article.url, Article.country).subquery()
 
         ranked = db.query(
@@ -1359,7 +1371,7 @@ def _build_map_cache():
             newest_per_url.c.country.label('c_name'),
         ).join(
             newest_per_url, Article.id == newest_per_url.c.id
-        ).order_by(newest_per_url.c.country, Article.created_at.desc()).all()
+        ).order_by(newest_per_url.c.country, eff_date.desc()).all()
 
         # Group in Python — fast since data is already fetched.
         # Use canonical country name so panel matches heatmap label.
@@ -1466,12 +1478,17 @@ def home_map_timeline():
     db = get_db()
     try:
         cutoff = datetime.utcnow() - timedelta(days=days)
+        # Bucket by the article's OWN publish date (fallback to ingest date when
+        # missing), so the timeline reflects when the news happened rather than
+        # when it was cached/copied. Future-dated rows are dropped below since
+        # they fall outside the [start..today] day_idx range.
+        eff_date = func.coalesce(Article.published_at, Article.created_at)
         rows = db.query(
-            cast(Article.created_at, SADate).label('day'),
+            cast(eff_date, SADate).label('day'),
             Article.country,
             func.count(func.distinct(Article.url)).label('cnt'),
         ).filter(
-            Article.created_at >= cutoff,
+            eff_date >= cutoff,
             Article.country.isnot(None),
             Article.country != '',
         ).group_by('day', Article.country).all()
